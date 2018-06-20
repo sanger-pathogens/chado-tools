@@ -4,11 +4,11 @@ import sys
 import pkg_resources
 
 availableCommands = {
-    'create'    : 'Create a new instance of the CHADO schema',
-    'connect'   : 'Connect to a CHADO database',
-    'dump'      : 'Dump a PostgreSQL instance of the database',
-    'help'      : 'Display this message',
-    'version'   : 'Display the version of the software'
+    'create'        : 'Create a new instance of the CHADO schema',
+    'connect'       : 'Connect to a CHADO database',
+    'dump'          : 'Dump a PostgreSQL instance of the database',
+    '-h, --help'    : 'Display this message',
+    '-v, --version' : 'Display the version of the software'
 }
 
 
@@ -37,5 +37,5 @@ def main():
         if command in availableCommands:
             print("\nRunning the following command:", command)
         else:
-            print('\nCommand "' + command + '" not recognised.', file=sys.stderr)
+            print('\nUnrecognized option/command "' + command + '".', file=sys.stderr)
             print_usage_and_exit()

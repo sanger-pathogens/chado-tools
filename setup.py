@@ -1,4 +1,3 @@
-import glob
 import setuptools
 
 with open("README.md", "r") as readmeFile:
@@ -14,10 +13,13 @@ setuptools.setup(
     author_email="path-help@sanger.ac.uk",
     description="Tools to access CHADO databases",
     long_description=longDescription,
-    long_description_content_type="text/markdown",
     url="https://github.com/puethe/chado-tools/",
-    packages = setuptools.find_packages(),
-    scripts=['scripts/chado-tools'],
+    packages=setuptools.find_packages(),
+    entry_points={
+        'console_scripts': [
+            'chado-tools = scripts.chado_tools:main',
+        ],
+    },
     test_suite="nose.collector",
     tests_require=["nose >= 1.3"],
     license="GPLv3",

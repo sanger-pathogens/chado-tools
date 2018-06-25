@@ -4,17 +4,17 @@ import sys
 import pkg_resources
 
 availableCommands = {
-    'create'        : 'Create a new instance of the CHADO schema',
-    'connect'       : 'Connect to a CHADO database',
-    'dump'          : 'Dump a PostgreSQL instance of the database',
-    '-h, --help'    : 'Display this message',
-    '-v, --version' : 'Display the version of the software'
+    'create'        : 'create a new instance of the CHADO schema',
+    'connect'       : 'connect to a CHADO database',
+    'dump'          : 'dump a PostgreSQL instance of the database',
+    '-h, --help'    : 'show this help message and exit',
+    '-v, --version' : 'show the version of the software'
 }
 
 
 def print_usage_and_exit():
     """Prints an info message to the user describing how to run the program"""
-    print('\nUsage: chado-tools <command> [options]\n', file=sys.stderr)
+    print('\nusage: chado-tools <command> [options]\n', file=sys.stderr)
     print('Available commands:\n', file=sys.stderr)
     maxStringLength = max([len(cmd) for cmd in list(availableCommands.keys())])
     for command, description in availableCommands.items():
@@ -35,7 +35,8 @@ def main():
         # Call function depending on entered command
         command = sys.argv[1]
         if command in availableCommands:
-            print("\nRunning the following command:", command)
+            exec('import pychado.runners.' + command)
+            exec('pychado.runners.' + command + '.run("' + availableCommands[command] + '")')
         else:
             print('\nUnrecognized option/command "' + command + '".', file=sys.stderr)
             print_usage_and_exit()

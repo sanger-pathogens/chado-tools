@@ -8,7 +8,8 @@ from pychado import tasks
 def run(description):
     """Create a new CHADO database"""
     defaultConfigFile = pkg_resources.resource_filename("pychado", "data/exampleDB.yml")
-    defaultSchemaFile = pkg_resources.resource_filename("pychado", "data/gmod_schema.sql")
+    defaultSchemaFile = "https://raw.githubusercontent.com/GMOD/Chado/master/chado/schemas/1.31/default_schema.sql"
+
     parser = argparse.ArgumentParser(
         description=description,
         prog=(os.path.basename(sys.argv[0]) + " " + sys.argv[1]))

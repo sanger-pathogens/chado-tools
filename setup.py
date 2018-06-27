@@ -15,7 +15,7 @@ setuptools.setup(
     long_description=longDescription,
     url="https://github.com/puethe/chado-tools/",
     packages=setuptools.find_packages(),
-    package_data={"pychado": ["data/*.yml", "data/*.sql"]},
+    package_data={"pychado": ["data/*.yml"]},
     entry_points={
         "console_scripts": [
             "chado = scripts.chado_tools:main",

@@ -1,5 +1,6 @@
 import subprocess
 import psycopg2
+import urllib.request, urllib.error
 from pychado import utils
 
 
@@ -66,15 +67,19 @@ def create(configurationFile: str, schemaFile: str, dbname: str) -> None:
     conn.close()
     print("Database has been created.")
 
-    # Read the schema from file
-    f = utils.open_file_read(schemaFile)
-    schema = f.read()
-    utils.close(f)
+    # Download schema if not saved locally
+    localSchemaFile = schemaFile
+    if schemaFile.startswith("http"):
+        print("Downloading database schema...")
+        try:
+            localSchemaFile, headers = urllib.request.urlretrieve(schemaFile)
+        except urllib.error.HTTPError:
+            raise Exception("HTTP Error 404: The address '" + schemaFile + "' does not exist.")
 
     # Set up the database with the provided schema
     connectionDetails["database"] = dbname
     connectionURI = generate_uri(connectionDetails)
-    command = ["psql", "-q", "-f", schemaFile, connectionURI]
+    command = ["psql", "-q", "-f", localSchemaFile, connectionURI]
     subprocess.run(command)
     print("Database schema has been set up.")
 

@@ -15,9 +15,10 @@ setuptools.setup(
     long_description=longDescription,
     url="https://github.com/puethe/chado-tools/",
     packages=setuptools.find_packages(),
+    package_data={"pychado": ["data/*.yml", "data/*.sql"]},
     entry_points={
-        'console_scripts': [
-            'chado-tools = scripts.chado_tools:main',
+        "console_scripts": [
+            "chado = scripts.chado_tools:main",
         ],
     },
     test_suite="nose.collector",
@@ -28,6 +29,6 @@ setuptools.setup(
         "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
         "Operating System :: OS Independent",
         "Topic :: Scientific/Engineering :: Bio-Informatics",
-        "Development Status :: 1 - Planning",
-    ],
+        "Development Status :: 1 - Planning"
+    ]
 )

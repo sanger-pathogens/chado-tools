@@ -1,28 +1,22 @@
 import sys
 import os
 import argparse
-import pkg_resources
 from pychado import tasks
 
 
 def run(description):
     """Create a new CHADO database"""
-    defaultConfigFile = pkg_resources.resource_filename("pychado", "data/exampleDB.yml")
-    defaultSchemaFile = "https://raw.githubusercontent.com/GMOD/Chado/master/chado/schemas/1.31/default_schema.sql"
-
     parser = argparse.ArgumentParser(
         description=description,
         prog=(os.path.basename(sys.argv[0]) + " " + sys.argv[1]))
     parser.add_argument(
         "-c", "--config",
         dest="config",
-        help="YAML file containing connection details (for an existing database)",
-        default=defaultConfigFile)
+        help="YAML file containing connection details (for an existing database)")
     parser.add_argument(
         "-s", "--schema",
         dest="schema",
-        help="Database schema (default: most recent GMOD schema)",
-        default=defaultSchemaFile)
+        help="File with database schema (default: GMOD schema 1.31)")
     parser.add_argument("dbname", help="name of the database to be created")
     arguments = parser.parse_args(sys.argv[2:])
     tasks.create(arguments.config, arguments.schema, arguments.dbname)

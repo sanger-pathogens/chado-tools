@@ -1,3 +1,4 @@
+import pkg_resources
 import subprocess
 import psycopg2
 import urllib.request, urllib.error
@@ -37,11 +38,20 @@ def generate_dsn(connectionDetails: dict) -> str:
     return "".join(dsnAsList).strip()
 
 
+def getSchemaUrl() -> str:
+    """Obtains the URL for a database schema from parsing a YAML file"""
+    yamlFile = pkg_resources.resource_filename("pychado", "data/gmodSchema.yml")
+    defaultSchema = utils.parse_yaml(yamlFile)
+    return defaultSchema["url"].replace("<VERSION>", defaultSchema["version"])
+
+
 def connect(configurationFile: str) -> None:
     """Connects to a CHADO database and brings back a command line prompt"""
 
     # Create a URI based on connection parameters from a configuration file
-    connectionDetails = utils.parseYaml(configurationFile)
+    if not configurationFile:
+        configurationFile = pkg_resources.resource_filename("pychado", "data/exampleDB.yml")
+    connectionDetails = utils.parse_yaml(configurationFile)
     connectionURI = generate_uri(connectionDetails)
 
     # Establish a connection to an SQL server by running a subprocess
@@ -55,31 +65,33 @@ def create(configurationFile: str, schemaFile: str, dbname: str) -> None:
     """Creates a new instance of the CHADO schema"""
 
     # Create a DSN based on connection parameters from a configuration file
-    connectionDetails = utils.parseYaml(configurationFile)
+    if not configurationFile:
+        configurationFile = pkg_resources.resource_filename("pychado", "data/exampleDB.yml")
+    connectionDetails = utils.parse_yaml(configurationFile)
     dsn = generate_dsn(connectionDetails)
 
     # Create a new database and set it up with the provided schema
     conn = psycopg2.connect(dsn)
     conn.autocommit = True
     cur = conn.cursor()
-    cur.execute("CREATE DATABASE " + dbname + ";")
+    cur.execute("CREATE DATABASE " + dbname)
     cur.close()
     conn.close()
     print("Database has been created.")
 
     # Download schema if not saved locally
-    localSchemaFile = schemaFile
-    if schemaFile.startswith("http"):
+    if not schemaFile:
         print("Downloading database schema...")
+        url = getSchemaUrl()
         try:
-            localSchemaFile, headers = urllib.request.urlretrieve(schemaFile)
+            schemaFile, headers = urllib.request.urlretrieve(url)
         except urllib.error.HTTPError:
-            raise Exception("HTTP Error 404: The address '" + schemaFile + "' does not exist.")
+            raise Exception("HTTP Error 404: The address '" + url + "' does not exist.")
 
     # Set up the database with the provided schema
     connectionDetails["database"] = dbname
     connectionURI = generate_uri(connectionDetails)
-    command = ["psql", "-q", "-f", localSchemaFile, connectionURI]
+    command = ["psql", "-q", "-f", schemaFile, connectionURI]
     subprocess.run(command)
     print("Database schema has been set up.")
 
@@ -88,7 +100,9 @@ def dump(configurationFile: str, dumpFile: str) -> None:
     """Dump a PostgreSQL instance of the CHADO schema"""
 
     # Create a URI based on connection parameters from a configuration file
-    connectionDetails = utils.parseYaml(configurationFile)
+    if not configurationFile:
+        configurationFile = pkg_resources.resource_filename("pychado", "data/exampleDB.yml")
+    connectionDetails = utils.parse_yaml(configurationFile)
     connectionURI = generate_uri(connectionDetails)
 
     # Dump the database scheme by running a subprocess

@@ -21,8 +21,11 @@ setuptools.setup(
             "chado = scripts.chado_tools:main",
         ],
     },
-    test_suite="nose.collector",
-    tests_require=["nose >= 1.3"],
+    test_suite="pychado/tests",
+    install_requires=[
+        'psycopg2',
+        'ruamel.yaml'
+    ],
     license="GPLv3",
     classifiers=[
         "Programming Language :: Python :: 3 :: Only",

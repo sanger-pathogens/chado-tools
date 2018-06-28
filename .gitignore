@@ -1,5 +1,7 @@
 .idea
+.eggs
 build
 dist
-pychado.egg-info
-scripts/__pycache__
+*.egg-info
+*/__pycache__
+*/*/__pycache__

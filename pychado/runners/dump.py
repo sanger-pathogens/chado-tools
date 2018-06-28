@@ -1,21 +1,18 @@
 import sys
 import os
 import argparse
-import pkg_resources
 from pychado import tasks
 
 
 def run(description):
     """Dump the schema of a CHADO database"""
-    defaultConfigFile = pkg_resources.resource_filename("pychado", "data/exampleDB.yml")
     parser = argparse.ArgumentParser(
         description=description,
         prog=(os.path.basename(sys.argv[0]) + " " + sys.argv[1]))
     parser.add_argument(
         "-c", "--config",
         dest="config",
-        help="YAML file containing connection details",
-        default=defaultConfigFile)
+        help="YAML file containing connection details")
     parser.add_argument(
         "-o", "--output",
         dest="output",

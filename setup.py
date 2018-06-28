@@ -21,7 +21,7 @@ setuptools.setup(
             "chado = scripts.chado_tools:main",
         ],
     },
-    test_suite="pychado/tests",
+    test_suite="pychado.tests",
     install_requires=[
         'psycopg2',
         'ruamel.yaml'

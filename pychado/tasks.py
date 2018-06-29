@@ -38,11 +38,69 @@ def generate_dsn(connectionDetails: dict) -> str:
     return "".join(dsnAsList).strip()
 
 
-def getSchemaUrl() -> str:
+def get_schema_url() -> str:
     """Obtains the URL for a database schema from parsing a YAML file"""
     yamlFile = pkg_resources.resource_filename("pychado", "data/gmodSchema.yml")
     defaultSchema = utils.parse_yaml(yamlFile)
     return defaultSchema["url"].replace("<VERSION>", defaultSchema["version"])
+
+
+def download_schema() -> str:
+    """Downloads a file with a database schema"""
+    print("Downloading database schema...")
+    url = get_schema_url()
+    try:
+        schemaFile, headers = urllib.request.urlretrieve(url)
+        return schemaFile
+    except urllib.error.HTTPError:
+        raise Exception("HTTP Error 404: The address '" + url + "' does not exist.")
+
+
+def exists(dsn: str, dbname: str) -> bool:
+    """Checks if a PostgreSQL database exists"""
+    conn = psycopg2.connect(dsn)
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) FROM pg_catalog.pg_database WHERE datname = '" + dbname + "'")
+    res = cur.fetchone()
+    cur.close()
+    conn.close()
+    return bool(res[0])
+
+
+def create_database(dsn: str, dbname: str) -> None:
+    """Creates a PostgreSQL database"""
+
+    # Check if the database already exists
+    if exists(dsn, dbname):
+        # Database exists - return without further action
+        print("Database already exists.")
+    else:
+        # Database doesn't exist - create it
+        conn = psycopg2.connect(dsn)
+        conn.autocommit = True
+        cur = conn.cursor()
+        cur.execute("CREATE DATABASE " + dbname)
+        cur.close()
+        conn.close()
+        print("Database has been created.")
+
+
+def drop_database(dsn: str, dbname: str) -> None:
+    """Deletes a PostgreSQL database"""
+
+    # Check if the database exists at all
+    if not exists(dsn, dbname):
+        # Database doesn't exist - return without further action
+        print("Database does not exist.")
+    else:
+        # Database exists - delete it
+        conn = psycopg2.connect(dsn)
+        conn.autocommit = True
+        cur = conn.cursor()
+        cur.execute("DROP DATABASE " + dbname)
+        cur.close()
+        conn.close()
+        print("Database has been deleted.")
 
 
 def connect(configurationFile: str, dbname: str) -> None:
@@ -52,42 +110,37 @@ def connect(configurationFile: str, dbname: str) -> None:
     if not configurationFile:
         configurationFile = pkg_resources.resource_filename("pychado", "data/exampleDB.yml")
     connectionDetails = utils.parse_yaml(configurationFile)
-    connectionDetails["database"] = dbname
-    connectionURI = generate_uri(connectionDetails)
+    connectionDSN = generate_dsn(connectionDetails)
 
-    # Establish a connection to an SQL server by running a subprocess
-    print("Establishing connection to database...")
-    command = ["psql", connectionURI]
-    subprocess.run(command)
-    print("Connection to database closed.")
+    # Check if the database exists
+    if exists(connectionDSN, dbname):
+        # Establish a connection to an SQL server by running a subprocess
+        print("Establishing connection to database...")
+        connectionDetails["database"] = dbname
+        connectionURI = generate_uri(connectionDetails)
+        command = ["psql", connectionURI]
+        subprocess.run(command)
+        print("Connection to database closed.")
+    else:
+        # Database doesn't exist - return without further action
+        print("Database does not exist.")
 
 
 def create(configurationFile: str, schemaFile: str, dbname: str) -> None:
-    """Creates a new PostgreSQL database"""
+    """Creates a new PostgreSQL database and sets it up according to a schema"""
 
-    # Create a DSN based on connection parameters from a configuration file
+    # Create DSN based on connection parameters from a configuration file
     if not configurationFile:
         configurationFile = pkg_resources.resource_filename("pychado", "data/exampleDB.yml")
     connectionDetails = utils.parse_yaml(configurationFile)
-    dsn = generate_dsn(connectionDetails)
+    connectionDSN = generate_dsn(connectionDetails)
 
-    # Create a new database
-    conn = psycopg2.connect(dsn)
-    conn.autocommit = True
-    cur = conn.cursor()
-    cur.execute("CREATE DATABASE " + dbname)
-    cur.close()
-    conn.close()
-    print("Database has been created.")
+    # Create the database
+    create_database(connectionDSN, dbname)
 
     # Download schema if not saved locally
     if not schemaFile:
-        print("Downloading database schema...")
-        url = getSchemaUrl()
-        try:
-            schemaFile, headers = urllib.request.urlretrieve(url)
-        except urllib.error.HTTPError:
-            raise Exception("HTTP Error 404: The address '" + url + "' does not exist.")
+        schemaFile = download_schema()
 
     # Set up the database with the provided schema
     connectionDetails["database"] = dbname
@@ -100,29 +153,40 @@ def create(configurationFile: str, schemaFile: str, dbname: str) -> None:
 def dump(configurationFile: str, dbname: str, archive: str) -> None:
     """Dumps a PostgreSQL database into an archive file"""
 
-    # Create a URI based on connection parameters from a configuration file
+    # Create a DSN based on connection parameters from a configuration file
     if not configurationFile:
         configurationFile = pkg_resources.resource_filename("pychado", "data/exampleDB.yml")
     connectionDetails = utils.parse_yaml(configurationFile)
-    connectionDetails["database"] = dbname
-    connectionURI = generate_uri(connectionDetails)
+    connectionDSN = generate_dsn(connectionDetails)
 
-    # Dump the database by running a subprocess
-    command = ["pg_dump", "-f", archive, "--format=custom", connectionURI]
-    subprocess.run(command)
-    print("Database has been dumped.")
+    # Check if the database exists
+    if exists(connectionDSN, dbname):
+        # Dump the database by running a subprocess
+        connectionDetails["database"] = dbname
+        connectionURI = generate_uri(connectionDetails)
+        command = ["pg_dump", "-f", archive, "--format=custom", connectionURI]
+        subprocess.run(command)
+        print("Database has been dumped.")
+    else:
+        # Database doesn't exist - return without further action
+        print("Database does not exist.")
 
 
-def restore(configurationFile: str, archive: str) -> None:
+def restore(configurationFile: str, dbname: str, archive: str) -> None:
     """Restores a PostgreSQL database from an archive file"""
 
-    # Create a URI based on connection parameters from a configuration file
+    # Create DSN based on connection parameters from a configuration file
     if not configurationFile:
         configurationFile = pkg_resources.resource_filename("pychado", "data/exampleDB.yml")
     connectionDetails = utils.parse_yaml(configurationFile)
-    connectionURI = generate_uri(connectionDetails)
+    connectionDSN = generate_dsn(connectionDetails)
 
-    # Restore the database by running a subprocess
-    command = ["pg_restore", "--create", "--clean", "--format=custom", "-d", connectionURI, archive]
+    # Create a database with the provided name
+    create_database(connectionDSN, dbname)
+
+    # Restore into the created database by running a subprocess
+    connectionDetails["database"] = dbname
+    connectionURI = generate_uri(connectionDetails)
+    command = ["pg_restore", "--clean", "--if-exists", "--format=custom", "-d", connectionURI, archive]
     subprocess.run(command)
     print("Database has been restored.")

@@ -13,6 +13,7 @@ def run(description):
         "-c", "--config",
         dest="config",
         help="YAML file containing connection details")
+    parser.add_argument("dbname", help="name of the database")
     parser.add_argument("archive", help="name of the archive file")
     arguments = parser.parse_args(sys.argv[2:])
-    tasks.restore(arguments.config, arguments.archive)
+    tasks.restore(arguments.config, arguments.dbname, arguments.archive)

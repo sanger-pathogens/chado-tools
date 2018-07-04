@@ -8,7 +8,7 @@ programName = os.path.basename(sys.argv[0])
 
 availableCommands = {
     "create"        : "create a new instance of the CHADO schema",
-    "connect"       : "connect to a CHADO database",
+    "connect"       : "connect to a CHADO database for an interactive session",
     "dump"          : "dump a CHADO database into an archive file",
     "restore"       : "restore a CHADO database from an archive file"
 }

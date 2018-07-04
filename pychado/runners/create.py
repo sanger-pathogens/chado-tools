@@ -12,7 +12,7 @@ def run(description):
     parser.add_argument(
         "-c", "--config",
         dest="config",
-        help="YAML file containing connection details (for an existing database)")
+        help="YAML file containing connection details")
     parser.add_argument(
         "-s", "--schema",
         dest="schema",

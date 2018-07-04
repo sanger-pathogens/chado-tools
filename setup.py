@@ -22,10 +22,12 @@ setuptools.setup(
         ],
     },
     test_suite="nose.collector",
-    tests_require=["nose >= 1.3"],
+    tests_require=[
+        "nose >= 1.3"
+    ],
     install_requires=[
         'psycopg2-binary',
-        'ruamel.yaml'
+        'pyyaml'
     ],
     license="GPLv3",
     classifiers=[

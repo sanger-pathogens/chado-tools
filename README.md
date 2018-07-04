@@ -33,7 +33,7 @@ The usage is:
 
 * To list the available commands and brief descriptions, just run `chado -h` or `chado --help`.
 * To display the version of the program, type `chado -v` or `chado --version`.
-* Use `chado command -h` or `chado command --help` to get a detailed description and the usage of that command.
+* Use `chado <command> -h` or `chado <command> --help` to get a detailed description and the usage of that command.
 
 ## Available commands
 

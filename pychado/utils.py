@@ -1,7 +1,7 @@
 import sys
 import os
 import subprocess
-import ruamel.yaml
+import yaml
 
 
 def open_file_read(filename: str):
@@ -50,7 +50,7 @@ def close(file):
 def parse_yaml(filename: str) -> dict:
     """Function parsing a YAML file"""
     stream = open_file_read(filename)
-    data = dict(ruamel.yaml.load(stream, Loader=ruamel.yaml.Loader))
+    data = dict(yaml.load(stream))
     for key, value in data.items():
         if value is not None:
             data[key] = str(value).strip()
@@ -61,5 +61,5 @@ def parse_yaml(filename: str) -> dict:
 def dump_yaml(filename: str, data: dict) -> None:
     """Function dumping data into a YAML file"""
     stream = open_file_write(filename)
-    ruamel.yaml.dump(data, stream, Dumper=ruamel.yaml.Dumper)
+    yaml.dump(data, stream)
     close(stream)

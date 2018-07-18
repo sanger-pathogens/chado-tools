@@ -1,67 +1,95 @@
 from pychado import dbutils
 
 
-def connect(configurationFile: str, dbname: str) -> None:
+def connect(configuration_file: str, dbname: str) -> None:
     """Connects to a PostgreSQL database for an interactive session"""
-    connectionDetails = dbutils.read_configuration_file(configurationFile)
-    connectionDSN = dbutils.generate_dsn(connectionDetails)
-    if not dbutils.exists(connectionDSN, dbname):
+    connection_details = dbutils.read_configuration_file(configuration_file)
+    connection_dsn = dbutils.generate_dsn(connection_details)
+    if not dbutils.exists(connection_dsn, dbname):
         # Database doesn't exist - return without further action
         print("Database does not exist.")
     else:
         # Establish a connection to an SQL server by running a subprocess
-        connectionDetails["database"] = dbname
-        connectionURI = dbutils.generate_uri(connectionDetails)
-        dbutils.connect_to_database(connectionURI)
+        connection_details["database"] = dbname
+        connection_uri = dbutils.generate_uri(connection_details)
+        dbutils.connect_to_database(connection_uri)
 
 
-def create(configurationFile: str, schemaFile: str, dbname: str) -> None:
+def create(configuration_file: str, schema_file: str, dbname: str) -> None:
     """Creates a new PostgreSQL database and sets it up according to a schema"""
     # Create database
-    connectionDetails = dbutils.read_configuration_file(configurationFile)
-    connectionDSN = dbutils.generate_dsn(connectionDetails)
-    if dbutils.exists(connectionDSN, dbname):
+    connection_details = dbutils.read_configuration_file(configuration_file)
+    connection_dsn = dbutils.generate_dsn(connection_details)
+    if dbutils.exists(connection_dsn, dbname):
         # Database already exists - return without further action
         print("Database already exists.")
     else:
         # Database doesn't exist - create it
-        dbutils.create_database(connectionDSN, dbname)
+        dbutils.create_database(connection_dsn, dbname)
 
     # Setup database
-    if not schemaFile:
-        schemaFile = dbutils.download_schema(dbutils.default_schema_url())
-    connectionDetails["database"] = dbname
-    connectionURI = dbutils.generate_uri(connectionDetails)
-    dbutils.setup_database(connectionURI, schemaFile)
+    if not schema_file:
+        schema_file = dbutils.download_schema(dbutils.default_schema_url())
+    connection_details["database"] = dbname
+    connection_uri = dbutils.generate_uri(connection_details)
+    dbutils.setup_database(connection_uri, schema_file)
 
 
-def dump(configurationFile: str, dbname: str, archive: str) -> None:
+def dump(configuration_file: str, dbname: str, archive: str) -> None:
     """Dumps a PostgreSQL database into an archive file"""
-    connectionDetails = dbutils.read_configuration_file(configurationFile)
-    connectionDSN = dbutils.generate_dsn(connectionDetails)
-    if not dbutils.exists(connectionDSN, dbname):
+    connection_details = dbutils.read_configuration_file(configuration_file)
+    connection_dsn = dbutils.generate_dsn(connection_details)
+    if not dbutils.exists(connection_dsn, dbname):
         # Database doesn't exist - return without further action
         print("Database does not exist.")
     else:
         # Dump the database by running a subprocess
-        connectionDetails["database"] = dbname
-        connectionURI = dbutils.generate_uri(connectionDetails)
-        dbutils.dump_database(connectionURI, archive)
+        connection_details["database"] = dbname
+        connection_uri = dbutils.generate_uri(connection_details)
+        dbutils.dump_database(connection_uri, archive)
 
 
-def restore(configurationFile: str, dbname: str, archive: str) -> None:
+def restore(configuration_file: str, dbname: str, archive: str) -> None:
     """Restores a PostgreSQL database from an archive file"""
     # Create database
-    connectionDetails = dbutils.read_configuration_file(configurationFile)
-    connectionDSN = dbutils.generate_dsn(connectionDetails)
-    if dbutils.exists(connectionDSN, dbname):
+    connection_details = dbutils.read_configuration_file(configuration_file)
+    connection_dsn = dbutils.generate_dsn(connection_details)
+    if dbutils.exists(connection_dsn, dbname):
         # Database already exists - return without further action
         print("Database already exists.")
     else:
         # Database doesn't exist - create it
-        dbutils.create_database(connectionDSN, dbname)
+        dbutils.create_database(connection_dsn, dbname)
 
     # Restore database
-    connectionDetails["database"] = dbname
-    connectionURI = dbutils.generate_uri(connectionDetails)
-    dbutils.restore_database(connectionURI, archive)
+    connection_details["database"] = dbname
+    connection_uri = dbutils.generate_uri(connection_details)
+    dbutils.restore_database(connection_uri, archive)
+
+
+def importer(configuration_file: str, dbname: str, table: str, filename: str, delimiter: str) -> None:
+    """Imports data from a text file into a table of a CHADO database"""
+    connection_details = dbutils.read_configuration_file(configuration_file)
+    connection_dsn = dbutils.generate_dsn(connection_details)
+    if not dbutils.exists(connection_dsn, dbname):
+        # Database doesn't exist - return without further action
+        print("Database does not exist.")
+    else:
+        # Import the data
+        connection_details["database"] = dbname
+        connection_dsn = dbutils.generate_dsn(connection_details)
+        dbutils.copy_from_file(connection_dsn, table, filename, delimiter)
+
+
+def exporter(configuration_file: str, dbname: str, table: str, filename: str, delimiter: str) -> None:
+    """Exports data from a table of a CHADO database into a text file"""
+    connection_details = dbutils.read_configuration_file(configuration_file)
+    connection_dsn = dbutils.generate_dsn(connection_details)
+    if not dbutils.exists(connection_dsn, dbname):
+        # Database doesn't exist - return without further action
+        print("Database does not exist.")
+    else:
+        # Export the data
+        connection_details["database"] = dbname
+        connection_dsn = dbutils.generate_dsn(connection_details)
+        dbutils.copy_to_file(connection_dsn, table, filename, delimiter)

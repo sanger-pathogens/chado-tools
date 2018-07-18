@@ -1,10 +1,11 @@
 import os
 import unittest.mock
 import urllib.error
-import string
-import random
-import pkg_resources
-from pychado import dbutils
+import filecmp
+from pychado import dbutils, utils
+
+modules_dir = os.path.dirname(os.path.abspath(dbutils.__file__))
+data_dir = os.path.join(modules_dir, 'tests', 'data')
 
 
 class TestConnection(unittest.TestCase):
@@ -58,15 +59,13 @@ class TestConnection(unittest.TestCase):
         self.assertTrue(dbutils.exists(self.dsn, "template0"))
 
     @unittest.skipIf("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true", "Skipping this test on Travis CI.")
-    def test_create_drop_dump_restore(self):
+    def test_dump_restore(self):
         # Test the basic functionality for creation and deletion of databases
         # NOTE: This test depends on an example SQL schema in the tests/data directory.
         # If the schema is changed, the test might fail.
 
         # Generate a random database name
-        dbname = "template0"
-        while dbutils.exists(self.dsn, dbname):
-            dbname = ''.join(random.choices(string.ascii_lowercase, k=20))
+        dbname = dbutils.random_database(self.dsn)
         parameters = self.connectionParameters.copy()
         parameters["database"] = dbname
         uri = dbutils.generate_uri(parameters)
@@ -77,9 +76,9 @@ class TestConnection(unittest.TestCase):
         self.assertTrue(dbutils.exists(self.dsn, dbname))
 
         # Set up the database according to a test schema
-        testSchema = pkg_resources.resource_filename("pychado", "tests/data/dbutils_example_schema.sql")
-        self.assertTrue(os.path.exists(os.path.abspath(testSchema)))
-        dbutils.setup_database(uri, testSchema)
+        test_schema = os.path.join(data_dir, "dbutils_example_schema.sql")
+        self.assertTrue(os.path.exists(test_schema))
+        dbutils.setup_database(uri, test_schema)
 
         # Check if the database is correctly set up
         result = dbutils.connect_and_execute_query(dsn, "SELECT * FROM species ORDER BY legs ASC")
@@ -87,12 +86,12 @@ class TestConnection(unittest.TestCase):
         self.assertIn("leech", result[0])
 
         # Dump the database and check for the archive file
-        archiveFile = "tmp.dump"
-        dbutils.dump_database(uri, archiveFile)
-        self.assertTrue(os.path.exists(os.path.abspath(archiveFile)))
+        archive_file = "tmp.dump"
+        dbutils.dump_database(uri, archive_file)
+        self.assertTrue(os.path.exists(archive_file))
 
         # Restore the database and check it exists
-        dbutils.restore_database(uri, archiveFile)
+        dbutils.restore_database(uri, archive_file)
         self.assertTrue(dbutils.exists(self.dsn, dbname))
 
         # Check if the database is still correctly set up
@@ -103,8 +102,55 @@ class TestConnection(unittest.TestCase):
         # Drop the database, remove the archive file and check that everything is gone
         dbutils.drop_database(self.dsn, dbname)
         self.assertFalse(dbutils.exists(self.dsn, dbname))
-        os.remove(os.path.abspath(archiveFile))
-        self.assertFalse(os.path.exists(os.path.abspath(archiveFile)))
+        os.remove(archive_file)
+        self.assertFalse(os.path.exists(archive_file))
+
+    @unittest.skipIf("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true", "Skipping this test on Travis CI.")
+    def test_import_export(self):
+        # Test the basic functionality for import and export of data
+        # NOTE: This test depends on an example SQL schema in the tests/data directory.
+        # If the schema is changed, the test might fail.
+
+        # Generate a random database name
+        dbname = dbutils.random_database(self.dsn)
+        parameters = self.connectionParameters.copy()
+        parameters["database"] = dbname
+        dsn = dbutils.generate_dsn(parameters)
+
+        # Create the database and check it exists
+        dbutils.create_database(self.dsn, dbname)
+        self.assertTrue(dbutils.exists(self.dsn, dbname))
+
+        # Create a table
+        command_file = os.path.join(data_dir, "dbutils_create_table_command.sql")
+        self.assertTrue(os.path.exists(command_file))
+        command = utils.read_text(command_file)
+        dbutils.connect_and_execute_statement(dsn, command)
+
+        # Import data
+        input_file = os.path.join(data_dir, "dbutils_ascii_copy_file_semicolons.csv")
+        self.assertTrue(os.path.exists(input_file))
+        table_name = "species"
+        dbutils.copy_from_file(dsn, table_name, input_file, ";")
+
+        # Check if the data are correctly imported
+        result = dbutils.connect_and_execute_query(dsn, "SELECT * FROM species ORDER BY legs ASC")
+        self.assertEqual(len(result), 4)
+        self.assertIn("leech", result[0])
+
+        # Export data and check the data are correctly exported
+        temp_file = os.path.join(os.getcwd(), "tmp.csv")
+        dbutils.copy_to_file(dsn, table_name, temp_file, "\t")
+        self.assertTrue(os.path.exists(temp_file))
+        output_file = os.path.join(data_dir, "dbutils_ascii_copy_file_tabs.csv")
+        self.assertTrue(os.path.exists(output_file))
+        self.assertTrue(filecmp.cmp(temp_file, output_file))
+
+        # Drop the database, remove the temporary file and check that everything is gone
+        dbutils.drop_database(self.dsn, dbname)
+        self.assertFalse(dbutils.exists(self.dsn, dbname))
+        os.remove(temp_file)
+        self.assertFalse(os.path.exists(temp_file))
 
 
 class TestDownload(unittest.TestCase):

@@ -84,6 +84,44 @@ class TestTasks(unittest.TestCase):
         mock_create.assert_called()
         mock_restore.assert_called()
 
+    @unittest.mock.patch('pychado.dbutils.generate_dsn')
+    @unittest.mock.patch('pychado.dbutils.copy_from_file')
+    @unittest.mock.patch('pychado.dbutils.exists')
+    def test_import(self, mock_exist, mock_copy, mock_dsn):
+        # Checks that an import is triggered if and only if the database exists
+        self.assertIs(mock_exist, dbutils.exists)
+        self.assertIs(mock_copy, dbutils.copy_from_file)
+        self.assertIs(mock_dsn, dbutils.generate_dsn)
+
+        mock_exist.return_value = False
+        tasks.importer(dbutils.default_configuration_file(), "testdb", "testtable", "testfile", "\t")
+        mock_copy.assert_not_called()
+
+        mock_copy.reset_mock()
+        mock_exist.return_value = True
+        mock_dsn.return_value = "testdsn"
+        tasks.importer(dbutils.default_configuration_file(), "testdb", "testtable", "testfile", "\t")
+        mock_copy.assert_called_with("testdsn", "testtable", "testfile", "\t")
+
+    @unittest.mock.patch('pychado.dbutils.generate_dsn')
+    @unittest.mock.patch('pychado.dbutils.copy_to_file')
+    @unittest.mock.patch('pychado.dbutils.exists')
+    def test_export(self, mock_exist, mock_copy, mock_dsn):
+        # Checks that an export is triggered if and only if the database exists
+        self.assertIs(mock_exist, dbutils.exists)
+        self.assertIs(mock_copy, dbutils.copy_to_file)
+        self.assertIs(mock_dsn, dbutils.generate_dsn)
+
+        mock_exist.return_value = False
+        tasks.exporter(dbutils.default_configuration_file(), "testdb", "testtable", "testfile", "\t")
+        mock_copy.assert_not_called()
+
+        mock_copy.reset_mock()
+        mock_exist.return_value = True
+        mock_dsn.return_value = "testdsn"
+        tasks.exporter(dbutils.default_configuration_file(), "testdb", "testtable", "testfile", "\t")
+        mock_copy.assert_called_with("testdsn", "testtable", "testfile", "\t")
+
 
 if __name__ == '__main__':
     unittest.main(buffer=True)

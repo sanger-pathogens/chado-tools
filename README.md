@@ -7,7 +7,7 @@ Python3 script providing various tools for accessing CHADO databases
 ## Prerequisites
 
 * PostgreSQL
-* Python3
+* Python 3.6 or higher
 
 ## Installation
 
@@ -43,6 +43,8 @@ The usage is:
 | create                | create a new instance of the CHADO schema                            |
 | dump                  | dump a CHADO database into an archive file                           |
 | restore               | restore a CHADO database from an archive file                        |
+| import                | import data from a text file into a table of a CHADO database        |
+| export                | export data from a table of a CHADO database into a text file        |
 
 ## Examples
 

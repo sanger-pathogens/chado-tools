@@ -47,6 +47,21 @@ def close(file):
         file.close()
 
 
+def read_text(filename: str) -> str:
+    """Function reading text from a file"""
+    file = open_file_read(filename)
+    content = file.read()
+    close(file)
+    return content
+
+
+def write_text(filename: str, content: str) -> None:
+    """Function writing text to a file"""
+    file = open_file_write(filename)
+    file.write(content)
+    close(file)
+
+
 def parse_yaml(filename: str) -> dict:
     """Function parsing a YAML file"""
     stream = open_file_read(filename)

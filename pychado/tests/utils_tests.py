@@ -2,6 +2,8 @@ import sys
 import os
 import unittest
 import subprocess
+import string
+import random
 from pychado import utils
 
 modules_dir = os.path.dirname(os.path.abspath(utils.__file__))
@@ -12,7 +14,7 @@ class TestUtils(unittest.TestCase):
     """Class for testing utilities"""
 
     def test_write_and_read(self):
-        # """open_file_write() and open_file_read() should do the right thing whether gzipped or not"""
+        # open_file_write() and open_file_read() should do the right thing whether gzipped or not
         for filename in ['utils.tmp', 'utils.tmp.gz']:
             # Test write
             f = utils.open_file_write(filename)
@@ -34,8 +36,19 @@ class TestUtils(unittest.TestCase):
         f = utils.open_file_write('-')
         self.assertEqual(sys.stdout, f)
 
+    def test_write_read_text(self):
+        # tests reading and writing text from/to file
+        text = ''.join(random.choices(string.ascii_lowercase, k=100)).strip()
+        filename = "tmp.txt"
+        utils.write_text(filename, text)
+        self.assertTrue(os.path.exists(os.path.abspath(filename)))
+        read_text = utils.read_text(filename)
+        self.assertEqual(text, read_text)
+        os.remove(filename)
+        self.assertFalse(os.path.exists(os.path.abspath(filename)))
+
     def test_raise_exception(self):
-        # """open_file_write() and open_file_read() should raise an exception if opening fails"""
+        # open_file_write() and open_file_read() should raise an exception if opening fails
         with self.assertRaises(FileNotFoundError):
             utils.open_file_read('this_file_is_not_here_so_throw_error')
         with self.assertRaises(FileNotFoundError):
@@ -48,7 +61,7 @@ class TestUtils(unittest.TestCase):
             utils.open_file_write(os.path.join('not_a_directory', 'this_file_is_not_here_so_throw_error.gz'))
 
     def test_yaml_parser(self):
-        # """checks if a yaml file is parsed correctly"""
+        # checks if a yaml file is parsed correctly
         filename = os.path.join(data_dir, "utils_yaml_example.yml")
         content = utils.parse_yaml(filename)
         self.assertIn("institute", content)

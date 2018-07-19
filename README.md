@@ -1,8 +1,8 @@
 # chado-tools
 
-Python3 script providing various tools for accessing CHADO databases
+Python3 command line script providing various tools for accessing CHADO databases
 
-[![Build Status](https://travis-ci.org/puethe/chado-tools.svg?branch=master)](https://travis-ci.org/puethe/chado-tools)
+[![Build Status](https://travis-ci.org/sanger-pathogens/chado-tools.svg?branch=master)](https://travis-ci.org/puethe/chado-tools)
 
 ## Prerequisites
 

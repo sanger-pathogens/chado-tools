@@ -13,7 +13,7 @@ setuptools.setup(
     author_email="path-help@sanger.ac.uk",
     description="Tools to access CHADO databases",
     long_description=longDescription,
-    url="https://github.com/puethe/chado-tools/",
+    url="https://github.com/sanger-pathogens/chado-tools/",
     packages=setuptools.find_packages(),
     package_data={"pychado": ["data/*.yml"]},
     entry_points={
@@ -35,6 +35,6 @@ setuptools.setup(
         "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
         "Operating System :: OS Independent",
         "Topic :: Scientific/Engineering :: Bio-Informatics",
-        "Development Status :: 1 - Planning"
+        "Development Status :: 2 - Pre-Alpha"
     ]
 )

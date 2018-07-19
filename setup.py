@@ -26,7 +26,7 @@ setuptools.setup(
         "nose >= 1.3"
     ],
     install_requires=[
-        'psycopg2-binary',
+        'psycopg2',
         'pyyaml'
     ],
     license="GPLv3",

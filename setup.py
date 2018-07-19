@@ -7,7 +7,7 @@ with open("VERSION", "r") as versionFile:
     version = versionFile.read().strip()
 
 setuptools.setup(
-    name="pychado",
+    name="chado-tools",
     version=version,
     author="Christoph Puethe",
     author_email="path-help@sanger.ac.uk",

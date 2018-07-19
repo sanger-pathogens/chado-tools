@@ -51,7 +51,7 @@ def main():
         print_usage_and_exit()
     elif sys.argv[1] in ["-v", "--version"]:
         # Display program version
-        print(pkg_resources.get_distribution("pychado").version)
+        print(pkg_resources.get_distribution("chado-tools").version)
     else:
         # Call function depending on entered command
         command = sys.argv[1]

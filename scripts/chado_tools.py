@@ -12,7 +12,8 @@ availableCommands = {
     "dump"          : "dump a CHADO database into an archive file",
     "restore"       : "restore a CHADO database from an archive file",
     "import"        : "import data from a text file into a table of a CHADO database",
-    "export"        : "export data from a table of a CHADO database into a text file"
+    "export"        : "export data from a table of a CHADO database into a text file",
+    "query"         : "query a CHADO database and export the result into a text file"
 }
 
 optionalArguments = {

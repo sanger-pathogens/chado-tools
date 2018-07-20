@@ -93,3 +93,17 @@ def exporter(configuration_file: str, dbname: str, table: str, filename: str, de
         connection_details["database"] = dbname
         connection_dsn = dbutils.generate_dsn(connection_details)
         dbutils.copy_to_file(connection_dsn, table, filename, delimiter)
+
+
+def query(configuration_file: str, dbname: str, query: str, filename: str, delimiter: str) -> None:
+    """Queries a CHADO database and exports the result into a text file"""
+    connection_details = dbutils.read_configuration_file(configuration_file)
+    connection_dsn = dbutils.generate_dsn(connection_details)
+    if not dbutils.exists(connection_dsn, dbname):
+        # Database doesn't exist - return without further action
+        print("Database does not exist.")
+    else:
+        # Query and export the result
+        connection_details["database"] = dbname
+        connection_dsn = dbutils.generate_dsn(connection_details)
+        dbutils.query_to_file(connection_dsn, query, filename, delimiter)

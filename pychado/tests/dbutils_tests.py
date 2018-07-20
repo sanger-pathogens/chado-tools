@@ -138,8 +138,16 @@ class TestConnection(unittest.TestCase):
         self.assertEqual(len(result), 4)
         self.assertIn("leech", result[0])
 
-        # Export data and check the data are correctly exported
+        # Query the database and check that the result is as expected
         temp_file = os.path.join(os.getcwd(), "tmp.csv")
+        dbutils.query_to_file(dsn, "SELECT * FROM species ORDER BY legs ASC", temp_file, ";")
+        self.assertTrue(os.path.exists(temp_file))
+        output_file = os.path.join(data_dir, "dbutils_ascii_copy_file_sorted.csv")
+        self.assertTrue(os.path.exists(output_file))
+        self.assertTrue(filecmp.cmp(temp_file, output_file))
+        os.remove(temp_file)
+
+        # Export data and check the data are correctly exported
         dbutils.copy_to_file(dsn, table_name, temp_file, "\t")
         self.assertTrue(os.path.exists(temp_file))
         output_file = os.path.join(data_dir, "dbutils_ascii_copy_file_tabs.csv")

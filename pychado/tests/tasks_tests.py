@@ -122,6 +122,24 @@ class TestTasks(unittest.TestCase):
         tasks.exporter(dbutils.default_configuration_file(), "testdb", "testtable", "testfile", "\t")
         mock_copy.assert_called_with("testdsn", "testtable", "testfile", "\t")
 
+    @unittest.mock.patch('pychado.dbutils.generate_dsn')
+    @unittest.mock.patch('pychado.dbutils.query_to_file')
+    @unittest.mock.patch('pychado.dbutils.exists')
+    def test_query(self, mock_exist, mock_query, mock_dsn):
+        # Checks that the database is queried if and only if it exists
+        self.assertIs(mock_exist, dbutils.exists)
+        self.assertIs(mock_query, dbutils.query_to_file)
+        self.assertIs(mock_dsn, dbutils.generate_dsn)
+
+        mock_exist.return_value = False
+        tasks.query(dbutils.default_configuration_file(), "testdb", "testquery", "testfile", "\t")
+        mock_query.assert_not_called()
+
+        mock_query.reset_mock()
+        mock_exist.return_value = True
+        mock_dsn.return_value = "testdsn"
+        tasks.query(dbutils.default_configuration_file(), "testdb", "testquery", "testfile", "\t")
+        mock_query.assert_called_with("testdsn", "testquery", "testfile", "\t")
 
 if __name__ == '__main__':
     unittest.main(buffer=True)

@@ -72,6 +72,12 @@ class TestUtils(unittest.TestCase):
         self.assertIn("parasites and microbes", content["faculties"])
         self.assertNotIn("zebrafish genetics", content["faculties"])
 
+    def test_list_to_string(self):
+        # checks if a list is correctly concatenated
+        test_list = [1.123, None, 'hello', True, 'A', 8, False]
+        string = utils.list_to_string(test_list, "_")
+        self.assertEqual(string, "1.123__hello_t_A_8_f")
+
 
 if __name__ == '__main__':
     unittest.main(buffer=True)

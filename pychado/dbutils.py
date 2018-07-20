@@ -185,3 +185,14 @@ def copy_to_file(dsn: str, table: str, filename: str, delimiter: str) -> None:
     utils.close(file)
     if filename:
         print("Data exported to " + filename)
+
+
+def query_to_file(dsn: str, query: str, filename: str, delimiter: str) -> None:
+    """Executes a query in a PostgreSQL database and writes the result into a CSV file"""
+    result = connect_and_execute_query(dsn, query)
+    file = utils.open_file_write(filename)
+    for line in result:
+        file.write(utils.list_to_string(line, delimiter) + "\n")
+    utils.close(file)
+    if filename:
+        print("Data written to " + filename)

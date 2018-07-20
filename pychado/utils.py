@@ -78,3 +78,20 @@ def dump_yaml(filename: str, data: dict) -> None:
     stream = open_file_write(filename)
     yaml.dump(data, stream)
     close(stream)
+
+
+def list_to_string(the_list: list, delimiter: str) -> str:
+    """Function concatenating all elements of a list"""
+    the_string = []
+    for element in the_list:
+        if isinstance(element, bool) and element:
+            the_string.append('t')
+        elif isinstance(element, bool) and not element:
+            the_string.append('f')
+        elif isinstance(element, str):
+            the_string.append(element)
+        elif element is None:
+            the_string.append("")
+        else:
+            the_string.append(str(element))
+    return delimiter.join(the_string)

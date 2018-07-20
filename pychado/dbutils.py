@@ -4,6 +4,7 @@ import string
 import random
 import psycopg2
 import urllib.request
+import urllib.parse
 from pychado import utils
 
 
@@ -13,7 +14,7 @@ def generate_uri(connection_details: dict) -> str:
     if "user" in connection_details and connection_details["user"] is not None:
         uri_as_list.append(connection_details["user"])
         if "password" in connection_details and connection_details["password"] is not None:
-            uri_as_list.append(":" + connection_details["password"])
+            uri_as_list.append(":" + urllib.parse.quote(connection_details["password"]))
         uri_as_list.append("@")
     if "host" in connection_details and connection_details["host"] is not None:
         uri_as_list.append(connection_details["host"])

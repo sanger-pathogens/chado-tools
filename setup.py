@@ -1,14 +1,14 @@
 import setuptools
 
-with open("README.md", "r") as readmeFile:
-    longDescription = readmeFile.read()
-
-with open("VERSION", "r") as versionFile:
-    version = versionFile.read().strip()
+try:
+    with open("README.md", "r") as readmeFile:
+        longDescription = readmeFile.read()
+except:
+    longDescription = "Tools to access CHADO databases"
 
 setuptools.setup(
     name="chado-tools",
-    version=version,
+    version="0.0.4",
     author="Christoph Puethe",
     author_email="path-help@sanger.ac.uk",
     description="Tools to access CHADO databases",

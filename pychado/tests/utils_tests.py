@@ -31,9 +31,9 @@ class TestUtils(unittest.TestCase):
             # Remove files
             os.unlink(filename)
         # Test streams stdin/stdout
-        f = utils.open_file_read('-')
+        f = utils.open_file_read('')
         self.assertEqual(sys.stdin, f)
-        f = utils.open_file_write('-')
+        f = utils.open_file_write('')
         self.assertEqual(sys.stdout, f)
 
     def test_write_read_text(self):

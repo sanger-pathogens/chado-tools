@@ -170,7 +170,8 @@ def copy_from_file(dsn: str, table: str, filename: str, delimiter: str) -> None:
     connection.commit()
     connection.close()
     utils.close(file)
-    print("Data imported from " + filename)
+    if filename:
+        print("Data imported from " + filename)
 
 
 def copy_to_file(dsn: str, table: str, filename: str, delimiter: str) -> None:
@@ -182,4 +183,5 @@ def copy_to_file(dsn: str, table: str, filename: str, delimiter: str) -> None:
     cursor.close()
     connection.close()
     utils.close(file)
-    print("Data exported to " + filename)
+    if filename:
+        print("Data exported to " + filename)

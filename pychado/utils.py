@@ -6,7 +6,7 @@ import yaml
 
 def open_file_read(filename: str):
     """Function opening a (potentially gzipped) text file for read access"""
-    if filename == "-":
+    if not filename:
         # Read from stdin
         f = sys.stdin
     else:
@@ -25,7 +25,7 @@ def open_file_read(filename: str):
 
 def open_file_write(filename: str):
     """Function opening a (potentially gzipped) text file for write access"""
-    if filename == "-":
+    if not filename:
         # Write to stdout
         f = sys.stdout
     else:

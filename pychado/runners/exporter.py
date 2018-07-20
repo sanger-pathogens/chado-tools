@@ -16,10 +16,13 @@ def run(description):
     parser.add_argument(
         "-d", "--delimiter",
         dest="delimiter",
-        help="Character delimiting fields in file",
+        help="Character delimiting fields in file (default: tab)",
         default="\t")
+    parser.add_argument(
+        "-o", "--output",
+        dest="output",
+        help="name of the file into which data are exported (default: stdout)")
     parser.add_argument("dbname", help="name of the database")
     parser.add_argument("table", help="name of the table from which data are exported")
-    parser.add_argument("file", help="name of the file into which data are exported")
     arguments = parser.parse_args(sys.argv[2:])
-    tasks.exporter(arguments.config, arguments.dbname, arguments.table, arguments.file, arguments.delimiter)
+    tasks.exporter(arguments.config, arguments.dbname, arguments.table, arguments.output, arguments.delimiter)

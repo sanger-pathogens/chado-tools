@@ -16,10 +16,13 @@ def run(description):
     parser.add_argument(
         "-d", "--delimiter",
         dest="delimiter",
-        help="Character delimiting fields in file",
+        help="Character delimiting fields in file (default: tab)",
         default="\t")
+    parser.add_argument(
+        "-i", "--input",
+        dest="input",
+        help="name of the file from which data are imported (default: stdin)")
     parser.add_argument("dbname", help="name of the database")
     parser.add_argument("table", help="name of the table into which data are imported")
-    parser.add_argument("file", help="name of the file from which data are imported")
     arguments = parser.parse_args(sys.argv[2:])
-    tasks.importer(arguments.config, arguments.dbname, arguments.table, arguments.file, arguments.delimiter)
+    tasks.importer(arguments.config, arguments.dbname, arguments.table, arguments.input, arguments.delimiter)

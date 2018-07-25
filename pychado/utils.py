@@ -88,6 +88,8 @@ def list_to_string(the_list: list, delimiter: str) -> str:
             the_string.append('t')
         elif isinstance(element, bool) and not element:
             the_string.append('f')
+        elif isinstance(element, str) and element == "":
+            the_string.append("\"\"")
         elif isinstance(element, str):
             the_string.append(element)
         elif element is None:

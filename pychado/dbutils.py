@@ -67,11 +67,15 @@ def read_configuration_file(filename: str) -> dict:
     return utils.parse_yaml(filename)
 
 
-def execute_query(connection, query: str) -> list:
+def execute_query(connection, query: str, header=False) -> list:
     """Executes an SQL query in an opened PostgreSQL database and returns the query result"""
     cursor = connection.cursor()
     cursor.execute(query)
-    result = cursor.fetchall()
+    if header:
+        result = [tuple([desc[0] for desc in cursor.description])]
+        result.extend(cursor.fetchall())
+    else:
+        result = cursor.fetchall()
     cursor.close()
     return result
 
@@ -83,10 +87,11 @@ def execute_statement(connection, statement: str):
     cursor.close()
 
 
-def connect_and_execute_query(dsn: str, query: str) -> list:
+def connect_and_execute_query(dsn: str, query: str, header=False) -> list:
     """Connects to a database, executes an SQL query, and returns the result"""
     connection = psycopg2.connect(dsn)
-    result = execute_query(connection, query)
+    connection.set_client_encoding("UTF8")
+    result = execute_query(connection, query, header)
     connection.close()
     return result
 
@@ -174,25 +179,18 @@ def copy_from_file(dsn: str, table: str, filename: str, delimiter: str) -> None:
         print("Data imported from " + filename)
 
 
-def copy_to_file(dsn: str, table: str, filename: str, delimiter: str) -> None:
+def copy_to_file(dsn: str, table: str, filename: str, delimiter: str, header: bool) -> None:
     """Copies data from a table of a PostgreSQL database into a CSV file"""
-    file = utils.open_file_write(filename)
-    connection = psycopg2.connect(dsn)
-    cursor = connection.cursor()
-    cursor.copy_to(file, table, sep=delimiter, null='\\null')
-    cursor.close()
-    connection.close()
-    utils.close(file)
-    if filename:
-        print("Data exported to " + filename)
+    sql = "SELECT * FROM " + table
+    query_to_file(dsn, sql, filename, delimiter, header)
 
 
-def query_to_file(dsn: str, query: str, filename: str, delimiter: str) -> None:
+def query_to_file(dsn: str, query: str, filename: str, delimiter: str, header: bool) -> None:
     """Executes a query in a PostgreSQL database and writes the result into a CSV file"""
-    result = connect_and_execute_query(dsn, query)
+    result = connect_and_execute_query(dsn, query, header)
     file = utils.open_file_write(filename)
     for line in result:
         file.write(utils.list_to_string(line, delimiter) + "\n")
     utils.close(file)
     if filename:
-        print("Data written to " + filename)
+        print("Data exported to " + filename)

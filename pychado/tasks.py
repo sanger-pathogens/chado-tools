@@ -81,7 +81,7 @@ def importer(configuration_file: str, dbname: str, table: str, filename: str, de
         dbutils.copy_from_file(connection_dsn, table, filename, delimiter)
 
 
-def exporter(configuration_file: str, dbname: str, table: str, filename: str, delimiter: str) -> None:
+def exporter(configuration_file: str, dbname: str, table: str, filename: str, delimiter: str, header: bool) -> None:
     """Exports data from a table of a CHADO database into a text file"""
     connection_details = dbutils.read_configuration_file(configuration_file)
     connection_dsn = dbutils.generate_dsn(connection_details)
@@ -92,10 +92,10 @@ def exporter(configuration_file: str, dbname: str, table: str, filename: str, de
         # Export the data
         connection_details["database"] = dbname
         connection_dsn = dbutils.generate_dsn(connection_details)
-        dbutils.copy_to_file(connection_dsn, table, filename, delimiter)
+        dbutils.copy_to_file(connection_dsn, table, filename, delimiter, header)
 
 
-def query(configuration_file: str, dbname: str, query: str, filename: str, delimiter: str) -> None:
+def query(configuration_file: str, dbname: str, query: str, filename: str, delimiter: str, header: bool) -> None:
     """Queries a CHADO database and exports the result into a text file"""
     connection_details = dbutils.read_configuration_file(configuration_file)
     connection_dsn = dbutils.generate_dsn(connection_details)
@@ -106,4 +106,4 @@ def query(configuration_file: str, dbname: str, query: str, filename: str, delim
         # Query and export the result
         connection_details["database"] = dbname
         connection_dsn = dbutils.generate_dsn(connection_details)
-        dbutils.query_to_file(connection_dsn, query, filename, delimiter)
+        dbutils.query_to_file(connection_dsn, query, filename, delimiter, header)

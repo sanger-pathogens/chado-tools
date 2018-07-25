@@ -19,10 +19,10 @@ def run(description):
         help="Character delimiting fields in file (default: tab)",
         default="\t")
     parser.add_argument(
-        "-i", "--input",
+        "-f", "--input_file",
         dest="input",
-        help="name of the file from which data are imported (default: stdin)")
+        help="file from which data are imported (default: stdin)")
     parser.add_argument("dbname", help="name of the database")
-    parser.add_argument("table", help="name of the table into which data are imported")
+    parser.add_argument("table", help="table into which data are imported")
     arguments = parser.parse_args(sys.argv[2:])
     tasks.importer(arguments.config, arguments.dbname, arguments.table, arguments.input, arguments.delimiter)

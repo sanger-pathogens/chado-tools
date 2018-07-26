@@ -60,13 +60,6 @@ def default_configuration_file() -> str:
     return pkg_resources.resource_filename("pychado", "data/defaultDatabase.yml")
 
 
-def read_configuration_file(filename: str) -> dict:
-    """Reads data from a configuration file into a dictionary"""
-    if not filename:
-        filename = default_configuration_file()
-    return utils.parse_yaml(filename)
-
-
 def execute_query(connection, query: str, header=False) -> list:
     """Executes an SQL query in an opened PostgreSQL database and returns the query result"""
     cursor = connection.cursor()

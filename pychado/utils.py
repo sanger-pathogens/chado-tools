@@ -4,6 +4,13 @@ import subprocess
 import yaml
 
 
+class EmptyObject:
+    """Helper class that creates objects with attributes supplied by keyword arguments"""
+    def __init__(self, **kwargs):
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+
 def open_file_read(filename: str):
     """Function opening a (potentially gzipped) text file for read access"""
     if not filename:

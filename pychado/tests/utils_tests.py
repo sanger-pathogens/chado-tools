@@ -80,4 +80,4 @@ class TestUtils(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    unittest.main(buffer=True)
+    unittest.main(verbosity=2, buffer=True)

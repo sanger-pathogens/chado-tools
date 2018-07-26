@@ -14,7 +14,7 @@ class TestConnection(unittest.TestCase):
     def setUp(self):
         # Checks if the default connection file is available and reads in the parameters
         self.assertTrue(os.path.exists(os.path.abspath(dbutils.default_configuration_file())))
-        self.connectionParameters = dbutils.read_configuration_file("")
+        self.connectionParameters = utils.parse_yaml(dbutils.default_configuration_file())
         self.dsn = dbutils.generate_dsn(self.connectionParameters)
 
     def tearDown(self):
@@ -183,4 +183,4 @@ class TestDownload(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    unittest.main(buffer=True)
+    unittest.main(verbosity=2, buffer=True)

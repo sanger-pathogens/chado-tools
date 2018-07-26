@@ -47,18 +47,15 @@ class TestConnection(unittest.TestCase):
               + " port=" + self.connectionParameters["port"]
         self.assertEqual(dbutils.generate_dsn(self.connectionParameters), dsn)
 
-    @unittest.skipIf("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true", "Skipping this test on Travis CI.")
     def test_connect(self):
         # Tests that a connection to the default database can be established and that queries can be executed
         result = dbutils.connect_and_execute_query(self.dsn, "SELECT 1 + 2")
         self.assertEqual(result[0][0], 3)
 
-    @unittest.skipIf("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true", "Skipping this test on Travis CI.")
     def test_exists(self):
         # Test the "exists" function by checking for existence of the obligatory template0 database
         self.assertTrue(dbutils.exists(self.dsn, "template0"))
 
-    @unittest.skipIf("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true", "Skipping this test on Travis CI.")
     def test_dump_restore(self):
         # Test the basic functionality for creation and deletion of databases
         # NOTE: This test depends on an example SQL schema in the tests/data directory.
@@ -105,7 +102,6 @@ class TestConnection(unittest.TestCase):
         os.remove(archive_file)
         self.assertFalse(os.path.exists(archive_file))
 
-    @unittest.skipIf("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true", "Skipping this test on Travis CI.")
     def test_import_export(self):
         # Test the basic functionality for import and export of data
         # NOTE: This test depends on an example SQL schema in the tests/data directory.

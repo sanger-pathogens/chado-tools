@@ -14,7 +14,7 @@ class TestConnection(unittest.TestCase):
     def setUp(self):
         # Checks if the default connection file is available and reads in the parameters
         self.assertTrue(os.path.exists(os.path.abspath(dbutils.default_configuration_file())))
-        self.connectionParameters = dbutils.read_configuration_file("")
+        self.connectionParameters = utils.parse_yaml(dbutils.default_configuration_file())
         self.dsn = dbutils.generate_dsn(self.connectionParameters)
 
     def tearDown(self):
@@ -138,9 +138,17 @@ class TestConnection(unittest.TestCase):
         self.assertEqual(len(result), 4)
         self.assertIn("leech", result[0])
 
-        # Export data and check the data are correctly exported
+        # Query the database and check that the result is as expected
         temp_file = os.path.join(os.getcwd(), "tmp.csv")
-        dbutils.copy_to_file(dsn, table_name, temp_file, "\t")
+        dbutils.query_to_file(dsn, "SELECT * FROM species ORDER BY legs ASC", temp_file, ";", True)
+        self.assertTrue(os.path.exists(temp_file))
+        output_file = os.path.join(data_dir, "dbutils_ascii_copy_file_sorted.csv")
+        self.assertTrue(os.path.exists(output_file))
+        self.assertTrue(filecmp.cmp(temp_file, output_file))
+        os.remove(temp_file)
+
+        # Export data and check the data are correctly exported
+        dbutils.copy_to_file(dsn, table_name, temp_file, "\t", False)
         self.assertTrue(os.path.exists(temp_file))
         output_file = os.path.join(data_dir, "dbutils_ascii_copy_file_tabs.csv")
         self.assertTrue(os.path.exists(output_file))
@@ -175,4 +183,4 @@ class TestDownload(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    unittest.main(buffer=True)
+    unittest.main(verbosity=2, buffer=True)

@@ -4,9 +4,16 @@ import subprocess
 import yaml
 
 
+class EmptyObject:
+    """Helper class that creates objects with attributes supplied by keyword arguments"""
+    def __init__(self, **kwargs):
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+
 def open_file_read(filename: str):
     """Function opening a (potentially gzipped) text file for read access"""
-    if filename == "-":
+    if not filename:
         # Read from stdin
         f = sys.stdin
     else:
@@ -25,7 +32,7 @@ def open_file_read(filename: str):
 
 def open_file_write(filename: str):
     """Function opening a (potentially gzipped) text file for write access"""
-    if filename == "-":
+    if not filename:
         # Write to stdout
         f = sys.stdout
     else:
@@ -78,3 +85,22 @@ def dump_yaml(filename: str, data: dict) -> None:
     stream = open_file_write(filename)
     yaml.dump(data, stream)
     close(stream)
+
+
+def list_to_string(the_list: list, delimiter: str) -> str:
+    """Function concatenating all elements of a list"""
+    the_string = []
+    for element in the_list:
+        if isinstance(element, bool) and element:
+            the_string.append('t')
+        elif isinstance(element, bool) and not element:
+            the_string.append('f')
+        elif isinstance(element, str) and element == "":
+            the_string.append("\"\"")
+        elif isinstance(element, str):
+            the_string.append(element)
+        elif element is None:
+            the_string.append("")
+        else:
+            the_string.append(str(element))
+    return delimiter.join(the_string)

@@ -1,5 +1,5 @@
 database: postgres
 host:     localhost
 port:     5432
-user:     postgres
-password: pw
+user:     chado_user
+password: chado_pw

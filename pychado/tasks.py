@@ -1,3 +1,4 @@
+import pkg_resources
 from pychado import utils, dbutils
 
 
@@ -29,7 +30,7 @@ def check_access(connection_parameters: dict, database: str, task: str) -> bool:
             return False
 
 
-def run_task_with_arguments(task: str, arguments, connection_parameters: dict):
+def run_command_with_arguments(command: str, arguments, connection_parameters: dict) -> None:
     """Runs a specified sub-command with the supplied arguments"""
 
     # Create connection strings
@@ -37,35 +38,73 @@ def run_task_with_arguments(task: str, arguments, connection_parameters: dict):
     connection_uri = dbutils.generate_uri(connection_parameters)
 
     # Run the command
-    if task == "connect":
+    if command == "connect":
         # Connect to a PostgreSQL database for an interactive session
         dbutils.connect_to_database(connection_uri)
-    elif task == "create":
+    elif command == "create":
         # Setup a PostgreSQL database according to a schema
         schema = arguments.schema
         if not schema:
             schema = dbutils.download_schema(dbutils.default_schema_url())
         dbutils.setup_database(connection_uri, schema)
-    elif task == "dump":
+    elif command == "dump":
         # Dump a PostgreSQL database into an archive file
         dbutils.dump_database(connection_uri, arguments.archive)
-    elif task == "restore":
+    elif command == "restore":
         # Restore a PostgreSQL database from an archive file
         dbutils.restore_database(connection_uri, arguments.archive)
-    elif task == "import":
-        # Import data from a text file into a table of a PostgreSQL database
+    elif command == "import":
+        # Import data from a text file to a table of a PostgreSQL database
         dbutils.copy_from_file(connection_dsn, arguments.table, arguments.input_file, arguments.delimiter)
-    elif task == "export":
-        # Export data from a table of a PostgreSQL database into a text file
+    elif command == "export":
+        # Export data from a table of a PostgreSQL database to a text file
         dbutils.copy_to_file(connection_dsn, arguments.table, arguments.output_file, arguments.delimiter,
                              arguments.include_header)
-    elif task == "query":
-        # Query a PostgreSQL database and exports the result into a text file
+    elif command == "query":
+        # Query a PostgreSQL database and exports the result to a text file
         if arguments.query:
             query = arguments.query
         else:
             query = utils.read_text(arguments.input_file)
-        dbutils.query_to_file(connection_dsn, query, arguments.output_file, arguments.delimiter,
+        dbutils.query_to_file(connection_dsn, query, tuple(), arguments.output_file, arguments.delimiter,
                               arguments.include_header)
     else:
-        raise ValueError("Functionality '" + task + "' is not yet implemented.")
+        print("Functionality '" + command + "' is not yet implemented.")
+
+
+def run_sub_command_with_arguments(command: str, sub_command: str, arguments, connection_parameters: dict) -> None:
+    """Runs a specified sub-command with the supplied arguments"""
+
+    # Create connection strings
+    connection_dsn = dbutils.generate_dsn(connection_parameters)
+
+    # Run the command
+    if command == "list":
+        # List the organisms/genera in the CHADO database and export the result to a text file
+        query = load_list_query(sub_command, arguments)
+        parameters = specify_list_parameters(sub_command, arguments)
+        dbutils.query_to_file(connection_dsn, query, parameters, arguments.output_file, arguments.delimiter,
+                              arguments.include_header)
+    else:
+        print("Functionality '" + command + "' is not yet implemented.")
+
+
+def load_list_query(specifier: str, arguments) -> str:
+    """Loads the SQL query for a 'chado list' command"""
+    query = ""
+    if specifier == "organisms" and arguments.genus == "all":
+        query = utils.read_text(pkg_resources.resource_filename("pychado", "sql/list_organisms.sql"))
+    elif specifier == "organisms" and arguments.genus != "all":
+        query = utils.read_text(pkg_resources.resource_filename("pychado", "sql/list_organisms_restricted.sql"))
+    elif specifier == "genera":
+        query = utils.read_text(pkg_resources.resource_filename("pychado", "sql/list_genera.sql"))
+    return query
+
+
+def specify_list_parameters(specifier: str, arguments) -> tuple:
+    """Specifies the parameters that complete the SQL query of a 'chado list' command"""
+    if specifier == "organisms" and arguments.genus != "all":
+        params = (arguments.genus,)
+    else:
+        params = tuple()
+    return params

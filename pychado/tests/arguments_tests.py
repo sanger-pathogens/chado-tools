@@ -2,12 +2,11 @@ import unittest
 from scripts import chado_tools
 
 
-class TestArguments(unittest.TestCase):
-    """Tests if input arguments are parsed correctly"""
+class TestCommands(unittest.TestCase):
+    """Tests if all implemented commands and sub-commands are available through the entry point"""
 
-    def test_available_commands(self):
-        # Tests if all implemented sub-commands are available through the entry point
-        commands = chado_tools.available_commands()
+    def test_general_commands(self):
+        commands = chado_tools.general_commands()
         self.assertIn("connect", commands)
         self.assertIn("create", commands)
         self.assertIn("dump", commands)
@@ -16,6 +15,19 @@ class TestArguments(unittest.TestCase):
         self.assertIn("export", commands)
         self.assertIn("query", commands)
         self.assertNotIn("non_existent_command", commands)
+
+    def test_specific_commands(self):
+        commands = chado_tools.specific_commands()
+        self.assertIn("list", commands)
+
+    def test_list_commands(self):
+        commands = chado_tools.list_commands()
+        self.assertIn("organisms", commands)
+        self.assertIn("genera", commands)
+
+
+class TestArguments(unittest.TestCase):
+    """Tests if input arguments are parsed correctly"""
 
     def test_connect_args(self):
         # Tests if the command line arguments for the subcommand 'chado connect' are parsed correctly
@@ -134,6 +146,34 @@ class TestArguments(unittest.TestCase):
         self.assertEqual(parsed_args["query"], "")
         self.assertIn("input_file", parsed_args)
         self.assertEqual(parsed_args["input_file"], "testqueryfile")
+
+    def test_list_genera_args(self):
+        # Tests if the command line arguments for the subcommand 'chado list genera' are parsed correctly
+        args = ["chado", "list", "genera", "-H", "-d", ";", "-o", "testfile", "testdb"]
+        parsed_args = vars(chado_tools.parse_arguments(args))
+        self.assertIn("include_header", parsed_args)
+        self.assertTrue(parsed_args["include_header"])
+        self.assertIn("delimiter", parsed_args)
+        self.assertEqual(parsed_args["delimiter"], ";")
+        self.assertIn("output_file", parsed_args)
+        self.assertEqual(parsed_args["output_file"], "testfile")
+        self.assertIn("dbname", parsed_args)
+        self.assertEqual(parsed_args["dbname"], "testdb")
+
+    def test_list_organisms_args(self):
+        # Tests if the command line arguments for the subcommand 'chado list organisms' are parsed correctly
+        args = ["chado", "list", "organisms", "-H", "-d", ";", "-o", "testfile", "-g", "testgenus", "testdb"]
+        parsed_args = vars(chado_tools.parse_arguments(args))
+        self.assertIn("include_header", parsed_args)
+        self.assertTrue(parsed_args["include_header"])
+        self.assertIn("delimiter", parsed_args)
+        self.assertEqual(parsed_args["delimiter"], ";")
+        self.assertIn("output_file", parsed_args)
+        self.assertEqual(parsed_args["output_file"], "testfile")
+        self.assertIn("genus", parsed_args)
+        self.assertEqual(parsed_args["genus"], "testgenus")
+        self.assertIn("dbname", parsed_args)
+        self.assertEqual(parsed_args["dbname"], "testdb")
 
 
 if __name__ == '__main__':

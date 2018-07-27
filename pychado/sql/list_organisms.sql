@@ -1,0 +1,1 @@
+SELECT DISTINCT genus, species, common_name FROM organism

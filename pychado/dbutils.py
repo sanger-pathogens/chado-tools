@@ -60,10 +60,10 @@ def default_configuration_file() -> str:
     return pkg_resources.resource_filename("pychado", "data/defaultDatabase.yml")
 
 
-def execute_query(connection, query: str, header=False) -> list:
+def execute_query(connection, query: str, params: tuple, header=False) -> list:
     """Executes an SQL query in an opened PostgreSQL database and returns the query result"""
     cursor = connection.cursor()
-    cursor.execute(query)
+    cursor.execute(query, params)
     if header:
         result = [tuple([desc[0] for desc in cursor.description])]
         result.extend(cursor.fetchall())
@@ -73,28 +73,28 @@ def execute_query(connection, query: str, header=False) -> list:
     return result
 
 
-def execute_statement(connection, statement: str):
+def execute_statement(connection, statement: str, params: tuple):
     """Executes an SQL statement in an opened PostgreSQL database"""
     cursor = connection.cursor()
-    cursor.execute(statement)
+    cursor.execute(statement, params)
     cursor.close()
 
 
-def connect_and_execute_query(dsn: str, query: str, header=False) -> list:
+def connect_and_execute_query(dsn: str, query: str, params=tuple(), header=False) -> list:
     """Connects to a database, executes an SQL query, and returns the result"""
     connection = psycopg2.connect(dsn)
     connection.set_client_encoding("UTF8")
-    result = execute_query(connection, query, header)
+    result = execute_query(connection, query, params, header)
     connection.close()
     return result
 
 
-def connect_and_execute_statement(dsn: str, statement: str, autocommit=False):
+def connect_and_execute_statement(dsn: str, statement: str, params=tuple(), autocommit=False):
     """Connects to a database and executes an SQL statement"""
     connection = psycopg2.connect(dsn)
     if autocommit:
         connection.autocommit = True
-    execute_statement(connection, statement)
+    execute_statement(connection, statement, params)
     if not autocommit:
         connection.commit()
     connection.close()
@@ -102,8 +102,8 @@ def connect_and_execute_statement(dsn: str, statement: str, autocommit=False):
 
 def exists(dsn: str, dbname: str) -> bool:
     """Checks if a PostgreSQL database exists"""
-    sql = "SELECT COUNT(*) FROM pg_catalog.pg_database WHERE datname = '" + dbname + "'"
-    result = connect_and_execute_query(dsn, sql)
+    sql = utils.read_text(pkg_resources.resource_filename("pychado", "sql/check_if_database_exists.sql"))
+    result = connect_and_execute_query(dsn, sql, (dbname,))
     return bool(result[0][0])
 
 
@@ -118,14 +118,14 @@ def random_database(dsn: str) -> str:
 def create_database(dsn: str, dbname: str) -> None:
     """Creates a PostgreSQL database"""
     sql = "CREATE DATABASE " + dbname
-    connect_and_execute_statement(dsn, sql, autocommit=True)
+    connect_and_execute_statement(dsn, sql, (), autocommit=True)
     print("Database has been created.")
 
 
 def drop_database(dsn: str, dbname: str) -> None:
     """Deletes a PostgreSQL database"""
     sql = "DROP DATABASE " + dbname
-    connect_and_execute_statement(dsn, sql, autocommit=True)
+    connect_and_execute_statement(dsn, sql, (), autocommit=True)
     print("Database has been deleted.")
 
 
@@ -175,12 +175,12 @@ def copy_from_file(dsn: str, table: str, filename: str, delimiter: str) -> None:
 def copy_to_file(dsn: str, table: str, filename: str, delimiter: str, header: bool) -> None:
     """Copies data from a table of a PostgreSQL database into a CSV file"""
     sql = "SELECT * FROM " + table
-    query_to_file(dsn, sql, filename, delimiter, header)
+    query_to_file(dsn, sql, (), filename, delimiter, header)
 
 
-def query_to_file(dsn: str, query: str, filename: str, delimiter: str, header: bool) -> None:
+def query_to_file(dsn: str, query: str, params: tuple, filename: str, delimiter: str, header: bool) -> None:
     """Executes a query in a PostgreSQL database and writes the result into a CSV file"""
-    result = connect_and_execute_query(dsn, query, header)
+    result = connect_and_execute_query(dsn, query, params, header)
     file = utils.open_file_write(filename)
     for line in result:
         file.write(utils.list_to_string(line, delimiter) + "\n")

@@ -12,16 +12,16 @@ def generate_uri(connection_details: dict) -> str:
     """Creates a connection URI"""
     uri_as_list = ["postgresql://"]
     if "user" in connection_details and connection_details["user"] is not None:
-        uri_as_list.append(connection_details["user"])
+        uri_as_list.append(urllib.parse.quote(connection_details["user"]))
         if "password" in connection_details and connection_details["password"] is not None:
             uri_as_list.append(":" + urllib.parse.quote(connection_details["password"]))
         uri_as_list.append("@")
     if "host" in connection_details and connection_details["host"] is not None:
-        uri_as_list.append(connection_details["host"])
+        uri_as_list.append(urllib.parse.quote(connection_details["host"]))
     if "port" in connection_details and connection_details["port"] is not None:
         uri_as_list.append(":" + connection_details["port"])
     if "database" in connection_details and connection_details["database"] is not None:
-        uri_as_list.append("/" + connection_details["database"])
+        uri_as_list.append("/" + urllib.parse.quote(connection_details["database"]))
     return "".join(uri_as_list)
 
 

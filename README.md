@@ -6,14 +6,14 @@ Python3 command line script providing various tools for accessing CHADO database
 
 ## Prerequisites
 
-* PostgreSQL
+* PostgreSQL 9.6 or higher
 * Python 3.6 or higher
 
 ## Installation
 
 Download the latest release from this github repository, or clone the repository.
 
-Change the file with [default connection settings](pychado/data/defaultDatabase.yml) such that it contains an existing PostgreSQL database to which you can connect.
+Modify the file with [default connection settings](pychado/data/defaultDatabase.yml) such that it contains an existing PostgreSQL database to which you can connect.
 Note: This database is only used for housekeeping purposes, it will never be changed or removed by `chado-tools`. You can thus simply use one of the built-in PostgreSQL databases, such as `template0`. 
 
 Then run the tests:
@@ -23,6 +23,10 @@ Then run the tests:
 If the tests all pass, install:
 
     python3 setup.py install
+    
+Alternatively, you can install the program from the Python Package Index (PyPI) using the command `pip install chado-tools`.
+Note that you'll still have to adapt the file with [default connection settings](pychado/data/defaultDatabase.yml),
+or alternatively run the program with flag `-c`.
 
 ## Usage
 
@@ -58,6 +62,10 @@ Create a new database called `insects` according to the current GMOD schema:
 Dump this database into an archive called `insects.dump`:
 
     chado dump insects insects.dump
+
+Run a query to get all species of the "Plasmodium" genus in the "pathogens" database:
+
+    chado query -q "SELECT * FROM organism WHERE genus = 'Plasmodium'" pathogens
 
 ## Note
 

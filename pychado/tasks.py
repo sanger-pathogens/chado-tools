@@ -1,5 +1,4 @@
-import pkg_resources
-from pychado import utils, dbutils
+from pychado import utils, dbutils, queries
 
 
 def read_configuration_file(filename: str) -> dict:
@@ -61,12 +60,18 @@ def run_command_with_arguments(command: str, arguments, connection_parameters: d
         dbutils.copy_to_file(connection_dsn, arguments.table, arguments.output_file, arguments.delimiter,
                              arguments.include_header)
     elif command == "query":
-        # Query a PostgreSQL database and exports the result to a text file
+        # Query a PostgreSQL database and export the result to a text file
         if arguments.query:
             query = arguments.query
         else:
             query = utils.read_text(arguments.input_file)
         dbutils.query_to_file(connection_dsn, query, tuple(), arguments.output_file, arguments.delimiter,
+                              arguments.include_header)
+    elif command == "stats":
+        # Obtain statistics to updates in a CHADO database
+        query = queries.load_stats_query(arguments)
+        parameters = queries.specify_stats_parameters(arguments)
+        dbutils.query_to_file(connection_dsn, query, parameters, arguments.output_file, arguments.delimiter,
                               arguments.include_header)
     else:
         print("Functionality '" + command + "' is not yet implemented.")
@@ -81,30 +86,9 @@ def run_sub_command_with_arguments(command: str, sub_command: str, arguments, co
     # Run the command
     if command == "list":
         # List the organisms/genera in the CHADO database and export the result to a text file
-        query = load_list_query(sub_command, arguments)
-        parameters = specify_list_parameters(sub_command, arguments)
+        query = queries.load_list_query(sub_command, arguments)
+        parameters = queries.specify_list_parameters(sub_command, arguments)
         dbutils.query_to_file(connection_dsn, query, parameters, arguments.output_file, arguments.delimiter,
-                              arguments.include_header)
+                             arguments.include_header)
     else:
         print("Functionality '" + command + "' is not yet implemented.")
-
-
-def load_list_query(specifier: str, arguments) -> str:
-    """Loads the SQL query for a 'chado list' command"""
-    query = ""
-    if specifier == "organisms" and arguments.genus == "all":
-        query = utils.read_text(pkg_resources.resource_filename("pychado", "sql/list_organisms.sql"))
-    elif specifier == "organisms" and arguments.genus != "all":
-        query = utils.read_text(pkg_resources.resource_filename("pychado", "sql/list_organisms_restricted.sql"))
-    elif specifier == "genera":
-        query = utils.read_text(pkg_resources.resource_filename("pychado", "sql/list_genera.sql"))
-    return query
-
-
-def specify_list_parameters(specifier: str, arguments) -> tuple:
-    """Specifies the parameters that complete the SQL query of a 'chado list' command"""
-    if specifier == "organisms" and arguments.genus != "all":
-        params = (arguments.genus,)
-    else:
-        params = tuple()
-    return params

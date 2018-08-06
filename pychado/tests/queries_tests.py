@@ -15,6 +15,9 @@ class TestQueries(unittest.TestCase):
         self.assertTrue(pkg_resources.resource_exists("pychado", "sql/list_products.sql"))
         self.assertTrue(pkg_resources.resource_exists("pychado", "sql/condition_genus.sql"))
         self.assertTrue(pkg_resources.resource_exists("pychado", "sql/condition_genus_species.sql"))
+        self.assertTrue(pkg_resources.resource_exists("pychado", "sql/insert_organism.sql"))
+        self.assertTrue(pkg_resources.resource_exists("pychado", "sql/delete_organism.sql"))
+        self.assertTrue(pkg_resources.resource_exists("pychado", "sql/max_organism_id.sql"))
 
     def test_load_stats_query(self):
         # Checks that the templates for the 'chado stats' query are correctly loaded
@@ -32,6 +35,21 @@ class TestQueries(unittest.TestCase):
         query = queries.load_list_query("products", args)
         self.assertIn("SELECT", query)
         query = queries.load_list_query("non_existent_specifier", args)
+        self.assertEqual(query, "")
+
+    def test_load_insert_statement(self):
+        # Checks that the templates for the 'chado insert' statements are correctly loaded
+        query = queries.load_insert_statement("organism")
+        self.assertIn("INSERT", query)
+        query = queries.load_insert_statement("non_existent_specifier")
+        self.assertEqual(query, "")
+
+    def test_load_delete_statement(self):
+        # Checks that the templates for the 'chado delete' statements are correctly loaded
+        args = utils.EmptyObject(genus="testgenus", species="testspecies")
+        query = queries.load_delete_statement("organism", args)
+        self.assertIn("DELETE", query)
+        query = queries.load_delete_statement("non_existent_specifier", args)
         self.assertEqual(query, "")
 
     def test_set_organism_condition(self):

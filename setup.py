@@ -14,11 +14,14 @@ setuptools.setup(
             "data/*.yml",
             "sql/*.sql"
         ],
+        "pychado.tests": [
+            "data/*"
+        ]
     },
     entry_points={
         "console_scripts": [
             "chado = scripts.chado_tools:main",
-        ],
+        ]
     },
     test_suite="nose.collector",
     tests_require=[

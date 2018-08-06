@@ -85,10 +85,25 @@ def run_sub_command_with_arguments(command: str, sub_command: str, arguments, co
 
     # Run the command
     if command == "list":
-        # List the organisms/genera in the CHADO database and export the result to a text file
+        # List all entities of a specified type in the CHADO database and export the result to a text file
         query = queries.load_list_query(sub_command, arguments)
         parameters = queries.specify_list_parameters(sub_command, arguments)
         dbutils.query_to_file(connection_dsn, query, parameters, arguments.output_file, arguments.delimiter,
                              arguments.include_header)
+    elif command == "insert":
+        # Insert a new entity of a specified type into the CHADO database
+        query = queries.load_maximum_id_query(sub_command)
+        result = dbutils.connect_and_execute_query(connection_dsn, query)
+        id = int(result[0][0]) + 1                                               # id of new entity = maximum id + 1
+        statement = queries.load_insert_statement(sub_command)
+        parameters = queries.specify_insert_parameters(sub_command, arguments, id)
+        dbutils.connect_and_execute_statement(connection_dsn, statement, parameters)
+        print("Inserted a new " + sub_command + " into the database.")
+    elif command == "delete":
+        # Delete an entity of a specified type from the CHADO database
+        statement = queries.load_delete_statement(sub_command, arguments)
+        parameters = queries.specify_delete_parameters(sub_command, arguments)
+        dbutils.connect_and_execute_statement(connection_dsn, statement, parameters)
+        print("Deleted an " + sub_command + " from the database.")
     else:
         print("Functionality '" + command + "' is not yet implemented.")

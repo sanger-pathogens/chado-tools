@@ -27,6 +27,14 @@ class TestCommands(unittest.TestCase):
         self.assertIn("genera", commands)
         self.assertIn("products", commands)
 
+    def test_insert_commands(self):
+        commands = chado_tools.insert_commands()
+        self.assertIn("organism", commands)
+
+    def test_delete_commands(self):
+        commands = chado_tools.delete_commands()
+        self.assertIn("organism", commands)
+
 
 class TestArguments(unittest.TestCase):
     """Tests if input arguments are parsed correctly"""
@@ -160,6 +168,26 @@ class TestArguments(unittest.TestCase):
         self.assertEqual(parsed_args["species"], "testspecies")
         self.assertEqual(parsed_args["dbname"], "testdb")
 
+    def test_insert_organism_args(self):
+        # Tests if the command line arguments for the subcommand 'chado insert organism' are parsed correctly
+        args = ["chado", "insert", "organism", "-g", "testgenus", "-s", "testspecies", "-a", "testabbreviation",
+                "--common_name", "testname", "--comment", "testcomment", "testdb"]
+        parsed_args = vars(chado_tools.parse_arguments(args))
+        self.assertEqual(parsed_args["genus"], "testgenus")
+        self.assertEqual(parsed_args["species"], "testspecies")
+        self.assertEqual(parsed_args["abbreviation"], "testabbreviation")
+        self.assertEqual(parsed_args["common_name"], "testname")
+        self.assertEqual(parsed_args["comment"], "testcomment")
+        self.assertEqual(parsed_args["dbname"], "testdb")
+
+    def test_delete_organism_args(self):
+        # Tests if the command line arguments for the subcommand 'chado delete organism' are parsed correctly
+        args = ["chado", "delete", "organism", "-g", "testgenus", "-s", "testspecies", "testdb"]
+        parsed_args = vars(chado_tools.parse_arguments(args))
+        self.assertEqual(len(parsed_args), 4)
+        self.assertEqual(parsed_args["genus"], "testgenus")
+        self.assertEqual(parsed_args["species"], "testspecies")
+        self.assertEqual(parsed_args["dbname"], "testdb")
 
 if __name__ == '__main__':
     unittest.main(verbosity=2, buffer=True)

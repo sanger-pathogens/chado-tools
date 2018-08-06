@@ -1,0 +1,1 @@
+SELECT MAX(organism_id) FROM organism

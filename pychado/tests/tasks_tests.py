@@ -165,6 +165,35 @@ class TestTasks(unittest.TestCase):
         tasks.run_sub_command_with_arguments("list", "products", args, self.connectionParameters)
         mock_query.assert_called_with(self.dsn, "testquery", ("testgenus", "testspecies"), "testfile", ";", True)
 
+    @unittest.mock.patch('pychado.queries.load_insert_statement')
+    @unittest.mock.patch('pychado.dbutils.connect_and_execute_query')
+    @unittest.mock.patch('pychado.dbutils.connect_and_execute_statement')
+    def test_insert_organism(self, mock_statement, mock_query, mock_load):
+        # Checks that the function querying a database is correctly called
+        self.assertIs(mock_statement, dbutils.connect_and_execute_statement)
+        self.assertIs(mock_query, dbutils.connect_and_execute_query)
+        self.assertIs(mock_load, queries.load_insert_statement)
+        args = chado_tools.parse_arguments(["chado", "insert", "organism", "-g", "testgenus", "-s", "testspecies",
+                                            "-a", "testabbreviation", "--common_name", "testname",
+                                            "--comment", "testcomment", "testdb"])
+        mock_load.return_value = "teststatement"
+        mock_query.return_value = [[158]]
+        tasks.run_sub_command_with_arguments("insert", "organism", args, self.connectionParameters)
+        mock_statement.assert_called_with(self.dsn, "teststatement", (159, "testgenus", "testspecies",
+                                                                      "testabbreviation", "testname", "testcomment"))
+
+    @unittest.mock.patch('pychado.queries.load_delete_statement')
+    @unittest.mock.patch('pychado.dbutils.connect_and_execute_statement')
+    def test_delete_organism(self, mock_statement, mock_load):
+        # Checks that the function querying a database is correctly called
+        self.assertIs(mock_statement, dbutils.connect_and_execute_statement)
+        self.assertIs(mock_load, queries.load_delete_statement)
+        args = chado_tools.parse_arguments(["chado", "delete", "organism", "-g", "testgenus", "-s", "testspecies",
+                                            "testdb"])
+        mock_load.return_value = "teststatement"
+        tasks.run_sub_command_with_arguments("delete", "organism", args, self.connectionParameters)
+        mock_statement.assert_called_with(self.dsn, "teststatement", ("testgenus", "testspecies"))
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=2, buffer=True)

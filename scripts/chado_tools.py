@@ -43,7 +43,9 @@ def general_commands() -> dict:
 def wrapper_commands() -> dict:
     """Lists the available 'wrapper' sub-commands of the 'chado' command with corresponding descriptions"""
     return {
-        "list": "list all entities of a specified type in the CHADO database"
+        "list": "list all entities of a specified type in the CHADO database",
+        "insert": "insert a new entity of a specified type into the CHADO database",
+        "delete": "delete an entity of a specified type from the CHADO database"
     }
 
 
@@ -53,6 +55,20 @@ def list_commands() -> dict:
         "organisms": "list all organisms in the CHADO database",
         "genera": "list all genera in the CHADO database",
         "products": "list all products of transcripts in the CHADO database"
+    }
+
+
+def insert_commands() -> dict:
+    """Lists the available sub-commands of the 'chado insert' command with corresponding descriptions"""
+    return {
+        "organism": "insert an organism into the CHADO database"
+    }
+
+
+def delete_commands() -> dict:
+    """Lists the available sub-commands of the 'chado delete' command with corresponding descriptions"""
+    return {
+        "organism": "delete an organism from the CHADO database"
     }
 
 
@@ -119,6 +135,10 @@ def add_arguments_by_command(command: str, parser: argparse.ArgumentParser):
         add_stats_arguments(parser)
     elif command == "list":
         add_list_arguments(parser)
+    elif command == "insert":
+        add_insert_arguments(parser)
+    elif command == "delete":
+        add_delete_arguments(parser)
     else:
         print("Command '" + parser.prog + "' is not available.")
 
@@ -211,3 +231,54 @@ def add_list_product_arguments(parser: argparse.ArgumentParser):
     """Defines formal arguments for the 'chado list products' sub-command"""
     parser.add_argument("-g", "--genus", default="all", help="Restrict to a certain genus (default: all)")
     parser.add_argument("-s", "--species", default="all", help="Restrict to a certain species (default: all)")
+
+
+def add_insert_arguments(parser: argparse.ArgumentParser):
+    """Defines formal arguments for the 'chado insert' sub-command"""
+    subparsers = parser.add_subparsers()
+    for command, description in insert_commands().items():
+        # Create subparser and add general and specific formal arguments
+        sub = subparsers.add_parser(command, description=description, help=description)
+        add_general_arguments(sub)
+        add_insert_arguments_by_command(command, sub)
+
+
+def add_insert_arguments_by_command(command: str, parser: argparse.ArgumentParser):
+    """Defines formal arguments for a specified sub-command of 'chado insert'"""
+    if command == "organism":
+        add_insert_organism_arguments(parser)
+    else:
+        print("Command '" + parser.prog + "' is not available.")
+
+
+def add_insert_organism_arguments(parser: argparse.ArgumentParser):
+    """Defines formal arguments for the 'chado insert organism' sub-command"""
+    parser.add_argument("-g", "--genus", required=True, help="genus of the organism")
+    parser.add_argument("-s", "--species", required=True, help="species of the organism")
+    parser.add_argument("-a", "--abbreviation", required=True, help="abbreviation of the organism")
+    parser.add_argument("--common_name", help="common name of the organism (default: use abbreviation)")
+    parser.add_argument("--comment", help="comment")
+
+
+def add_delete_arguments(parser: argparse.ArgumentParser):
+    """Defines formal arguments for the 'chado delete' sub-command"""
+    subparsers = parser.add_subparsers()
+    for command, description in delete_commands().items():
+        # Create subparser and add general and specific formal arguments
+        sub = subparsers.add_parser(command, description=description, help=description)
+        add_general_arguments(sub)
+        add_delete_arguments_by_command(command, sub)
+
+
+def add_delete_arguments_by_command(command: str, parser: argparse.ArgumentParser):
+    """Defines formal arguments for a specified sub-command of 'chado delete'"""
+    if command == "organism":
+        add_delete_organism_arguments(parser)
+    else:
+        print("Command '" + parser.prog + "' is not available.")
+
+
+def add_delete_organism_arguments(parser: argparse.ArgumentParser):
+    """Defines formal arguments for the 'chado delete organism' sub-command"""
+    parser.add_argument("-g", "--genus", required=True, help="genus of the organism")
+    parser.add_argument("-s", "--species", default="all", help="species of the organism (default: all)")

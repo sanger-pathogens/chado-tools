@@ -11,7 +11,7 @@ Python3 command line script providing various tools for accessing CHADO database
 
 ## Installation
 
-Download the latest release from this github repository, or clone the repository.
+Download the latest release from this github repository, or clone the repository to obtain the most recent updates.
 
 Modify the file with [default connection settings](pychado/data/defaultDatabase.yml) such that it contains an existing PostgreSQL database to which you can connect.
 Note: This database is only used for housekeeping purposes, it will never be changed or removed by `chado-tools`. You can thus simply use one of the built-in PostgreSQL databases, such as `template0`. 
@@ -24,9 +24,16 @@ If the tests all pass, install:
 
     python3 setup.py install
     
-Alternatively, you can install the program from the Python Package Index (PyPI) using the command `pip install chado-tools`.
-Note that you'll still have to adapt the file with [default connection settings](pychado/data/defaultDatabase.yml),
-or alternatively run the program with flag `-c`.
+Alternatively, you can install the program from the *Python Package Index (PyPI)* using the command
+
+    pip install chado-tools
+    
+The program is also available as *Bioconda* package. Install it with the command
+
+    conda install -c bioconda chado-tools
+
+No matter which installation method you choose, you'll have to adapt the file with 
+[default connection settings](pychado/data/defaultDatabase.yml), or alternatively run the program with flag `-c`.
 
 ## Usage
 
@@ -51,21 +58,30 @@ The usage is:
 | import                | import data from a text file into a table of a CHADO database        |
 | export                | export data from a table of a CHADO database into a text file        |
 | query                 | query a CHADO database and export the result into a text file        |
+| stats                 | obtain statistics to updates in a CHADO database                     |
+| list                  | list all entities of a specified type in the CHADO database          |
+| insert                | insert a new entity of a specified type into the CHADO database      |
+| delete                | delete an entity of a specified type from the CHADO database         |
 ------------------------------------------------------------------------------------------------
 
 ## Examples
 
-Create a new database called `insects` according to the current GMOD schema:
+Create a new CHADO database called `eukaryotes` according to the current GMOD schema:
 
-    chado create insects
+    chado create eukaryotes
     
-Dump this database into an archive called `insects.dump`:
+Dump this database into an archive called `eukaryotes.dump`:
 
-    chado dump insects insects.dump
+    chado dump eukaryotes eukaryotes.dump
 
-Run a query to get all species of the "Plasmodium" genus in the "pathogens" database:
+List all organisms of the `Plasmodium` genus in the `eukaryotes` database:
 
-    chado query -q "SELECT * FROM organism WHERE genus = 'Plasmodium'" pathogens
+    chado list organisms -g Plasmodium eukaryotes
+
+Query the database to check the meaning of a certain `cvterm_id`:
+
+    chado query -q "SELECT name FROM cvterm WHERE cvterm_id = 25" eukaryotes
+
 
 ## Note
 

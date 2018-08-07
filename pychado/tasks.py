@@ -15,17 +15,20 @@ def check_access(connection_parameters: dict, database: str, task: str) -> bool:
     exists = dbutils.exists(connection_dsn, database)
     if exists:
         if task in ["create", "restore"]:
-            # Database already exists - no need to create it
-            print("Database already exists.")
-        return True
+            # Database already exists, we should not overwrite it. Return without further action
+            print("Database already exists. Overwriting is not permitted.")
+            return False
+        else:
+            # Database exists, that's all we need
+            return True
     else:
         if task in ["create", "restore"]:
-            # Database doesn't exist, but task implies its creation - create it
+            # Database doesn't exist, but task implies its creation. Create it
             dbutils.create_database(connection_dsn, database)
             return True
         else:
-            # Database doesn't exist, and task can't be completed - return without further action
-            print("Database does not exist.")
+            # Database doesn't exist, and task can't be completed. Return without further action
+            print("Database does not exist. Task can't be completed.")
             return False
 
 
@@ -92,11 +95,8 @@ def run_sub_command_with_arguments(command: str, sub_command: str, arguments, co
                              arguments.include_header)
     elif command == "insert":
         # Insert a new entity of a specified type into the CHADO database
-        query = queries.load_maximum_id_query(sub_command)
-        result = dbutils.connect_and_execute_query(connection_dsn, query)
-        id = int(result[0][0]) + 1                                               # id of new entity = maximum id + 1
         statement = queries.load_insert_statement(sub_command)
-        parameters = queries.specify_insert_parameters(sub_command, arguments, id)
+        parameters = queries.specify_insert_parameters(sub_command, arguments)
         dbutils.connect_and_execute_statement(connection_dsn, statement, parameters)
         print("Inserted a new " + sub_command + " into the database.")
     elif command == "delete":

@@ -1,1 +1,1 @@
-INSERT INTO organism (organism_id, genus, species, abbreviation, common_name, comment) VALUES (%s, %s, %s, %s, %s, %s)
+INSERT INTO organism (genus, species, abbreviation, common_name, comment) VALUES (%s, %s, %s, %s, %s)

@@ -255,8 +255,8 @@ def add_insert_organism_arguments(parser: argparse.ArgumentParser):
     """Defines formal arguments for the 'chado insert organism' sub-command"""
     parser.add_argument("-g", "--genus", required=True, help="genus of the organism")
     parser.add_argument("-s", "--species", required=True, help="species of the organism")
-    parser.add_argument("-a", "--abbreviation", required=True, help="abbreviation of the organism")
-    parser.add_argument("--common_name", help="common name of the organism (default: use abbreviation)")
+    parser.add_argument("-a", "--abbreviation", help="abbreviation of the organism")
+    parser.add_argument("--common_name", help="common name of the organism (default: use abbreviation, if provided)")
     parser.add_argument("--comment", help="comment")
 
 

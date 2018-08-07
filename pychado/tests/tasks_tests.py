@@ -35,20 +35,22 @@ class TestTasks(unittest.TestCase):
     @unittest.mock.patch('pychado.dbutils.create_database')
     @unittest.mock.patch('pychado.dbutils.exists')
     def test_access(self, mock_exist, mock_create):
-        # Checks that database access is only permitted if the database exists or gets created
+        # Checks that database access is only permitted if the database exists or gets created,
+        # and checks that no existing database is overwritten
         self.assertIs(mock_exist, dbutils.exists)
         self.assertIs(mock_create, dbutils.create_database)
 
         mock_exist.return_value = True
         self.assertTrue(tasks.check_access(self.connectionParameters, "testdb", "connect"))
         mock_create.assert_not_called()
+        self.assertFalse(tasks.check_access(self.connectionParameters, "testdb", "create"))
+        mock_create.assert_not_called()
 
         mock_exist.return_value = False
         self.assertFalse(tasks.check_access(self.connectionParameters, "testdb", "connect"))
         mock_create.assert_not_called()
-
         self.assertTrue(tasks.check_access(self.connectionParameters, "testdb", "create"))
-        mock_create.assert_called()
+        mock_create.assert_called_with(self.dsn, "testdb")
 
     @unittest.mock.patch('pychado.dbutils.connect_to_database')
     def test_connect(self, mock_connect):
@@ -166,20 +168,17 @@ class TestTasks(unittest.TestCase):
         mock_query.assert_called_with(self.dsn, "testquery", ("testgenus", "testspecies"), "testfile", ";", True)
 
     @unittest.mock.patch('pychado.queries.load_insert_statement')
-    @unittest.mock.patch('pychado.dbutils.connect_and_execute_query')
     @unittest.mock.patch('pychado.dbutils.connect_and_execute_statement')
-    def test_insert_organism(self, mock_statement, mock_query, mock_load):
+    def test_insert_organism(self, mock_statement, mock_load):
         # Checks that the function querying a database is correctly called
         self.assertIs(mock_statement, dbutils.connect_and_execute_statement)
-        self.assertIs(mock_query, dbutils.connect_and_execute_query)
         self.assertIs(mock_load, queries.load_insert_statement)
         args = chado_tools.parse_arguments(["chado", "insert", "organism", "-g", "testgenus", "-s", "testspecies",
                                             "-a", "testabbreviation", "--common_name", "testname",
                                             "--comment", "testcomment", "testdb"])
         mock_load.return_value = "teststatement"
-        mock_query.return_value = [[158]]
         tasks.run_sub_command_with_arguments("insert", "organism", args, self.connectionParameters)
-        mock_statement.assert_called_with(self.dsn, "teststatement", (159, "testgenus", "testspecies",
+        mock_statement.assert_called_with(self.dsn, "teststatement", ("testgenus", "testspecies",
                                                                       "testabbreviation", "testname", "testcomment"))
 
     @unittest.mock.patch('pychado.queries.load_delete_statement')

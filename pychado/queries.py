@@ -84,13 +84,12 @@ def specify_stats_parameters(arguments) -> tuple:
     return params
 
 
-def specify_insert_parameters(specifier: str, arguments, id: int) -> tuple:
+def specify_insert_parameters(specifier: str, arguments) -> tuple:
     """Specifies the parameters that complete the SQL query of a 'chado insert' command"""
     if specifier == "organism":
         if not arguments.common_name:
             arguments.common_name = arguments.abbreviation
-        params = (id, arguments.genus, arguments.species, arguments.abbreviation, arguments.common_name,
-                  arguments.comment)
+        params = (arguments.genus, arguments.species, arguments.abbreviation, arguments.common_name, arguments.comment)
     else:
         params = tuple()
     return params

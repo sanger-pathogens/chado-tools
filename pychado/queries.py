@@ -16,10 +16,15 @@ def load_list_query(specifier: str, arguments) -> str:
     return query
 
 
-def load_stats_query(arguments) -> str:
+def load_stats_query(specifier: str, arguments) -> str:
     """Loads the SQL query for a 'chado stats' command"""
-    template = utils.read_text(pkg_resources.resource_filename("pychado", "sql/stats.sql"))
-    query = set_organism_condition(template, arguments)
+    query = ""
+    if specifier == "annotations":
+        template = utils.read_text(pkg_resources.resource_filename("pychado", "sql/stats_annotations.sql"))
+        query = set_organism_condition(template, arguments)
+    elif specifier == "eupathdb_tags":
+        template = utils.read_text(pkg_resources.resource_filename("pychado", "sql/stats_eupath.sql"))
+        query = set_organism_condition(template, arguments)
     return query
 
 

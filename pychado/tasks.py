@@ -70,12 +70,6 @@ def run_command_with_arguments(command: str, arguments, connection_parameters: d
             query = utils.read_text(arguments.input_file)
         dbutils.query_to_file(connection_dsn, query, tuple(), arguments.output_file, arguments.delimiter,
                               arguments.include_header)
-    elif command == "stats":
-        # Obtain statistics to updates in a CHADO database
-        query = queries.load_stats_query(arguments)
-        parameters = queries.specify_stats_parameters(arguments)
-        dbutils.query_to_file(connection_dsn, query, parameters, arguments.output_file, arguments.delimiter,
-                              arguments.include_header)
     else:
         print("Functionality '" + command + "' is not yet implemented.")
 
@@ -104,6 +98,12 @@ def run_sub_command_with_arguments(command: str, sub_command: str, arguments, co
         statement = queries.load_delete_statement(sub_command, arguments)
         parameters = queries.specify_delete_parameters(sub_command, arguments)
         dbutils.connect_and_execute_statement(connection_dsn, statement, parameters)
-        print("Deleted an " + sub_command + " from the database.")
+        print("Deleted an existing " + sub_command + " from the database.")
+    elif command == "stats":
+        # Obtain statistics to updates in a CHADO database
+        query = queries.load_stats_query(sub_command, arguments)
+        parameters = queries.specify_stats_parameters(arguments)
+        dbutils.query_to_file(connection_dsn, query, parameters, arguments.output_file, arguments.delimiter,
+                              arguments.include_header)
     else:
         print("Functionality '" + command + "' is not yet implemented.")

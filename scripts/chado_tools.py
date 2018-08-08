@@ -35,8 +35,7 @@ def general_commands() -> dict:
         "restore": "restore a CHADO database from an archive file",
         "import": "import data from a text file to a table of a CHADO database",
         "export": "export data from a table of a CHADO database to a text file",
-        "query": "query a CHADO database and export the result to a text file",
-        "stats": "obtain statistics to updates in a CHADO database"
+        "query": "query a CHADO database and export the result to a text file"
     }
 
 
@@ -45,7 +44,8 @@ def wrapper_commands() -> dict:
     return {
         "list": "list all entities of a specified type in the CHADO database",
         "insert": "insert a new entity of a specified type into the CHADO database",
-        "delete": "delete an entity of a specified type from the CHADO database"
+        "delete": "delete an entity of a specified type from the CHADO database",
+        "stats": "obtain statistics to updates in a CHADO database"
     }
 
 
@@ -69,6 +69,14 @@ def delete_commands() -> dict:
     """Lists the available sub-commands of the 'chado delete' command with corresponding descriptions"""
     return {
         "organism": "delete an organism from the CHADO database"
+    }
+
+
+def stats_commands() -> dict:
+    """Lists the available sub-commands of the 'chado stats' command with corresponding descriptions"""
+    return {
+        "annotations": "obtain a list of annotation upates",
+        "eupathdb_tags": "obtain a list of updated EuPathDB tags"
     }
 
 
@@ -187,15 +195,32 @@ def add_query_arguments(parser: argparse.ArgumentParser):
 
 def add_stats_arguments(parser: argparse.ArgumentParser):
     """Defines formal arguments for the 'chado stats' sub-command"""
-    add_general_export_arguments(parser)
-    parser.add_argument("-g", "--genus", default="all", help="Restrict to a certain genus (default: all)")
-    parser.add_argument("-s", "--species", default="all", help="Restrict to a certain species (default: all)")
-    parser.add_argument("-D", "--date", required=True,
-                        help="date from which on updates are included, format 'YYYYMMDD'")
+    parser.epilog = "For detailed usage information type '" + parser.prog + " <command> -h'"
+    subparsers = parser.add_subparsers()
+    for command, description in stats_commands().items():
+        # Create subparser and add general and specific formal arguments
+        sub = subparsers.add_parser(command, description=description, help=description)
+        add_general_arguments(sub)
+        add_general_export_arguments(sub)
+        sub.add_argument("-g", "--genus", default="all", help="Restrict to a certain genus (default: all)")
+        sub.add_argument("-s", "--species", default="all", help="Restrict to a certain species (default: all)")
+        sub.add_argument("-D", "--date", required=True, help="date for maximum age of updates, format 'YYYYMMDD'")
+        add_stats_arguments_by_command(command, sub)
+
+
+def add_stats_arguments_by_command(command: str, parser: argparse.ArgumentParser):
+    """Defines formal arguments for a specified sub-command of 'chado stats'"""
+    if command == "annotations":
+        pass
+    elif command == "eupathdb_tags":
+        pass
+    else:
+        print("Command '" + parser.prog + "' is not available.")
 
 
 def add_list_arguments(parser: argparse.ArgumentParser):
     """Defines formal arguments for the 'chado list' sub-command"""
+    parser.epilog = "For detailed usage information type '" + parser.prog + " <command> -h'"
     subparsers = parser.add_subparsers()
     for command, description in list_commands().items():
         # Create subparser and add general and specific formal arguments
@@ -235,6 +260,7 @@ def add_list_product_arguments(parser: argparse.ArgumentParser):
 
 def add_insert_arguments(parser: argparse.ArgumentParser):
     """Defines formal arguments for the 'chado insert' sub-command"""
+    parser.epilog = "For detailed usage information type '" + parser.prog + " <command> -h'"
     subparsers = parser.add_subparsers()
     for command, description in insert_commands().items():
         # Create subparser and add general and specific formal arguments
@@ -262,6 +288,7 @@ def add_insert_organism_arguments(parser: argparse.ArgumentParser):
 
 def add_delete_arguments(parser: argparse.ArgumentParser):
     """Defines formal arguments for the 'chado delete' sub-command"""
+    parser.epilog = "For detailed usage information type '" + parser.prog + " <command> -h'"
     subparsers = parser.add_subparsers()
     for command, description in delete_commands().items():
         # Create subparser and add general and specific formal arguments

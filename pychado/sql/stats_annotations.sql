@@ -1,12 +1,12 @@
 /*
- * This query returns all changes in annotation/gene model since the latest release for a given organism
+ * This query returns all changes in annotation/gene model since the latest release
  */
 SELECT
 	feature1.uniquename AS mrnaid,
 	feature2.uniquename AS geneid,
 	fcvt.feature_cvterm_id AS annotationid,
 	property1.value AS annotationvalue,
-	property1.type_id
+	property1.type_id AS type_id
 FROM
 	feature_cvterm fcvt																-- start off with a gene product (e.g. polypeptide)
 	JOIN
@@ -28,13 +28,13 @@ WHERE
 	AND
 	property2.type_id IN (SELECT cvterm_id FROM cvterm WHERE name = 'date')			-- capture any commits since the latest release
 	AND
-	property2.value > '20180227'
+	property2.value > %s
 	AND
 	relation1.type_id IN (SELECT cvterm_id FROM cvterm WHERE name = 'derives_from')	-- gene product 'derives from' transcript
 	AND
 	feature1.organism_id IN (SELECT organism_id FROM organism WHERE {{CONDITION}})	-- a specific organism
 ORDER BY
-	feature2.uniquename,
-	fcvt.feature_cvterm_id,
-	property1.type_id,
-	property1.value
+	mrnaid,
+	annotationid,
+	type_id,
+	annotationvalue

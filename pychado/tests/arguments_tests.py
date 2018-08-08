@@ -14,12 +14,15 @@ class TestCommands(unittest.TestCase):
         self.assertIn("import", commands)
         self.assertIn("export", commands)
         self.assertIn("query", commands)
-        self.assertIn("stats", commands)
         self.assertNotIn("non_existent_command", commands)
 
     def test_wrapper_commands(self):
         commands = chado_tools.wrapper_commands()
         self.assertIn("list", commands)
+        self.assertIn("insert", commands)
+        self.assertIn("delete", commands)
+        self.assertIn("stats", commands)
+        self.assertNotIn("non_existent_command", commands)
 
     def test_list_commands(self):
         commands = chado_tools.list_commands()
@@ -124,9 +127,22 @@ class TestArguments(unittest.TestCase):
         self.assertEqual(parsed_args["query"], "")
         self.assertEqual(parsed_args["input_file"], "testqueryfile")
 
-    def test_stats_args(self):
-        # Tests if the command line arguments for the subcommand 'chado stats' are parsed correctly
-        args = ["chado", "stats", "-H", "-d", ";", "-o", "testfile", "-g", "testgenus",
+    def test_stats_annotations_args(self):
+        # Tests if the command line arguments for the subcommand 'chado stats annotations' are parsed correctly
+        args = ["chado", "stats", "annotations", "-H", "-d", ";", "-o", "testfile", "-g", "testgenus",
+                "-s", "testspecies", "-D", "testdate", "testdb"]
+        parsed_args = vars(chado_tools.parse_arguments(args))
+        self.assertTrue(parsed_args["include_header"])
+        self.assertEqual(parsed_args["delimiter"], ";")
+        self.assertEqual(parsed_args["output_file"], "testfile")
+        self.assertEqual(parsed_args["genus"], "testgenus")
+        self.assertEqual(parsed_args["species"], "testspecies")
+        self.assertEqual(parsed_args["date"], "testdate")
+        self.assertEqual(parsed_args["dbname"], "testdb")
+
+    def test_stats_eupathdb_tags_args(self):
+        # Tests if the command line arguments for the subcommand 'chado stats eupathdb_tags' are parsed correctly
+        args = ["chado", "stats", "eupathdb_tags", "-H", "-d", ";", "-o", "testfile", "-g", "testgenus",
                 "-s", "testspecies", "-D", "testdate", "testdb"]
         parsed_args = vars(chado_tools.parse_arguments(args))
         self.assertTrue(parsed_args["include_header"])

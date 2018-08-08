@@ -9,7 +9,8 @@ class TestQueries(unittest.TestCase):
     def test_sql_resources(self):
         # Checks that all required resources are available
         self.assertTrue(pkg_resources.resource_isdir("pychado", "sql"))
-        self.assertTrue(pkg_resources.resource_exists("pychado", "sql/stats.sql"))
+        self.assertTrue(pkg_resources.resource_exists("pychado", "sql/stats_annotations.sql"))
+        self.assertTrue(pkg_resources.resource_exists("pychado", "sql/stats_eupath.sql"))
         self.assertTrue(pkg_resources.resource_exists("pychado", "sql/list_organisms.sql"))
         self.assertTrue(pkg_resources.resource_exists("pychado", "sql/list_genera.sql"))
         self.assertTrue(pkg_resources.resource_exists("pychado", "sql/list_products.sql"))
@@ -22,8 +23,12 @@ class TestQueries(unittest.TestCase):
     def test_load_stats_query(self):
         # Checks that the templates for the 'chado stats' query are correctly loaded
         args = utils.EmptyObject(genus="all", species="all", date="20180101")
-        query = queries.load_stats_query(args)
+        query = queries.load_stats_query("annotations", args)
         self.assertIn("SELECT", query)
+        query = queries.load_stats_query("eupathdb_tags", args)
+        self.assertIn("SELECT", query)
+        query = queries.load_list_query("non_existent_specifier", args)
+        self.assertEqual(query, "")
 
     def test_load_list_query(self):
         # Checks that the templates for the 'chado list' queries are correctly loaded

@@ -1,17 +1,17 @@
 /*
- * This query returns a list of all GeneDB products of transcripts
+ * This query returns the EuPathDB tags of all annotation updates since the latest release
  */
 SELECT
 	feature1.uniquename AS mrnaid,
 	feature2.uniquename AS geneid,
-	feature2.name AS genename,
-	cvt.name AS product,
-	fcvt.rank AS rankalternative,
-	feature1.organism_id AS organismid
+	property1.value AS tag,
+	feature1.organism_id AS orgid
 FROM
 	feature_cvterm fcvt																-- start off with a gene product (e.g. polypeptide)
 	JOIN
-	cvterm cvt USING (cvterm_id)
+	feature_cvtermprop property1 USING (feature_cvterm_id)							-- first property of the gene product
+	JOIN
+	feature_cvtermprop property2 USING (feature_cvterm_id)							-- second property of the gene product
 	JOIN
 	feature_relationship relation1 ON fcvt.feature_id = relation1.subject_id		-- connect gene product...
 	JOIN
@@ -21,15 +21,18 @@ FROM
 	JOIN
 	feature feature2 ON relation2.object_id = feature2.feature_id					-- ... with the corresponding gene
 WHERE
-	cvt.cvterm_id IN (SELECT cvterm_id FROM cvterm JOIN cv USING (cv_id) WHERE cv.name = 'genedb_products') -- restrict to GeneDB products
+	property1.type_id IN (SELECT cvterm_id FROM cvterm WHERE name = 'qualifier')	-- qualifier must start with 'eupathdb'
 	AND
-	feature1.organism_id IN (SELECT organism_id FROM organism WHERE {{CONDITION}})	-- a specific organism
+	property1.value LIKE 'eupathdb_uc=%%'
+	AND
+	property2.type_id IN (SELECT cvterm_id FROM cvterm WHERE name = 'date')			-- capture any commits since the latest release
+	AND
+	property2.value > %s
 	AND
 	relation1.type_id IN (SELECT cvterm_id FROM cvterm WHERE name = 'derives_from')	-- gene product 'derives from' transcript
 	AND
-	feature1.is_obsolete = 'f'														-- ignore obsolete features
+	feature1.organism_id IN (SELECT organism_id FROM organism WHERE {{CONDITION}})	-- a specific organism
 ORDER BY
 	mrnaid,
-	organismid,
-	rankalternative,
-	product
+	tag,
+	orgid

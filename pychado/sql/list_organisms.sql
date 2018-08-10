@@ -1,0 +1,1 @@
+SELECT DISTINCT genus, species, abbreviation FROM organism

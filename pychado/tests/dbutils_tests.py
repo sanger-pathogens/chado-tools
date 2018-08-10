@@ -136,7 +136,7 @@ class TestConnection(unittest.TestCase):
 
         # Query the database and check that the result is as expected
         temp_file = os.path.join(os.getcwd(), "tmp.csv")
-        dbutils.query_to_file(dsn, "SELECT * FROM species ORDER BY legs ASC", temp_file, ";", True)
+        dbutils.query_to_file(dsn, "SELECT * FROM species ORDER BY legs ASC", (), temp_file, ";", True)
         self.assertTrue(os.path.exists(temp_file))
         output_file = os.path.join(data_dir, "dbutils_ascii_copy_file_sorted.csv")
         self.assertTrue(os.path.exists(output_file))

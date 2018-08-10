@@ -201,7 +201,7 @@ def add_stats_arguments(parser: argparse.ArgumentParser):
         sub = subparsers.add_parser(command, description=description, help=description)
         add_general_arguments(sub)
         add_general_export_arguments(sub)
-        sub.add_argument("-a", "--abbreviation", default="all",
+        sub.add_argument("-a", "--abbreviation", default="all", dest="organism",
                          help="restrict to a certain organism, defined by its abbreviation/short name (default: all)")
         sub.add_argument("-D", "--date", required=True, help="date for maximum age of updates, format 'YYYYMMDD'")
         add_stats_arguments_by_command(command, sub)
@@ -246,7 +246,7 @@ def add_list_organisms_arguments(parser: argparse.ArgumentParser):
 
 def add_list_product_arguments(parser: argparse.ArgumentParser):
     """Defines formal arguments for the 'chado list products' sub-command"""
-    parser.add_argument("-a", "--abbreviation", default="all",
+    parser.add_argument("-a", "--abbreviation", dest="organism", default="all",
                         help="restrict to a certain organism, defined by its abbreviation/short name (default: all)")
 
 
@@ -299,4 +299,5 @@ def add_delete_arguments_by_command(command: str, parser: argparse.ArgumentParse
 
 def add_delete_organism_arguments(parser: argparse.ArgumentParser):
     """Defines formal arguments for the 'chado delete organism' sub-command"""
-    parser.add_argument("-a", "--abbreviation", required=True, help="abbreviation/short name of the organism")
+    parser.add_argument("-a", "--abbreviation", required=True, dest="organism",
+                        help="abbreviation/short name of the organism")

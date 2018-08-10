@@ -56,10 +56,10 @@ class TestQueries(unittest.TestCase):
     def test_set_organism_condition(self):
         # Checks that a query placeholder is correctly replaced
         query = "SELECT * FROM testdb WHERE {{CONDITION}}"
-        args = utils.EmptyObject(abbreviation="all")
+        args = utils.EmptyObject(organism="all")
         self.assertEqual(queries.set_organism_condition(query, args),
                          "SELECT * FROM testdb WHERE TRUE")
-        args.abbreviation = "testabbreviation"
+        args.organism = "testorganism"
         self.assertEqual(queries.set_organism_condition(query, args),
                          "SELECT * FROM testdb WHERE abbreviation = %s")
 

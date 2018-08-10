@@ -44,7 +44,7 @@ def load_delete_statement(specifier: str, arguments) -> str:
 
 def set_organism_condition(query: str, arguments) -> str:
     """Replaces a placeholder in a query with a condition restricting results to certain organisms"""
-    if not hasattr(arguments, "abbreviation") or arguments.abbreviation == "all":
+    if not hasattr(arguments, "organism") or arguments.organism == "all":
         modified_query = query.replace('{{CONDITION}}', 'TRUE')
     else:
         condition = utils.read_text(pkg_resources.resource_filename("pychado", "sql/condition_organism.sql"))
@@ -55,8 +55,8 @@ def set_organism_condition(query: str, arguments) -> str:
 def specify_list_parameters(specifier: str, arguments) -> tuple:
     """Specifies the parameters that complete the SQL query of a 'chado list' command"""
     if specifier == "products":
-        if arguments.abbreviation != "all":
-            params = (arguments.abbreviation, )
+        if arguments.organism != "all":
+            params = (arguments.organism, )
         else:
             params = tuple()
     else:
@@ -66,8 +66,8 @@ def specify_list_parameters(specifier: str, arguments) -> tuple:
 
 def specify_stats_parameters(arguments) -> tuple:
     """Specifies the parameters that complete the SQL query of a 'chado stats' command"""
-    if arguments.abbreviation != "all":
-        params = (arguments.date, arguments.abbreviation)
+    if arguments.organism != "all":
+        params = (arguments.date, arguments.organism)
     else:
         params = (arguments.date,)
     return params
@@ -87,7 +87,7 @@ def specify_insert_parameters(specifier: str, arguments) -> tuple:
 def specify_delete_parameters(specifier: str, arguments) -> tuple:
     """Specifies the parameters that complete the SQL query of a 'chado delete' command"""
     if specifier == "organism":
-        params = (arguments.abbreviation, )
+        params = (arguments.organism, )
     else:
         params = tuple()
     return params

@@ -128,25 +128,25 @@ class TestArguments(unittest.TestCase):
 
     def test_stats_annotations_args(self):
         # Tests if the command line arguments for the subcommand 'chado stats annotations' are parsed correctly
-        args = ["chado", "stats", "annotations", "-H", "-d", ";", "-o", "testfile", "-a", "testabbreviation",
+        args = ["chado", "stats", "annotations", "-H", "-d", ";", "-o", "testfile", "-a", "testorganism",
                 "-D", "testdate", "testdb"]
         parsed_args = vars(chado_tools.parse_arguments(args))
         self.assertTrue(parsed_args["include_header"])
         self.assertEqual(parsed_args["delimiter"], ";")
         self.assertEqual(parsed_args["output_file"], "testfile")
-        self.assertEqual(parsed_args["abbreviation"], "testabbreviation")
+        self.assertEqual(parsed_args["organism"], "testorganism")
         self.assertEqual(parsed_args["date"], "testdate")
         self.assertEqual(parsed_args["dbname"], "testdb")
 
     def test_stats_eupathdb_tags_args(self):
         # Tests if the command line arguments for the subcommand 'chado stats eupathdb_tags' are parsed correctly
-        args = ["chado", "stats", "eupathdb_tags", "-H", "-d", ";", "-o", "testfile", "-a", "testabbreviation",
+        args = ["chado", "stats", "eupathdb_tags", "-H", "-d", ";", "-o", "testfile", "-a", "testorganism",
                 "-D", "testdate", "testdb"]
         parsed_args = vars(chado_tools.parse_arguments(args))
         self.assertTrue(parsed_args["include_header"])
         self.assertEqual(parsed_args["delimiter"], ";")
         self.assertEqual(parsed_args["output_file"], "testfile")
-        self.assertEqual(parsed_args["abbreviation"], "testabbreviation")
+        self.assertEqual(parsed_args["organism"], "testorganism")
         self.assertEqual(parsed_args["date"], "testdate")
         self.assertEqual(parsed_args["dbname"], "testdb")
 
@@ -161,12 +161,12 @@ class TestArguments(unittest.TestCase):
 
     def test_list_products_args(self):
         # Tests if the command line arguments for the subcommand 'chado list products' are parsed correctly
-        args = ["chado", "list", "products", "-H", "-d", ";", "-o", "testfile", "-a", "testabbreviation", "testdb"]
+        args = ["chado", "list", "products", "-H", "-d", ";", "-o", "testfile", "-a", "testorganism", "testdb"]
         parsed_args = vars(chado_tools.parse_arguments(args))
         self.assertTrue(parsed_args["include_header"])
         self.assertEqual(parsed_args["delimiter"], ";")
         self.assertEqual(parsed_args["output_file"], "testfile")
-        self.assertEqual(parsed_args["abbreviation"], "testabbreviation")
+        self.assertEqual(parsed_args["organism"], "testorganism")
         self.assertEqual(parsed_args["dbname"], "testdb")
 
     def test_insert_organism_args(self):
@@ -183,9 +183,9 @@ class TestArguments(unittest.TestCase):
 
     def test_delete_organism_args(self):
         # Tests if the command line arguments for the subcommand 'chado delete organism' are parsed correctly
-        args = ["chado", "delete", "organism", "-a", "testabbreviation", "testdb"]
+        args = ["chado", "delete", "organism", "-a", "testorganism", "testdb"]
         parsed_args = vars(chado_tools.parse_arguments(args))
-        self.assertEqual(parsed_args["abbreviation"], "testabbreviation")
+        self.assertEqual(parsed_args["organism"], "testorganism")
         self.assertEqual(parsed_args["dbname"], "testdb")
 
 if __name__ == '__main__':

@@ -1,1 +1,1 @@
-SELECT DISTINCT genus, species, common_name FROM organism WHERE {{CONDITION}}
+SELECT DISTINCT genus, species, abbreviation FROM organism

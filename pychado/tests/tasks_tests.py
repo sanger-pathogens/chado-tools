@@ -126,10 +126,10 @@ class TestTasks(unittest.TestCase):
         self.assertIs(mock_query, dbutils.query_to_file)
         self.assertIs(mock_load, queries.load_stats_query)
         args = chado_tools.parse_arguments(["chado", "stats", "annotations", "-H", "-d", ";", "-o", "testfile",
-                                            "-g", "testgenus", "-s", "testspecies", "-D", "testdate", "testdb"])
+                                            "-a", "testabbreviation", "-D", "testdate", "testdb"])
         mock_load.return_value = "testquery"
         tasks.run_sub_command_with_arguments("stats", "annotations", args, self.connectionParameters)
-        mock_query.assert_called_with(self.dsn, "testquery", ("testdate", "testgenus", "testspecies"), "testfile",
+        mock_query.assert_called_with(self.dsn, "testquery", ("testdate", "testabbreviation"), "testfile",
                                       ";", True)
 
     @unittest.mock.patch('pychado.queries.load_stats_query')
@@ -139,22 +139,11 @@ class TestTasks(unittest.TestCase):
         self.assertIs(mock_query, dbutils.query_to_file)
         self.assertIs(mock_load, queries.load_stats_query)
         args = chado_tools.parse_arguments(["chado", "stats", "eupathdb_tags", "-H", "-d", ";", "-o", "testfile",
-                                            "-g", "testgenus", "-s", "testspecies", "-D", "testdate", "testdb"])
+                                            "-a", "testabbreviation", "-D", "testdate", "testdb"])
         mock_load.return_value = "testquery"
         tasks.run_sub_command_with_arguments("stats", "eupathdb_tags", args, self.connectionParameters)
-        mock_query.assert_called_with(self.dsn, "testquery", ("testdate", "testgenus", "testspecies"), "testfile",
+        mock_query.assert_called_with(self.dsn, "testquery", ("testdate", "testabbreviation"), "testfile",
                                       ";", True)
-
-    @unittest.mock.patch('pychado.queries.load_list_query')
-    @unittest.mock.patch('pychado.dbutils.query_to_file')
-    def test_list_genera(self, mock_query, mock_load):
-        # Checks that the function listing genera is correctly called
-        self.assertIs(mock_query, dbutils.query_to_file)
-        self.assertIs(mock_load, queries.load_list_query)
-        args = chado_tools.parse_arguments(["chado", "list", "genera", "-H", "-d", ";", "-o", "testfile", "testdb"])
-        mock_load.return_value = "testquery"
-        tasks.run_sub_command_with_arguments("list", "genera", args, self.connectionParameters)
-        mock_query.assert_called_with(self.dsn, "testquery", (), "testfile", ";", True)
 
     @unittest.mock.patch('pychado.queries.load_list_query')
     @unittest.mock.patch('pychado.dbutils.query_to_file')
@@ -162,11 +151,10 @@ class TestTasks(unittest.TestCase):
         # Checks that the function listing organisms is correctly called
         self.assertIs(mock_query, dbutils.query_to_file)
         self.assertIs(mock_load, queries.load_list_query)
-        args = chado_tools.parse_arguments(["chado", "list", "organisms", "-H", "-d", ";", "-o", "testfile",
-                                            "-g", "testgenus", "testdb"])
+        args = chado_tools.parse_arguments(["chado", "list", "organisms", "-H", "-d", ";", "-o", "testfile", "testdb"])
         mock_load.return_value = "testquery"
         tasks.run_sub_command_with_arguments("list", "organisms", args, self.connectionParameters)
-        mock_query.assert_called_with(self.dsn, "testquery", ("testgenus",), "testfile", ";", True)
+        mock_query.assert_called_with(self.dsn, "testquery", (), "testfile", ";", True)
 
     @unittest.mock.patch('pychado.queries.load_list_query')
     @unittest.mock.patch('pychado.dbutils.query_to_file')
@@ -175,10 +163,10 @@ class TestTasks(unittest.TestCase):
         self.assertIs(mock_query, dbutils.query_to_file)
         self.assertIs(mock_load, queries.load_list_query)
         args = chado_tools.parse_arguments(["chado", "list", "products", "-H", "-d", ";", "-o", "testfile",
-                                            "-g", "testgenus", "-s", "testspecies", "testdb"])
+                                            "-a", "testabbreviation", "testdb"])
         mock_load.return_value = "testquery"
         tasks.run_sub_command_with_arguments("list", "products", args, self.connectionParameters)
-        mock_query.assert_called_with(self.dsn, "testquery", ("testgenus", "testspecies"), "testfile", ";", True)
+        mock_query.assert_called_with(self.dsn, "testquery", ("testabbreviation", ), "testfile", ";", True)
 
     @unittest.mock.patch('pychado.queries.load_insert_statement')
     @unittest.mock.patch('pychado.dbutils.connect_and_execute_statement')
@@ -200,11 +188,10 @@ class TestTasks(unittest.TestCase):
         # Checks that the function deleting organisms is correctly called
         self.assertIs(mock_statement, dbutils.connect_and_execute_statement)
         self.assertIs(mock_load, queries.load_delete_statement)
-        args = chado_tools.parse_arguments(["chado", "delete", "organism", "-g", "testgenus", "-s", "testspecies",
-                                            "testdb"])
+        args = chado_tools.parse_arguments(["chado", "delete", "organism", "-a", "testabbreviation", "testdb"])
         mock_load.return_value = "teststatement"
         tasks.run_sub_command_with_arguments("delete", "organism", args, self.connectionParameters)
-        mock_statement.assert_called_with(self.dsn, "teststatement", ("testgenus", "testspecies"))
+        mock_statement.assert_called_with(self.dsn, "teststatement", ("testabbreviation", ))
 
 
 if __name__ == '__main__':

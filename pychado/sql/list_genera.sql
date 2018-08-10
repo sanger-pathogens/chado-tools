@@ -1,1 +1,0 @@
-SELECT DISTINCT genus FROM organism

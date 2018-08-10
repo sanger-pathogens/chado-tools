@@ -12,10 +12,8 @@ class TestQueries(unittest.TestCase):
         self.assertTrue(pkg_resources.resource_exists("pychado", "sql/stats_annotations.sql"))
         self.assertTrue(pkg_resources.resource_exists("pychado", "sql/stats_eupath.sql"))
         self.assertTrue(pkg_resources.resource_exists("pychado", "sql/list_organisms.sql"))
-        self.assertTrue(pkg_resources.resource_exists("pychado", "sql/list_genera.sql"))
         self.assertTrue(pkg_resources.resource_exists("pychado", "sql/list_products.sql"))
-        self.assertTrue(pkg_resources.resource_exists("pychado", "sql/condition_genus.sql"))
-        self.assertTrue(pkg_resources.resource_exists("pychado", "sql/condition_genus_species.sql"))
+        self.assertTrue(pkg_resources.resource_exists("pychado", "sql/condition_organism.sql"))
         self.assertTrue(pkg_resources.resource_exists("pychado", "sql/insert_organism.sql"))
         self.assertTrue(pkg_resources.resource_exists("pychado", "sql/delete_organism.sql"))
         self.assertTrue(pkg_resources.resource_exists("pychado", "sql/max_organism_id.sql"))
@@ -34,8 +32,6 @@ class TestQueries(unittest.TestCase):
         # Checks that the templates for the 'chado list' queries are correctly loaded
         args = utils.EmptyObject(genus="all", species="all")
         query = queries.load_list_query("organisms", args)
-        self.assertIn("SELECT", query)
-        query = queries.load_list_query("genera", args)
         self.assertIn("SELECT", query)
         query = queries.load_list_query("products", args)
         self.assertIn("SELECT", query)
@@ -60,15 +56,12 @@ class TestQueries(unittest.TestCase):
     def test_set_organism_condition(self):
         # Checks that a query placeholder is correctly replaced
         query = "SELECT * FROM testdb WHERE {{CONDITION}}"
-        args = utils.EmptyObject(genus="all", species="all")
+        args = utils.EmptyObject(abbreviation="all")
         self.assertEqual(queries.set_organism_condition(query, args),
                          "SELECT * FROM testdb WHERE TRUE")
-        args.genus = "testgenus"
+        args.abbreviation = "testabbreviation"
         self.assertEqual(queries.set_organism_condition(query, args),
-                         "SELECT * FROM testdb WHERE genus = %s")
-        args.species = "testspecies"
-        self.assertEqual(queries.set_organism_condition(query, args),
-                         "SELECT * FROM testdb WHERE genus = %s AND species = %s")
+                         "SELECT * FROM testdb WHERE abbreviation = %s")
 
 
 if __name__ == '__main__':

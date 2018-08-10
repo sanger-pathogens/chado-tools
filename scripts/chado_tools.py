@@ -52,8 +52,7 @@ def wrapper_commands() -> dict:
 def list_commands() -> dict:
     """Lists the available sub-commands of the 'chado list' command with corresponding descriptions"""
     return {
-        "organisms": "list all organisms in the CHADO database",
-        "genera": "list all genera in the CHADO database",
+        "organisms": "list all organisms in the CHADO database (genus, species, abbreviation)",
         "products": "list all products of transcripts in the CHADO database"
     }
 
@@ -202,8 +201,8 @@ def add_stats_arguments(parser: argparse.ArgumentParser):
         sub = subparsers.add_parser(command, description=description, help=description)
         add_general_arguments(sub)
         add_general_export_arguments(sub)
-        sub.add_argument("-g", "--genus", default="all", help="Restrict to a certain genus (default: all)")
-        sub.add_argument("-s", "--species", default="all", help="Restrict to a certain species (default: all)")
+        sub.add_argument("-a", "--abbreviation", default="all",
+                         help="restrict to a certain organism, defined by its abbreviation/short name (default: all)")
         sub.add_argument("-D", "--date", required=True, help="date for maximum age of updates, format 'YYYYMMDD'")
         add_stats_arguments_by_command(command, sub)
 
@@ -234,8 +233,6 @@ def add_list_arguments_by_command(command: str, parser: argparse.ArgumentParser)
     """Defines formal arguments for a specified sub-command of 'chado list'"""
     if command == "organisms":
         add_list_organisms_arguments(parser)
-    elif command == "genera":
-        add_list_genera_arguments(parser)
     elif command == "products":
         add_list_product_arguments(parser)
     else:
@@ -244,18 +241,13 @@ def add_list_arguments_by_command(command: str, parser: argparse.ArgumentParser)
 
 def add_list_organisms_arguments(parser: argparse.ArgumentParser):
     """Defines formal arguments for the 'chado list organisms' sub-command"""
-    parser.add_argument("-g", "--genus", default="all", help="Restrict organisms to a certain genus (default: all)")
-
-
-def add_list_genera_arguments(parser: argparse.ArgumentParser):
-    """Defines formal arguments for the 'chado list genera' sub-command"""
     pass
 
 
 def add_list_product_arguments(parser: argparse.ArgumentParser):
     """Defines formal arguments for the 'chado list products' sub-command"""
-    parser.add_argument("-g", "--genus", default="all", help="Restrict to a certain genus (default: all)")
-    parser.add_argument("-s", "--species", default="all", help="Restrict to a certain species (default: all)")
+    parser.add_argument("-a", "--abbreviation", default="all",
+                        help="restrict to a certain organism, defined by its abbreviation/short name (default: all)")
 
 
 def add_insert_arguments(parser: argparse.ArgumentParser):
@@ -281,7 +273,7 @@ def add_insert_organism_arguments(parser: argparse.ArgumentParser):
     """Defines formal arguments for the 'chado insert organism' sub-command"""
     parser.add_argument("-g", "--genus", required=True, help="genus of the organism")
     parser.add_argument("-s", "--species", required=True, help="species of the organism")
-    parser.add_argument("-a", "--abbreviation", help="abbreviation of the organism")
+    parser.add_argument("-a", "--abbreviation", required=True, help="abbreviation/short name of the organism")
     parser.add_argument("--common_name", help="common name of the organism (default: use abbreviation, if provided)")
     parser.add_argument("--comment", help="comment")
 
@@ -307,5 +299,4 @@ def add_delete_arguments_by_command(command: str, parser: argparse.ArgumentParse
 
 def add_delete_organism_arguments(parser: argparse.ArgumentParser):
     """Defines formal arguments for the 'chado delete organism' sub-command"""
-    parser.add_argument("-g", "--genus", required=True, help="genus of the organism")
-    parser.add_argument("-s", "--species", default="all", help="species of the organism (default: all)")
+    parser.add_argument("-a", "--abbreviation", required=True, help="abbreviation/short name of the organism")

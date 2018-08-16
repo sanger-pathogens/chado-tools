@@ -5,25 +5,45 @@ import os
 import pkg_resources
 import argparse
 import pychado.tasks
+import time
 
 
 def main():
     """Main routine of the chado-tools package"""
+
     # Parse the supplied command line arguments
     arguments = parse_arguments(sys.argv)
     command = sys.argv[1]
 
-    # Check database access
-    connection_parameters = pychado.tasks.read_configuration_file(arguments.config)
-    if pychado.tasks.check_access(connection_parameters, arguments.dbname, command):
+    if command in setup_commands():
+        # Set database connection parameters
+        pychado.tasks.run_command_with_arguments(command, arguments, dict())
 
-        # Run the command
-        connection_parameters["database"] = arguments.dbname
-        if command in general_commands():
-            pychado.tasks.run_command_with_arguments(command, arguments, connection_parameters)
-        else:
-            sub_command = sys.argv[2]
-            pychado.tasks.run_sub_command_with_arguments(command, sub_command, arguments, connection_parameters)
+    else:
+        # Check database access
+        start_time = time.time()
+        connection_parameters = pychado.tasks.read_configuration_file(arguments.config)
+        if pychado.tasks.check_access(connection_parameters, arguments.dbname, command):
+
+            # Run the command
+            connection_parameters["database"] = arguments.dbname
+            if command in general_commands():
+                pychado.tasks.run_command_with_arguments(command, arguments, connection_parameters)
+            else:
+                sub_command = sys.argv[2]
+                pychado.tasks.run_sub_command_with_arguments(command, sub_command, arguments, connection_parameters)
+
+        # Print run time
+        if arguments.verbose:
+            print("Runtime: {0:.2f} s".format(time.time()-start_time))
+
+
+def setup_commands() -> dict:
+    """Lists the available 'setup' sub-commands of the 'chado' command with corresponding descriptions"""
+    return {
+        "init": "set the default connection parameters",
+        "reset": "reset the default connection parameters to factory settings"
+    }
 
 
 def general_commands() -> dict:
@@ -35,7 +55,8 @@ def general_commands() -> dict:
         "restore": "restore a CHADO database from an archive file",
         "import": "import data from a text file to a table of a CHADO database",
         "export": "export data from a table of a CHADO database to a text file",
-        "query": "query a CHADO database and export the result to a text file"
+        "query": "query a CHADO database and export the result to a text file",
+        "stats": "obtain statistics to updates in a CHADO database"
     }
 
 
@@ -44,8 +65,7 @@ def wrapper_commands() -> dict:
     return {
         "list": "list all entities of a specified type in the CHADO database",
         "insert": "insert a new entity of a specified type into the CHADO database",
-        "delete": "delete an entity of a specified type from the CHADO database",
-        "stats": "obtain statistics to updates in a CHADO database"
+        "delete": "delete an entity of a specified type from the CHADO database"
     }
 
 
@@ -71,14 +91,6 @@ def delete_commands() -> dict:
     }
 
 
-def stats_commands() -> dict:
-    """Lists the available sub-commands of the 'chado stats' command with corresponding descriptions"""
-    return {
-        "annotations": "obtain a list of annotation upates",
-        "eupathdb_tags": "obtain a list of updated EuPathDB tags"
-    }
-
-
 def parse_arguments(input_arguments: list) -> argparse.Namespace:
     """Defines the formal arguments of the 'chado' command and parses the actual arguments accordingly"""
 
@@ -92,6 +104,10 @@ def parse_arguments(input_arguments: list) -> argparse.Namespace:
 
     # Add subparsers for all sub-commands
     subparsers = parser.add_subparsers()
+
+    for command, description in setup_commands().items():
+        # Create subparser
+        subparsers.add_parser(command, description=description, help=description)
 
     for command, description in general_commands().items():
         # Create subparser and add general and specific formal arguments
@@ -110,6 +126,7 @@ def parse_arguments(input_arguments: list) -> argparse.Namespace:
 
 def add_general_arguments(parser: argparse.ArgumentParser):
     """Defines general formal arguments (available to all sub-commands)"""
+    parser.add_argument("-V", "--verbose", action="store_true", help="verbose mode")
     parser.add_argument("-c", "--config", default="", help="YAML file containing connection details")
     parser.add_argument("dbname", help="name of the database")
 
@@ -194,27 +211,10 @@ def add_query_arguments(parser: argparse.ArgumentParser):
 
 def add_stats_arguments(parser: argparse.ArgumentParser):
     """Defines formal arguments for the 'chado stats' sub-command"""
-    parser.epilog = "For detailed usage information type '" + parser.prog + " <command> -h'"
-    subparsers = parser.add_subparsers()
-    for command, description in stats_commands().items():
-        # Create subparser and add general and specific formal arguments
-        sub = subparsers.add_parser(command, description=description, help=description)
-        add_general_arguments(sub)
-        add_general_export_arguments(sub)
-        sub.add_argument("-a", "--abbreviation", default="all", dest="organism",
-                         help="restrict to a certain organism, defined by its abbreviation/short name (default: all)")
-        sub.add_argument("-D", "--date", required=True, help="date for maximum age of updates, format 'YYYYMMDD'")
-        add_stats_arguments_by_command(command, sub)
-
-
-def add_stats_arguments_by_command(command: str, parser: argparse.ArgumentParser):
-    """Defines formal arguments for a specified sub-command of 'chado stats'"""
-    if command == "annotations":
-        pass
-    elif command == "eupathdb_tags":
-        pass
-    else:
-        print("Command '" + parser.prog + "' is not available.")
+    add_general_export_arguments(parser)
+    parser.add_argument("-a", "--abbreviation", default="all", dest="organism",
+                     help="restrict to a certain organism, defined by its abbreviation/short name (default: all)")
+    parser.add_argument("-D", "--date", required=True, help="date for maximum age of updates, format 'YYYYMMDD'")
 
 
 def add_list_arguments(parser: argparse.ArgumentParser):

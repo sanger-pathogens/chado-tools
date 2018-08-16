@@ -5,6 +5,12 @@ from scripts import chado_tools
 class TestCommands(unittest.TestCase):
     """Tests if all implemented commands and sub-commands are available through the entry point"""
 
+    def test_setup_commands(self):
+        commands = chado_tools.setup_commands()
+        self.assertIn("init", commands)
+        self.assertIn("reset", commands)
+        self.assertNotIn("non_existent_command", commands)
+
     def test_general_commands(self):
         commands = chado_tools.general_commands()
         self.assertIn("connect", commands)
@@ -14,6 +20,7 @@ class TestCommands(unittest.TestCase):
         self.assertIn("import", commands)
         self.assertIn("export", commands)
         self.assertIn("query", commands)
+        self.assertIn("stats", commands)
         self.assertNotIn("non_existent_command", commands)
 
     def test_wrapper_commands(self):
@@ -21,7 +28,6 @@ class TestCommands(unittest.TestCase):
         self.assertIn("list", commands)
         self.assertIn("insert", commands)
         self.assertIn("delete", commands)
-        self.assertIn("stats", commands)
         self.assertNotIn("non_existent_command", commands)
 
     def test_list_commands(self):
@@ -43,15 +49,17 @@ class TestArguments(unittest.TestCase):
 
     def test_connect_args(self):
         # Tests if the command line arguments for the subcommand 'chado connect' are parsed correctly
-        args = ["chado", "connect", "-c", "testconfig", "testdb"]
+        args = ["chado", "connect", "-c", "testconfig", "-V", "testdb"]
         parsed_args = vars(chado_tools.parse_arguments(args))
         self.assertEqual(parsed_args["config"], "testconfig")
         self.assertEqual(parsed_args["dbname"], "testdb")
+        self.assertTrue(parsed_args["verbose"])
 
         # Test the default values
         args = ["chado", "connect", "testdb"]
         parsed_args = vars(chado_tools.parse_arguments(args))
         self.assertEqual(parsed_args["config"], "")
+        self.assertFalse(parsed_args["verbose"])
         self.assertNotIn("non_existent_argument", parsed_args)
 
     def test_create_args(self):
@@ -126,21 +134,9 @@ class TestArguments(unittest.TestCase):
         self.assertEqual(parsed_args["query"], "")
         self.assertEqual(parsed_args["input_file"], "testqueryfile")
 
-    def test_stats_annotations_args(self):
+    def test_stats_args(self):
         # Tests if the command line arguments for the subcommand 'chado stats annotations' are parsed correctly
-        args = ["chado", "stats", "annotations", "-H", "-d", ";", "-o", "testfile", "-a", "testorganism",
-                "-D", "testdate", "testdb"]
-        parsed_args = vars(chado_tools.parse_arguments(args))
-        self.assertTrue(parsed_args["include_header"])
-        self.assertEqual(parsed_args["delimiter"], ";")
-        self.assertEqual(parsed_args["output_file"], "testfile")
-        self.assertEqual(parsed_args["organism"], "testorganism")
-        self.assertEqual(parsed_args["date"], "testdate")
-        self.assertEqual(parsed_args["dbname"], "testdb")
-
-    def test_stats_eupathdb_tags_args(self):
-        # Tests if the command line arguments for the subcommand 'chado stats eupathdb_tags' are parsed correctly
-        args = ["chado", "stats", "eupathdb_tags", "-H", "-d", ";", "-o", "testfile", "-a", "testorganism",
+        args = ["chado", "stats", "-H", "-d", ";", "-o", "testfile", "-a", "testorganism",
                 "-D", "testdate", "testdb"]
         parsed_args = vars(chado_tools.parse_arguments(args))
         self.assertTrue(parsed_args["include_header"])

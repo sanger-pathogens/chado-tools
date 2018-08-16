@@ -1,3 +1,4 @@
+import shutil
 import pkg_resources
 import subprocess
 import string
@@ -5,7 +6,27 @@ import random
 import psycopg2
 import urllib.request
 import urllib.parse
+import getpass
 from pychado import utils
+
+
+def set_default_parameters() -> None:
+    """Sets the default connection parameters"""
+    parameters = {}
+    print("Please set the connection parameters for your default database.")
+    parameters["host"] = input("host: ")
+    parameters["port"] = input("port: ")
+    parameters["database"] = input("database: ")
+    parameters["user"] = input("username: ")
+    parameters["password"] = getpass.getpass(prompt="password: ")
+    utils.dump_yaml(default_configuration_file(), parameters)
+    print("Your default connection parameters have been changed.")
+
+
+def reset_default_parameters() -> None:
+    """Resets the default connection parameters to factory settings"""
+    shutil.copyfile(factory_settings_configuration_file(), default_configuration_file())
+    print("Your default connection parameters have been reset.")
 
 
 def generate_uri(connection_details: dict) -> str:
@@ -58,6 +79,11 @@ def download_schema(url: str) -> str:
 def default_configuration_file() -> str:
     """Returns the name of the default configuration file"""
     return pkg_resources.resource_filename("pychado", "data/defaultDatabase.yml")
+
+
+def factory_settings_configuration_file() -> str:
+    """Returns the name of the configuration file with factory settings"""
+    return pkg_resources.resource_filename("pychado", "data/factorySettings.yml")
 
 
 def execute_query(connection, query: str, params: tuple, header=False) -> list:

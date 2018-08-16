@@ -77,9 +77,9 @@ Dump this database into an archive called `eukaryotes.dump`:
 
     chado dump eukaryotes eukaryotes.dump
 
-List all organisms of the `Plasmodium` genus in the `eukaryotes` database:
+List all organisms in the `eukaryotes` database:
 
-    chado list organisms -g Plasmodium eukaryotes
+    chado list organisms eukaryotes
 
 Query the database to check the meaning of a certain `cvterm_id`:
 

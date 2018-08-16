@@ -2,7 +2,7 @@ import setuptools
 
 setuptools.setup(
     name="chado-tools",
-    version="0.0.4",
+    version="0.0.5",
     author="Christoph Puethe",
     author_email="path-help@sanger.ac.uk",
     description="Tools to access CHADO databases",

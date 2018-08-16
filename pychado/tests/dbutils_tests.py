@@ -2,6 +2,7 @@ import os
 import unittest.mock
 import urllib.error
 import filecmp
+import getpass
 from pychado import dbutils, utils
 
 modules_dir = os.path.dirname(os.path.abspath(dbutils.__file__))
@@ -20,6 +21,11 @@ class TestConnection(unittest.TestCase):
     def tearDown(self):
         self.connectionParameters.clear()
 
+    def test_factory_settings(self):
+        # Tests if the settings in the default connection file are equivalent to the factory settings
+        factorySettings = utils.parse_yaml(dbutils.factory_settings_configuration_file())
+        self.assertEqual(self.connectionParameters, factorySettings)
+
     def test_connection_parameters(self):
         # Tests if the default connection file contains all required parameters
         self.assertIn("database", self.connectionParameters)
@@ -27,6 +33,25 @@ class TestConnection(unittest.TestCase):
         self.assertIn("password", self.connectionParameters)
         self.assertIn("host", self.connectionParameters)
         self.assertIn("port", self.connectionParameters)
+
+    @unittest.mock.patch('builtins.input')
+    @unittest.mock.patch('getpass.getpass')
+    def test_set_reset_parameters(self, mock_getpass, mock_input):
+        # Tests if the default connection parameters can be changed
+        self.assertIs(mock_input, input)
+        self.assertIs(mock_getpass, getpass.getpass)
+        mock_input.side_effect = ["myhost", 5555, "mydb", "myuser"]
+        mock_getpass.return_value = "mypw"
+        dbutils.set_default_parameters()
+        default_parameters = utils.parse_yaml(dbutils.default_configuration_file())
+        self.assertEqual(default_parameters["host"], "myhost")
+        self.assertEqual(default_parameters["port"], "5555")
+        self.assertEqual(default_parameters["database"], "mydb")
+        self.assertEqual(default_parameters["user"], "myuser")
+        self.assertEqual(default_parameters["password"], "mypw")
+        dbutils.reset_default_parameters()
+        default_parameters = utils.parse_yaml(dbutils.default_configuration_file())
+        self.assertEqual(self.connectionParameters, default_parameters)
 
     def test_connection_uri(self):
         # Tests the correct creation of a database connection string in URI format

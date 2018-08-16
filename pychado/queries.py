@@ -13,15 +13,10 @@ def load_list_query(specifier: str, arguments) -> str:
     return query
 
 
-def load_stats_query(specifier: str, arguments) -> str:
+def load_stats_query(arguments) -> str:
     """Loads the SQL query for a 'chado stats' command"""
-    query = ""
-    if specifier == "annotations":
-        template = utils.read_text(pkg_resources.resource_filename("pychado", "sql/stats_annotations.sql"))
-        query = set_organism_condition(template, arguments)
-    elif specifier == "eupathdb_tags":
-        template = utils.read_text(pkg_resources.resource_filename("pychado", "sql/stats_eupath.sql"))
-        query = set_organism_condition(template, arguments)
+    template = utils.read_text(pkg_resources.resource_filename("pychado", "sql/stats.sql"))
+    query = set_organism_condition(template, arguments)
     return query
 
 
@@ -45,10 +40,10 @@ def load_delete_statement(specifier: str, arguments) -> str:
 def set_organism_condition(query: str, arguments) -> str:
     """Replaces a placeholder in a query with a condition restricting results to certain organisms"""
     if not hasattr(arguments, "organism") or arguments.organism == "all":
-        modified_query = query.replace('{{CONDITION}}', 'TRUE')
+        modified_query = query.replace('{{ORGANISM_CONDITION}}', 'TRUE')
     else:
         condition = utils.read_text(pkg_resources.resource_filename("pychado", "sql/condition_organism.sql"))
-        modified_query = query.replace('{{CONDITION}}', condition)
+        modified_query = query.replace('{{ORGANISM_CONDITION}}', condition)
     return modified_query
 
 
@@ -91,11 +86,3 @@ def specify_delete_parameters(specifier: str, arguments) -> tuple:
     else:
         params = tuple()
     return params
-
-
-def load_maximum_id_query(specifier: str) -> str:
-    """Loads the SQL query that determines the maximum ID of a given table in a CHADO database"""
-    query = ""
-    if specifier == "organism":
-        query = utils.read_text(pkg_resources.resource_filename("pychado", "sql/max_organism_id.sql"))
-    return query

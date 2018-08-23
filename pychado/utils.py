@@ -1,5 +1,6 @@
 import sys
 import os
+import datetime
 import subprocess
 import yaml
 
@@ -102,3 +103,8 @@ def list_to_string(the_list: list, delimiter: str) -> str:
         else:
             the_string.append(str(element))
     return delimiter.join(the_string)
+
+
+def current_date() -> str:
+    """Function returning the current date in format 'YYYYMMDD"""
+    return datetime.date.today().strftime('%Y%m%d')

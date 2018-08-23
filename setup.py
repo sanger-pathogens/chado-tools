@@ -1,4 +1,11 @@
 import setuptools
+import os
+
+try:
+    with open(os.path.dirname(os.path.abspath(__file__)) + "/README.md") as readme_file:
+        long_description = readme_file.read()
+except FileNotFoundError or FileExistsError:
+    long_description = "Tools to access CHADO databases. For a detailed description visit the GitHub repository."
 
 setuptools.setup(
     name="chado-tools",
@@ -6,7 +13,8 @@ setuptools.setup(
     author="Christoph Puethe",
     author_email="path-help@sanger.ac.uk",
     description="Tools to access CHADO databases",
-    long_description="Tools to access CHADO databases. For a detailed description please visit the GitHub repository.",
+    long_description_content_type="text/markdown",
+    long_description=long_description,
     url="https://github.com/sanger-pathogens/chado-tools/",
     packages=setuptools.find_packages(),
     package_data={

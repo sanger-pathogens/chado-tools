@@ -135,16 +135,26 @@ class TestArguments(unittest.TestCase):
         self.assertEqual(parsed_args["input_file"], "testqueryfile")
 
     def test_stats_args(self):
-        # Tests if the command line arguments for the subcommand 'chado stats annotations' are parsed correctly
+        # Tests if the command line arguments for the subcommand 'chado stats' are parsed correctly
         args = ["chado", "stats", "-H", "-d", ";", "-o", "testfile", "-a", "testorganism",
-                "-D", "testdate", "testdb"]
+                "--start_date", "testdate", "--end_date", "testdate2", "testdb"]
         parsed_args = vars(chado_tools.parse_arguments(args))
         self.assertTrue(parsed_args["include_header"])
         self.assertEqual(parsed_args["delimiter"], ";")
         self.assertEqual(parsed_args["output_file"], "testfile")
         self.assertEqual(parsed_args["organism"], "testorganism")
-        self.assertEqual(parsed_args["date"], "testdate")
+        self.assertEqual(parsed_args["start_date"], "testdate")
+        self.assertEqual(parsed_args["end_date"], "testdate2")
         self.assertEqual(parsed_args["dbname"], "testdb")
+
+        # Test the default values
+        args = ["chado", "stats", "--start_date", "testdate", "testdb"]
+        parsed_args = vars(chado_tools.parse_arguments(args))
+        self.assertFalse(parsed_args["include_header"])
+        self.assertEqual(parsed_args["delimiter"], "\t")
+        self.assertEqual(parsed_args["output_file"], "")
+        self.assertEqual(parsed_args["organism"], "all")
+        self.assertEqual(parsed_args["end_date"], "")
 
     def test_list_organisms_args(self):
         # Tests if the command line arguments for the subcommand 'chado list organisms' are parsed correctly
@@ -183,6 +193,7 @@ class TestArguments(unittest.TestCase):
         parsed_args = vars(chado_tools.parse_arguments(args))
         self.assertEqual(parsed_args["organism"], "testorganism")
         self.assertEqual(parsed_args["dbname"], "testdb")
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=2, buffer=True)

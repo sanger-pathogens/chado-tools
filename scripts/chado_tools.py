@@ -214,7 +214,9 @@ def add_stats_arguments(parser: argparse.ArgumentParser):
     add_general_export_arguments(parser)
     parser.add_argument("-a", "--abbreviation", default="all", dest="organism",
                      help="restrict to a certain organism, defined by its abbreviation/short name (default: all)")
-    parser.add_argument("-D", "--date", required=True, help="date for maximum age of updates, format 'YYYYMMDD'")
+    parser.add_argument("--start_date", required=True, help="date for maximum age of updates, format 'YYYYMMDD'")
+    parser.add_argument("--end_date", default="", help="date for minimum age of updates, format 'YYYYMMDD' "
+                                                       "(default: today)")
 
 
 def add_list_arguments(parser: argparse.ArgumentParser):

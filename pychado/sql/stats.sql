@@ -10,6 +10,10 @@ SELECT
 FROM
 	feature_cvterm fcvt																-- start off with a gene product (e.g. polypeptide)
 	JOIN
+	cvterm cvt USING (cvterm_id)
+	JOIN
+	cv USING (cv_id)
+	JOIN
 	feature_cvtermprop property1 USING (feature_cvterm_id)							-- first property of the gene product
 	JOIN
 	feature_cvtermprop property2 USING (feature_cvterm_id)							-- second property of the gene product
@@ -24,14 +28,17 @@ FROM
 	JOIN
 	organism ON feature2.organism_id = organism.organism_id                         -- finally connect with the organism
 WHERE
-	fcvt.cvterm_id IN (SELECT cvterm_id FROM cvterm JOIN cv USING (cv_id)
-	                   WHERE cv.name = 'annotation_change')		                    -- capture all changes in annotation
+	cv.name = 'annotation_change'		                                            -- capture all changes in annotation
 	AND
 	property1.type_id IN (SELECT cvterm_id FROM cvterm WHERE name = 'qualifier')	-- restrict to actual annotation descriptions
 	AND
+	property1.value != ''
+	AND
 	property2.type_id IN (SELECT cvterm_id FROM cvterm WHERE name = 'date')			-- restrict to certain dates
 	AND
-	property2.value > %s
+	property2.value >= %s
+	AND
+	property2.value <= %s
 	AND
 	relation1.type_id IN (SELECT cvterm_id FROM cvterm WHERE name = 'derives_from')	-- gene product 'derives from' transcript
 	AND

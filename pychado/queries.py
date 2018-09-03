@@ -61,10 +61,13 @@ def specify_list_parameters(specifier: str, arguments) -> tuple:
 
 def specify_stats_parameters(arguments) -> tuple:
     """Specifies the parameters that complete the SQL query of a 'chado stats' command"""
+    end_date = arguments.end_date
+    if not end_date:
+        end_date = utils.current_date()
     if arguments.organism != "all":
-        params = (arguments.date, arguments.organism)
+        params = (arguments.start_date, end_date, arguments.organism)
     else:
-        params = (arguments.date,)
+        params = (arguments.start_date, end_date)
     return params
 
 

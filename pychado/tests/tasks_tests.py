@@ -141,11 +141,12 @@ class TestTasks(unittest.TestCase):
         # Checks that the function providing database statistics is correctly called
         self.assertIs(mock_query, dbutils.query_to_file)
         self.assertIs(mock_load, queries.load_stats_query)
-        args = chado_tools.parse_arguments(["chado", "stats", "-H", "-d", ";", "-o", "testfile",
-                                            "-a", "testorganism", "-D", "testdate", "testdb"])
+        args = chado_tools.parse_arguments(["chado", "stats", "-H", "-d", ";", "-o", "testfile", "-a", "testorganism",
+                                            "--start_date", "testdate", "--end_date", "testdate2", "testdb"])
         mock_load.return_value = "testquery"
         tasks.run_command_with_arguments("stats", args, self.connectionParameters)
-        mock_query.assert_called_with(self.dsn, "testquery", ("testdate", "testorganism"), "testfile", ";", True)
+        mock_query.assert_called_with(self.dsn, "testquery", ("testdate", "testdate2", "testorganism"),
+                                      "testfile", ";", True)
 
     @unittest.mock.patch('pychado.queries.load_list_query')
     @unittest.mock.patch('pychado.dbutils.query_to_file')

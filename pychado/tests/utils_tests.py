@@ -78,6 +78,14 @@ class TestUtils(unittest.TestCase):
         string = utils.list_to_string(test_list, "_")
         self.assertEqual(string, "1.123__hello_t_A_8_f")
 
+    def test_current_date(self):
+        # checks if a function returns the current date in the correct format
+        date = utils.current_date()
+        self.assertEqual(len(date), 8)
+        self.assertEqual(int(date[0]), 2)
+        self.assertTrue(int(date[4:5]) <= 12)
+        self.assertTrue(int(date[6:7]) <= 31)
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=2, buffer=True)

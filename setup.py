@@ -37,6 +37,7 @@ setuptools.setup(
     ],
     install_requires=[
         "sqlalchemy",
+        "psycopg2"
         "pyyaml",
         "pronto"
     ],

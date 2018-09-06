@@ -5,14 +5,14 @@ SELECT
     organism.abbreviation AS organism_name,
 	feature1.uniquename AS transcript_id,
 	feature2.uniquename AS gene_id,
-	property2.value AS date,
+	property2.value AS "date",
 	property1.value AS annotation
 FROM
 	feature_cvterm fcvt																-- start off with a gene product (e.g. polypeptide)
 	JOIN
 	cvterm cvt USING (cvterm_id)
 	JOIN
-	cv USING (cv_id)
+	"cv" USING (cv_id)
 	JOIN
 	feature_cvtermprop property1 USING (feature_cvterm_id)							-- first property of the gene product
 	JOIN
@@ -36,17 +36,17 @@ WHERE
 	AND
 	property2.type_id IN (SELECT cvterm_id FROM cvterm WHERE name = 'date')			-- restrict to certain dates
 	AND
-	property2.value >= %s
+	property2.value >= :start_date
 	AND
-	property2.value <= %s
+	property2.value <= :end_date
 	AND
 	relation1.type_id IN (SELECT cvterm_id FROM cvterm WHERE name = 'derives_from')	-- gene product 'derives from' transcript
 	AND
 	relation2.type_id IN (SELECT cvterm_id FROM cvterm WHERE name = 'part_of')	    -- transcript is 'part of' gene, at least in the Sanger pathogen DBs
 	AND
-	{{ORGANISM_CONDITION}}	                                                        -- a specific organism, or all
+	:ORGANISM_CONDITION                                                             -- a specific organism, or all
 ORDER BY
 	organism_name,
 	transcript_id,
-	date,
+	"date",
 	annotation

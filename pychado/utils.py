@@ -2,7 +2,9 @@ import sys
 import os
 import datetime
 import subprocess
+import urllib.request
 import yaml
+import pronto
 
 
 class EmptyObject:
@@ -88,6 +90,12 @@ def dump_yaml(filename: str, data: dict) -> None:
     close(stream)
 
 
+def parse_obo(filename: str) -> pronto.Ontology:
+    """Function parsing an OBO file"""
+    print("Parsing OBO file ...")
+    return pronto.Ontology(filename)
+
+
 def list_to_string(the_list: list, delimiter: str) -> str:
     """Function concatenating all elements of a list"""
     the_string = []
@@ -108,3 +116,10 @@ def list_to_string(the_list: list, delimiter: str) -> str:
 def current_date() -> str:
     """Function returning the current date in format 'YYYYMMDD"""
     return datetime.date.today().strftime('%Y%m%d')
+
+
+def download_file(url: str) -> str:
+    """Downloads a file from the internet"""
+    print("Downloading file from URL " + url + " ...")
+    file, headers = urllib.request.urlretrieve(url)
+    return file

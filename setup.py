@@ -9,7 +9,7 @@ except FileNotFoundError or FileExistsError:
 
 setuptools.setup(
     name="chado-tools",
-    version="0.0.5",
+    version="0.1.0",
     author="Christoph Puethe",
     author_email="path-help@sanger.ac.uk",
     description="Tools to access CHADO databases",
@@ -36,8 +36,9 @@ setuptools.setup(
         "nose >= 1.3"
     ],
     install_requires=[
-        'psycopg2',
-        'pyyaml'
+        "sqlalchemy",
+        "pyyaml",
+        "pronto"
     ],
     license="GPLv3",
     classifiers=[

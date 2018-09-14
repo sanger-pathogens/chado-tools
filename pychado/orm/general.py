@@ -23,6 +23,11 @@ class Db(Base):
             if key != self:
                 setattr(self, key, value)
 
+    # Representation
+    def __repr__(self):
+        return "<general.Db(db_id={0}, name='{1}', description='{2}', urlprefix='{3}', url='{4}')>"\
+            .format(self.db_id, self.name, self.description, self.urlprefix, self.url)
+
 
 class DbxRef(Base):
     """Class for the CHADO 'dbxref' table"""
@@ -49,3 +54,8 @@ class DbxRef(Base):
         for key, value in locals().items():
             if key != self:
                 setattr(self, key, value)
+
+    # Representation
+    def __repr__(self):
+        return "<general.DbxRef(dbxref_id={0}, db_id={1}, accession='{2}', version='{3}', description='{4}')>"\
+            .format(self.dbxref_id, self.db_id, self.accession, self.version, self.description)

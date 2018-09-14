@@ -4,7 +4,7 @@ import datetime
 import subprocess
 import urllib.request
 import yaml
-import pronto
+import pronto.parser
 
 
 class EmptyObject:
@@ -90,10 +90,14 @@ def dump_yaml(filename: str, data: dict) -> None:
     close(stream)
 
 
-def parse_obo(filename: str) -> pronto.Ontology:
-    """Function parsing an OBO file"""
-    print("Parsing OBO file ...")
-    return pronto.Ontology(filename)
+def parse_ontology(filename: str, format="obo") -> pronto.Ontology:
+    """Function parsing an OBO/OWL file"""
+    if format == "owl":
+        print("Parsing OWL file ...")
+        return pronto.Ontology(filename, parser="OwlXMLParser")
+    else:
+        print("Parsing OBO file ...")
+        return pronto.Ontology(filename, parser="OboParser")
 
 
 def list_to_string(the_list: list, delimiter: str) -> str:

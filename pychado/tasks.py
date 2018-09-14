@@ -1,4 +1,5 @@
 from pychado import utils, dbutils, queries
+from pychado.io import load_cvterms
 
 
 def read_configuration_file(filename: str) -> dict:
@@ -103,11 +104,11 @@ def run_sub_command_with_arguments(command: str, sub_command: str, arguments, co
         parameters = queries.specify_delete_parameters(sub_command, arguments)
         dbutils.connect_and_execute(connection_uri, statement, parameters)
         print("Deleted an existing " + sub_command + " from the database.")
-    elif command == "load":
-        # Load entities of a specified type into the CHADO database
+    elif command == "import":
+        # Import entities of a specified type into the CHADO database
         file = arguments.input_file
         if arguments.input_url:
             file = utils.download_file(arguments.input_url)
-        utils.parse_obo(file)
+        load_cvterms.run(file, arguments.format, connection_uri, arguments.database_authority)
     else:
         print("Functionality '" + command + "' is not yet implemented.")

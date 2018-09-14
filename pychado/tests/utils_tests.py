@@ -72,6 +72,18 @@ class TestUtils(unittest.TestCase):
         self.assertIn("parasites and microbes", content["faculties"])
         self.assertNotIn("zebrafish genetics", content["faculties"])
 
+    def test_ontology_parser(self):
+        # checks that an ontology file is parsed correctly
+        filename = os.path.join(data_dir, "utils_obo_example.obo")
+        content = utils.parse_ontology(filename)
+        self.assertEqual(len(content), 2)
+        self.assertIn("test:0000001", content)
+        term = content["test:0000001"]
+        self.assertEqual(term.name, "diplodocus")
+        self.assertEqual(term.desc, "definition of a diplodocus")
+        self.assertEqual(term.other["namespace"][0], "animals")
+        self.assertEqual(len(term.relations), 1)
+
     def test_list_to_string(self):
         # checks if a list is correctly concatenated
         test_list = [1.123, None, 'hello', True, 'A', 8, False]

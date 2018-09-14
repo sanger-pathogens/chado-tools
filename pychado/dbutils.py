@@ -155,7 +155,8 @@ def dump_database(uri: str, archive: str):
 
 def restore_database(uri: str, archive: str):
     """Restores a database from an archive file"""
-    command = ["pg_restore", "--clean", "--if-exists", "--format=custom", "-d", uri, archive]
+    command = ["pg_restore", "--clean", "--if-exists", "--no-owner", "--no-privileges", "--format=custom",
+               "-d", uri, archive]
     subprocess.run(command)
     print("Database has been restored.")
 

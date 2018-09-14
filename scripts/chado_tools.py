@@ -64,7 +64,7 @@ def wrapper_commands() -> dict:
         "list": "list all entities of a specified type in the CHADO database",
         "insert": "insert a new entity of a specified type into the CHADO database",
         "delete": "delete an entity of a specified type from the CHADO database",
-        "load": "load entities of a specified type into the CHADO database"
+        "import": "import entities of a specified type into the CHADO database"
     }
 
 
@@ -91,10 +91,10 @@ def delete_commands() -> dict:
     }
 
 
-def load_commands() -> dict:
-    """Lists the available sub-commands of the 'chado load' command with corresponding descriptions"""
+def import_commands() -> dict:
+    """Lists the available sub-commands of the 'chado import' command with corresponding descriptions"""
     return {
-        "cv_terms": "load CV terms into the CHADO database"
+        "cv_terms": "import CV terms into the CHADO database"
     }
 
 
@@ -166,8 +166,8 @@ def add_arguments_by_command(command: str, parser: argparse.ArgumentParser):
         add_insert_arguments(parser)
     elif command == "delete":
         add_delete_arguments(parser)
-    elif command == "load":
-        add_load_arguments(parser)
+    elif command == "import":
+        add_import_arguments(parser)
     else:
         print("Command '" + parser.prog + "' is not available.")
 
@@ -204,7 +204,7 @@ def add_stats_arguments(parser: argparse.ArgumentParser):
     """Defines formal arguments for the 'chado stats' sub-command"""
     add_general_export_arguments(parser)
     parser.add_argument("-a", "--abbreviation", default="all", dest="organism",
-                     help="restrict to a certain organism, defined by its abbreviation/short name (default: all)")
+                        help="restrict to a certain organism, defined by its abbreviation/short name (default: all)")
     parser.add_argument("--start_date", required=True, help="date for maximum age of updates, format 'YYYYMMDD'")
     parser.add_argument("--end_date", default="", help="date for minimum age of updates, format 'YYYYMMDD' "
                                                        "(default: today)")
@@ -304,28 +304,31 @@ def add_delete_organism_arguments(parser: argparse.ArgumentParser):
                         help="abbreviation/short name of the organism")
 
 
-def add_load_arguments(parser: argparse.ArgumentParser):
-    """Defines formal arguments for the 'chado load' sub-command"""
+def add_import_arguments(parser: argparse.ArgumentParser):
+    """Defines formal arguments for the 'chado import' sub-command"""
     parser.epilog = "For detailed usage information type '" + parser.prog + " <command> -h'"
     subparsers = parser.add_subparsers()
-    for command, description in load_commands().items():
+    for command, description in import_commands().items():
         # Create subparser and add general and specific formal arguments
         sub = subparsers.add_parser(command, description=description, help=description)
         add_general_arguments(sub)
-        add_load_arguments_by_command(command, sub)
+        add_import_arguments_by_command(command, sub)
 
 
-def add_load_arguments_by_command(command: str, parser: argparse.ArgumentParser):
-    """Defines formal arguments for a specified sub-command of 'chado load'"""
+def add_import_arguments_by_command(command: str, parser: argparse.ArgumentParser):
+    """Defines formal arguments for a specified sub-command of 'chado import'"""
     if command == "cv_terms":
-        add_load_cvterms_arguments(parser)
+        add_import_cvterms_arguments(parser)
     else:
         print("Command '" + parser.prog + "' is not available.")
 
 
-def add_load_cvterms_arguments(parser: argparse.ArgumentParser):
-    """Defines formal arguments for the 'chado load cv_terms' sub-command"""
+def add_import_cvterms_arguments(parser: argparse.ArgumentParser):
+    """Defines formal arguments for the 'chado import cv_terms' sub-command"""
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("-f", "--input_file", default="", help="File containing CV terms")
+    group.add_argument("-f", "--input_file", default="", help="file containing CV terms")
     group.add_argument("-u", "--input_url", default="", help="URL to a file containing CV terms")
-    parser.add_argument("--format", default="obo", choices={"obo"}, help="Format of the file (default: obo)")
+    parser.add_argument("-A", "--database_authority", required=True,
+                        help="database authority of the terms in the file, e.g. 'GO'")
+    parser.add_argument("-F", "--format", default="obo", choices={"obo", "owl"},
+                        help="format of the file (default: obo)")

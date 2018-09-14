@@ -22,6 +22,10 @@ class Cv(Base):
             if key != self:
                 setattr(self, key, value)
 
+    # Representation
+    def __repr__(self):
+        return "<cv.Cv(cv_id={0}, name='{1}', definition='{2}')>".format(self.cv_id, self.name, self.definition)
+
 
 class CvTerm(Base):
     """Class for the CHADO 'cvterm' table"""
@@ -54,6 +58,12 @@ class CvTerm(Base):
         for key, value in locals().items():
             if key != self:
                 setattr(self, key, value)
+
+    # Representation
+    def __repr__(self):
+        return "<cv.CvTerm(cvterm_id={0}, cv_id={1}, dbxref_id={2}, name='{3}', definition='{4}', is_obsolete={5}, " \
+               "is_relationshiptype={6})>".format(self.cvterm_id, self.cv_id, self.dbxref_id, self.name,
+                                                  self.definition, self.is_obsolete, self.is_relationshiptype)
 
 
 class CvTermProp(Base):

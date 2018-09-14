@@ -26,7 +26,7 @@ class TestCommands(unittest.TestCase):
         self.assertIn("list", commands)
         self.assertIn("insert", commands)
         self.assertIn("delete", commands)
-        self.assertIn("load", commands)
+        self.assertIn("import", commands)
         self.assertNotIn("non_existent_command", commands)
 
     def test_list_commands(self):
@@ -43,8 +43,8 @@ class TestCommands(unittest.TestCase):
         commands = chado_tools.delete_commands()
         self.assertIn("organism", commands)
 
-    def test_load_commands(self):
-        commands = chado_tools.load_commands()
+    def test_import_commands(self):
+        commands = chado_tools.import_commands()
         self.assertIn("cv_terms", commands)
 
 
@@ -177,19 +177,22 @@ class TestArguments(unittest.TestCase):
         self.assertEqual(parsed_args["organism"], "testorganism")
         self.assertEqual(parsed_args["dbname"], "testdb")
 
-    def test_load_cvterms_args(self):
-        # Tests if the command line arguments for the subcommand 'chado load cv_terms' are parsed correctly
-        args = ["chado", "load", "cv_terms", "-f", "testfile", "testdb"]
+    def test_import_cvterms_args(self):
+        # Tests if the command line arguments for the subcommand 'chado import cv_terms' are parsed correctly
+        args = ["chado", "import", "cv_terms", "-f", "testfile", "-A", "testauthority", "-F", "owl", "testdb"]
         parsed_args = vars(chado_tools.parse_arguments(args))
         self.assertEqual(parsed_args["input_file"], "testfile")
         self.assertEqual(parsed_args["input_url"], "")
-        self.assertEqual(parsed_args["format"], "obo")
+        self.assertEqual(parsed_args["database_authority"], "testauthority")
+        self.assertEqual(parsed_args["format"], "owl")
         self.assertEqual(parsed_args["dbname"], "testdb")
 
-        args = ["chado", "load", "cv_terms", "-u", "testurl", "testdb"]
+        # Test the default values / alternatives
+        args = ["chado", "import", "cv_terms", "-u", "testurl", "-A", "testauthority", "testdb"]
         parsed_args = vars(chado_tools.parse_arguments(args))
         self.assertEqual(parsed_args["input_file"], "")
         self.assertEqual(parsed_args["input_url"], "testurl")
+        self.assertEqual(parsed_args["format"], "obo")
 
 
 if __name__ == '__main__':

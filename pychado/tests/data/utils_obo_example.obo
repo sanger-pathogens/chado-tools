@@ -1,0 +1,18 @@
+format-version: 1.2
+default-namespace: test_ontology
+ontology: test
+
+[Term]
+id: test:0000001
+name: diplodocus
+namespace: animals
+def: "definition of a diplodocus"
+is_a: GO:123457 ! reptile
+
+[Term]
+id: test:0000002
+name: human
+namespace: animals
+def: "definition of a human"
+synonym: "homo sapiens" EXACT []
+is_a: test:123456 ! mammal

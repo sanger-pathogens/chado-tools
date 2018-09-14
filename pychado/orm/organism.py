@@ -1,6 +1,6 @@
 import sqlalchemy.orm
 from pychado.orm.base import Base
-from pychado.orm.controlled_vocabulary import CvTerm
+from pychado.orm.cv import CvTerm
 
 # Object-relational mappings for the CHADO Organism module
 

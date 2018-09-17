@@ -31,3 +31,10 @@ class Organism(Base):
         for key, value in locals().items():
             if key != self:
                 setattr(self, key, value)
+
+    # Representation
+    def __repr__(self):
+        return "<organism.Organism(organism_id={0}, abbreviation='{1}', genus='{2}', species='{3}', " \
+               "common_name='{4}', infraspecific_name='{5}', type_id={6}, comment='{7}')>"\
+            .format(self.organism_id, self.abbreviation, self.genus, self.species, self.common_name,
+                    self.infraspecific_name, self.type_id, self.comment)

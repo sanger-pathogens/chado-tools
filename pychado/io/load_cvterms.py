@@ -1,23 +1,31 @@
+import copy
 from typing import List, Dict, Set
 import sqlalchemy.orm.query
 import pronto
 from pychado import utils
 from pychado.orm import general, cv
 
-# TODO: behaviour for duplicate cvterm names - temporarily solved by skipping the INSERT/UPDATE
+
+class DatabaseError(Exception):
+    pass
+
+
+class InputFileError(Exception):
+    pass
+
 # TODO: read typedefs and add to the database
 # TODO: test if minimizing the number of queries can speed up the program without adding too much overhead
 
 
-def run(filename: str, format: str, uri: str, db_authority: str) -> None:
+def run(filename: str, file_format: str, uri: str, db_authority: str) -> None:
     """Loads CV terms from a file into a database"""
 
     # Parse the file
-    ontology = utils.parse_ontology(filename, format)                                   # type: pronto.Ontology
+    ontology = utils.parse_ontology(filename, file_format)                              # type: pronto.Ontology
 
     # Filter content: Only retain the terms stemming from the database authority of interest
     default_namespace = get_default_namespace(ontology)
-    ontology_terms = filter_ontology_by_db(ontology, db_authority)                      # type: List[pronto.Term]
+    ontology_terms = filter_ontology_by_db(ontology, db_authority)                      # type: Dict[str, pronto.Term]
 
     # Connect to database
     session = start_session(uri)                                                        # type: sqlalchemy.orm.Session
@@ -32,16 +40,12 @@ def run(filename: str, format: str, uri: str, db_authority: str) -> None:
     all_cvterm_entries = {}                                                             # type: Dict[str, cv.CvTerm]
 
     # First loop over all terms retrieved from the file: handle vocabulary, dbxref, CV terms, synonyms, comments
-    for term in ontology_terms:                                                         # type: pronto.Term
+    for accession, term in ontology_terms.items():                                      # type: str, pronto.Term
 
         # Insert, update and/or delete entries in various tables
         cv_entry = handle_cv(session, term, default_namespace)
         dbxref_entry = handle_dbxref(session, term, default_db_entry)
-        if not dbxref_entry.dbxref_id:
-            continue
-        cvterm_entry = handle_cvterm(session, term, cv_entry.cv_id, dbxref_entry.dbxref_id)
-        if not cvterm_entry.cvterm_id:
-            continue
+        cvterm_entry = handle_cvterms_without_conflicts(session, ontology_terms, cv_entry.cv_id, dbxref_entry)
         handle_comments(session, term, cvterm_entry, comment_term.cvterm_id)
         handle_synonyms(session, term, cvterm_entry, synonym_type_terms)
 
@@ -50,11 +54,9 @@ def run(filename: str, format: str, uri: str, db_authority: str) -> None:
         all_cvterm_entries[term.id] = cvterm_entry
 
     # Second loop over all terms retrieved from file: cross references and relationships
-    for term in ontology_terms:                                                         # type: pronto.Term
+    for accession, term in ontology_terms.items():                                      # type: str, pronto.Term
 
         # Insert, update and/or delete entries in various tables
-        if term.id not in all_dbxref_entries or term.id not in all_cvterm_entries:
-            continue
         handle_cross_references(session, term, all_cvterm_entries[term.id], all_dbxref_entries[term.id],
                                 default_db_entry)
         handle_relationships(session, term, all_cvterm_entries[term.id], relationship_terms, default_db_entry,
@@ -146,21 +148,18 @@ def load_and_check_dependencies(session: sqlalchemy.orm.Session) -> (cv.CvTerm, 
     # CV term for comments
     comment_term = find(session, cv.CvTerm, name="comment").first()                     # type: cv.CvTerm
     if not comment_term:
-        print("ERROR: CV term for comments not present in database")
-        exit()
+        raise DatabaseError("CV term for comments not present in database")
 
     # CV terms for synonym types
     synonym_type_cv = find(session, cv.Cv, name="synonym_type").first()                 # type: cv.Cv
     if not synonym_type_cv:
-        print("ERROR: CV 'synonym_type' not present in database")
-        exit()
+        raise DatabaseError("CV 'synonym_type' not present in database")
     synonym_type_cvterms = find(session, cv.CvTerm, cv_id=synonym_type_cv.cv_id).all()  # type: List[cv.CvTerm]
     synonym_type_terms = list_to_dict(synonym_type_cvterms, "name")                     # type: Dict[str, cv.CvTerm]
     required_terms = ["exact", "narrow", "broad", "related"]
     for term in required_terms:
         if term not in synonym_type_terms:
-            print("ERROR: CV term for synonym type '" + term + "' not present in database")
-            exit()
+            raise DatabaseError("CV term for synonym type '" + term + "' not present in database")
 
     # CV terms for relationships
     relationship_cv = find(session, cv.Cv, name="relationship").first()                 # type: cv.Cv
@@ -171,8 +170,7 @@ def load_and_check_dependencies(session: sqlalchemy.orm.Session) -> (cv.CvTerm, 
     required_terms = ["is_a", "part_of"]
     for term in required_terms:
         if term not in relationship_terms:
-            print("ERROR: CV term for relationship '" + term + "' not present in database")
-            exit()
+            raise DatabaseError("CV term for relationship '" + term + "' not present in database")
 
     return comment_term, synonym_type_terms, relationship_terms
 
@@ -187,13 +185,13 @@ def get_default_namespace(ontology: pronto.Ontology) -> str:
     return default_namespace
 
 
-def filter_ontology_by_db(ontology: pronto.Ontology, db_authority: str) -> List[pronto.Term]:
+def filter_ontology_by_db(ontology: pronto.Ontology, db_authority: str) -> Dict[str, pronto.Term]:
     """Filters the terms in an ontology, only retaining those stemming from a given database"""
-    filtered_terms = []                                                                 # type: List[pronto.Term]
+    filtered_terms = {}                                                                 # type: Dict[str, pronto.Term]
     for term in ontology:                                                               # type: pronto.Term
-        db = split_dbxref(term.id)[0]
+        (db, accession, _) = split_dbxref(term.id)
         if db == db_authority:
-            filtered_terms.append(term)
+            filtered_terms[accession] = term
     print("Retrieved " + str(len(filtered_terms)) + " terms for database authority " + db_authority)
     return filtered_terms
 
@@ -222,8 +220,7 @@ def handle_cv(session: sqlalchemy.orm.Session, term: pronto.Term, default_namesp
     if "namespace" in term.other:
         namespace = term.other["namespace"][0]
     if not namespace:
-        print("ERROR: Namespace missing in input file")
-        exit()
+        raise InputFileError("Namespace missing in input file")
 
     # Get the corresponding CV in the database - create it, if not yet available
     cv_entry = find_or_create(session, cv.Cv, name=namespace)
@@ -263,60 +260,141 @@ def handle_dbxref(session: sqlalchemy.orm.Session, term: pronto.Term, default_db
     return dbxref_entry
 
 
-def handle_cvterm(session: sqlalchemy.orm.Session, term: pronto.Term, cv_id: int, dbxref_id: int) -> cv.CvTerm:
-    """Inserts or updates a CV term in the cvterm table"""
+def handle_cvterms_without_conflicts(session: sqlalchemy.orm.Session, ontology_terms: Dict[str, pronto.Term],
+                                     cv_id: int, dbxref_entry: general.DbxRef, force=False) -> cv.CvTerm:
+    """Inserts or updates a CV term in the cvterm table, and makes sure not to violate any UNIQUE constraints"""
 
-    # Check if term in file is marked as obsolete
+    # Check if there is an entry in the input ontology
+    if dbxref_entry.accession in ontology_terms:
+
+        # Create a CV term and check if it is unique (if inserted into the database)
+        term = ontology_terms[dbxref_entry.accession]                                            # type: pronto.Term
+        cvterm_entry = create_cvterm_entry(term, cv_id, dbxref_entry.dbxref_id)
+        (is_unique, existing_cvterm_entry, existing_dbxref_entry) \
+            = is_cvterm_unique(session, cvterm_entry)                   # type: bool, cv.CvTerm, general.DbxRef
+        if not is_unique:
+
+            # Recursive call to update the existing CV term first
+            handle_cvterms_without_conflicts(session, ontology_terms, existing_cvterm_entry.cv_id,
+                                             existing_dbxref_entry, True)
+
+        if is_unique and existing_cvterm_entry:
+
+            # There is a CV term in the database that coincides with the input in terms of cv, name,
+            # is_obsolete and dbxref_id. Update if necessary.
+            if update_cvterm_properties(existing_cvterm_entry, cvterm_entry):
+                print("Updated CV term '" + existing_cvterm_entry.name + "' for dbxref " + term.id)
+            elif existing_cvterm_entry.is_obsolete and \
+                    mark_cvterm_as_obsolete(session, existing_cvterm_entry, force):
+                print("Marked CV term '" + existing_cvterm_entry.name + "' for dbxref " + term.id + " as obsolete")
+            return existing_cvterm_entry
+        else:
+
+            # There is no CV term in the database that coincides with the input in terms of cv, name and is_obsolete.
+            # Check if there is one with the same dbxref.
+            existing_cvterm_entry = find(session, cv.CvTerm, dbxref_id=cvterm_entry.dbxref_id).first()
+            if existing_cvterm_entry:
+
+                # Update parameters, if necessary
+                if update_cvterm_properties(existing_cvterm_entry, cvterm_entry):
+                    print("Updated CV term '" + existing_cvterm_entry.name + "' for dbxref " + term.id)
+                return existing_cvterm_entry
+            else:
+
+                # Insert a new CV term
+                session.add(cvterm_entry)
+                session.flush()
+                print("Inserted CV term '" + cvterm_entry.name + "' for dbxref " + term.id)
+                return cvterm_entry
+    else:
+
+        # Mark the CV term as obsolete (or "more obsolete")
+        existing_cvterm_entry = find(session, cv.CvTerm, dbxref_id=dbxref_entry.dbxref_id).first()
+        if mark_cvterm_as_obsolete(session, existing_cvterm_entry, True):
+            print("Marked CV term '" + existing_cvterm_entry.name + "' as obsolete")
+        return existing_cvterm_entry
+
+
+def create_cvterm_entry(term: pronto.Term, cv_id: int, dbxref_id: int) -> cv.CvTerm:
+    """Creates a CV term entry for the database from an ontology term"""
     is_obsolete = False
     if "is_obsolete" in term.other:
         is_obsolete = bool(term.other["is_obsolete"][0])
-
-    # Check if the CV term is already present in the database
-    cvterm_entry = find(session, cv.CvTerm, dbxref_id=dbxref_id).first()                # type: cv.CvTerm
-    if cvterm_entry:
-
-        # Check if the entries in database and file are identical
-        if cvterm_entry.name != term.name or cvterm_entry.definition != term.desc \
-                or bool(cvterm_entry.is_obsolete) != is_obsolete:
-
-            # Update CV term (name, definition, is_obsolete)
-            test_cvterm_entry = cv.CvTerm(cv_id=cv_id, dbxref_id=dbxref_id, name=term.name, definition=term.desc,
-                                          is_obsolete=int(is_obsolete))
-            if assert_uniqueness(session, test_cvterm_entry):
-                cvterm_entry.name = test_cvterm_entry.name
-                cvterm_entry.definition = test_cvterm_entry.definition
-                cvterm_entry.is_obsolete = test_cvterm_entry.is_obsolete
-                print("Updated CV term '" + cvterm_entry.name + "'")
-            else:
-                print("CV term '" + cvterm_entry.name + "' could not be updated due to a UNIQUE constraint violation")
-    else:
-
-        # Insert CV term
-        cvterm_entry = cv.CvTerm(cv_id=cv_id, dbxref_id=dbxref_id, name=term.name, definition=term.desc,
-                                 is_obsolete=int(is_obsolete))
-        if assert_uniqueness(session, cvterm_entry):
-            session.add(cvterm_entry)
-            session.flush()
-            print("Inserted CV term '" + cvterm_entry.name + "'")
-        else:
-            print("CV term '" + cvterm_entry.name + "' could not be inserted due to a UNIQUE constraint violation")
-
-    # Return the entry
+    cvterm_entry = cv.CvTerm(cv_id=cv_id, dbxref_id=dbxref_id, name=term.name, definition=term.desc,
+                             is_obsolete=int(is_obsolete))
     return cvterm_entry
 
 
-def assert_uniqueness(session: sqlalchemy.orm.Session, cvterm_entry: cv.CvTerm) -> bool:
-    """Makes sure an inserted CV term does not violate the UNIQUE constraint"""
-    term_with_same_properties = find(session, cv.CvTerm, cv_id=cvterm_entry.cv_id, name=cvterm_entry.name,
-                                     is_obsolete=cvterm_entry.is_obsolete).first()      # type: cv.CvTerm
-    if term_with_same_properties:
-        if cvterm_entry.is_obsolete:
-            cvterm_entry.is_obsolete += 1       # fake uniqueness by increasing the is_obsolete flag
-            return True
-        else:
-            return False
+def is_cvterm_unique(session: sqlalchemy.orm.Session, cvterm_entry: cv.CvTerm) -> (bool, cv.CvTerm, general.DbxRef):
+    """Checks if a CV term would fulfill all UNIQUE constraints if inserted into the database"""
+
+    # Check if a CV term with the same properties exists in the database
+    confounding_cvterm_entry = find(session, cv.CvTerm, cv_id=cvterm_entry.cv_id, name=cvterm_entry.name,
+                                    is_obsolete=cvterm_entry.is_obsolete).first()       # type: cv.CvTerm
+
+    if confounding_cvterm_entry and confounding_cvterm_entry.dbxref_id != cvterm_entry.dbxref_id:
+
+        # There is a CV term with these properties in the database, and its ID differs from the input term -> non-unique
+        corresponding_debxref_entry = find(session, general.DbxRef,
+                                           dbxref_id=confounding_cvterm_entry.dbxref_id).first()  # type: general.DbxRef
+        return False, confounding_cvterm_entry, corresponding_debxref_entry
+
+    elif confounding_cvterm_entry:
+
+        # There is a CV term with these properties in the database, but its ID aligns with the input term -> unique
+        return True, confounding_cvterm_entry, None
+
     else:
-        return True
+
+        # There is no CV term with these properties in the database -> unique
+        return True, None, None
+
+
+def update_cvterm_properties(existing_cvterm_entry: cv.CvTerm, cvterm_entry: cv.CvTerm) -> bool:
+    """Updates the properties of a CV term in the database"""
+    updated = False
+    if cvterm_entry.cv_id != existing_cvterm_entry.cv_id:
+        existing_cvterm_entry.cv_id = cvterm_entry.cv_id
+        updated = True
+    if cvterm_entry.name != existing_cvterm_entry.name:
+        existing_cvterm_entry.name = cvterm_entry.name
+        updated = True
+    if cvterm_entry.definition != existing_cvterm_entry.definition:
+        existing_cvterm_entry.definition = cvterm_entry.definition
+        updated = True
+    if cvterm_entry.is_obsolete != existing_cvterm_entry.is_obsolete:
+        existing_cvterm_entry.is_obsolete = cvterm_entry.is_obsolete
+        updated = True
+    return updated
+
+
+def mark_cvterm_as_obsolete(session: sqlalchemy.orm.Session, cvterm_entry: cv.CvTerm, force=False) -> bool:
+    """Marks a CV term in the database as obsolete, and makes sure this doesn't violate any UNIQUE constraints"""
+
+    # Create a copy of the CV term entry and mark that as obsolete
+    marked = False
+    test_cvterm_entry = copy.deepcopy(cvterm_entry)
+    if "obsolete" not in test_cvterm_entry.name.lower():
+        test_cvterm_entry.name = "obsolete " + test_cvterm_entry.name
+    if force:
+        test_cvterm_entry.is_obsolete += 1
+    else:
+        test_cvterm_entry.is_obsolete = 1
+
+    # If nothing has changed: Return
+    if test_cvterm_entry == cvterm_entry:
+        return marked
+
+    # Check if the changed CV term still fulfills all UNIQUE constraints. If not, increase the is_obsolete parameter
+    while not is_cvterm_unique(session, test_cvterm_entry):
+        test_cvterm_entry.is_obsolete += 1
+
+    # Transfer the changed properties to the original CV term
+    if test_cvterm_entry != cvterm_entry:
+        marked = True
+    cvterm_entry.name = test_cvterm_entry.name
+    cvterm_entry.is_obsolete = test_cvterm_entry.is_obsolete
+    return marked
 
 
 def handle_comments(session: sqlalchemy.orm.Session, term: pronto.Term, cvterm_entry: cv.CvTerm, comment_id: int):
@@ -539,19 +617,16 @@ def handle_relationships(session: sqlalchemy.orm.Session, term: pronto.Term, sub
             print("Deleted relationship for CV term '" + subject_term_entry.name + "'")
 
 
-def mark_obsolete_terms(session: sqlalchemy.orm.Session, terms: List[pronto.Term], default_db: general.Db):
+def mark_obsolete_terms(session: sqlalchemy.orm.Session, ontology_terms: Dict[str, pronto.Term],
+                        default_db: general.Db) -> None:
     """Marks obsolete CV terms in the database"""
 
-    # Get existing and new dbxrefs, i.e. dbxrefs present in database and in input file
-    existing_entries = find(session, general.DbxRef, db_id=default_db.db_id).all()      # type: List[general.DbxRef]
-    ontology_dbxrefs = {term.id for term in terms}                                      # type: Set[str]
-
     # Loop over all dbxref entries in the database
+    existing_entries = find(session, general.DbxRef, db_id=default_db.db_id).all()      # type: List[general.DbxRef]
     for dbxref_entry in existing_entries:                                               # type: general.DbxRef
 
         # Check if the dbxref is also present in the input file
-        dbxref = create_dbxref(default_db.name, dbxref_entry.accession, dbxref_entry.version)
-        if dbxref not in ontology_dbxrefs:
+        if dbxref_entry.accession not in ontology_terms:
 
             # Find the corresponding CV term in the database
             cvterm_entry = find(session, cv.CvTerm, dbxref_id=dbxref_entry.dbxref_id).first()  # type: cv.CvTerm
@@ -559,9 +634,5 @@ def mark_obsolete_terms(session: sqlalchemy.orm.Session, terms: List[pronto.Term
                 continue
 
             # Mark the CV term as obsolete, if necessary
-            if "obsolete" not in cvterm_entry.name.lower():
-                cvterm_entry.name = "obsolete " + cvterm_entry.name
-                print("Updated CV term '" + cvterm_entry.name + "'")
-            if cvterm_entry.is_obsolete == 0:
-                cvterm_entry.is_obsolete = 1
+            if mark_cvterm_as_obsolete(session, cvterm_entry):
                 print("Marked CV term '" + cvterm_entry.name + "' as obsolete")

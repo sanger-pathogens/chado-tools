@@ -65,6 +65,13 @@ class CvTerm(Base):
                "is_relationshiptype={6})>".format(self.cvterm_id, self.cv_id, self.dbxref_id, self.name,
                                                   self.definition, self.is_obsolete, self.is_relationshiptype)
 
+    # Comparison
+    def __eq__(self, other):
+        return isinstance(other, CvTerm) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not self == other
+
 
 class CvTermProp(Base):
     """Class for the CHADO 'cvtermprop' table"""
@@ -92,6 +99,11 @@ class CvTermProp(Base):
         for key, value in locals().items():
             if key != self:
                 setattr(self, key, value)
+
+    # Representation
+    def __repr__(self):
+        return "<cv.CvTermProp(cvtermprop_id={0}, cvterm_id={1}, type_id={2}, value='{3}', rank={4})>"\
+            .format(self.cvtermprop_id, self.cvterm_id, self.type_id, self.value, self.rank)
 
 
 class CvTermRelationship(Base):
@@ -123,6 +135,11 @@ class CvTermRelationship(Base):
             if key != self:
                 setattr(self, key, value)
 
+    # Representation
+    def __repr__(self):
+        return "<cv.CvTermRelationship(cvterm_relationship_id={0}, type_id={1}, subject_id={2}, object_id={3})>"\
+            .format(self.cvterm_relationship_id, self.type_id, self.subject_id, self.object_id)
+
 
 class CvTermSynonym(Base):
     """Class for the CHADO 'cvtermsynonym' table"""
@@ -148,6 +165,11 @@ class CvTermSynonym(Base):
         for key, value in locals().items():
             if key != self:
                 setattr(self, key, value)
+
+    # Representation
+    def __repr__(self):
+        return "<cv.CvTermSynonym(cvtermsynonym_id={0}, cvterm_id={1}, synonym='{2}', type_id={3})>"\
+            .format(self.cvtermsynonym_id, self.cvterm_id, self.synonym, self.type_id)
 
 
 class CvTermDbxRef(Base):
@@ -175,3 +197,8 @@ class CvTermDbxRef(Base):
         for key, value in locals().items():
             if key != self:
                 setattr(self, key, value)
+
+    # Representation
+    def __repr__(self):
+        return "<cv.CvTermDbxRef(cvterm_dbxref_id={0}, cvterm_id={1}, dbxref_id={2}, is_for_definition={3})>"\
+            .format(self.cvterm_dbxref_id, self.cvterm_id, self.dbxref_id, self.is_for_definition)

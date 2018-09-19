@@ -1,5 +1,5 @@
 import sqlalchemy.orm
-from pychado.orm.base import Base
+from pychado.orm.base import Base, BIGINT
 
 # Object-relational mappings for the CHADO General module
 
@@ -7,7 +7,7 @@ from pychado.orm.base import Base
 class Db(Base):
     """Class for the CHADO 'db' table"""
     # Columns
-    db_id = sqlalchemy.Column(sqlalchemy.BIGINT, nullable=False, primary_key=True, autoincrement=True)
+    db_id = sqlalchemy.Column(BIGINT, nullable=False, primary_key=True, autoincrement=True)
     name = sqlalchemy.Column(sqlalchemy.VARCHAR(255), nullable=False)
     description = sqlalchemy.Column(sqlalchemy.VARCHAR(255), nullable=True)
     urlprefix = sqlalchemy.Column(sqlalchemy.VARCHAR(255), nullable=True)
@@ -32,7 +32,7 @@ class Db(Base):
 class DbxRef(Base):
     """Class for the CHADO 'dbxref' table"""
     # Columns
-    dbxref_id = sqlalchemy.Column(sqlalchemy.BIGINT, nullable=False, primary_key=True, autoincrement=True)
+    dbxref_id = sqlalchemy.Column(BIGINT, nullable=False, primary_key=True, autoincrement=True)
     db_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(
         Db.db_id, onupdate="CASCADE", ondelete="CASCADE", deferrable=True, initially="DEFERRED"), nullable=False)
     accession = sqlalchemy.Column(sqlalchemy.VARCHAR(1024), nullable=False)

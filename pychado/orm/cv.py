@@ -1,5 +1,5 @@
 import sqlalchemy.orm
-from pychado.orm.base import Base
+from pychado.orm.base import Base, BIGINT
 from pychado.orm.general import DbxRef
 
 # Object-relational mappings for the CHADO Controlled Vocabulary (CV) module
@@ -8,7 +8,7 @@ from pychado.orm.general import DbxRef
 class Cv(Base):
     """Class for the CHADO 'cv' table"""
     # Columns
-    cv_id = sqlalchemy.Column(sqlalchemy.BIGINT, nullable=False, primary_key=True, autoincrement=True)
+    cv_id = sqlalchemy.Column(BIGINT, nullable=False, primary_key=True, autoincrement=True)
     name = sqlalchemy.Column(sqlalchemy.VARCHAR(255), nullable=False)
     definition = sqlalchemy.Column(sqlalchemy.TEXT, nullable=True)
 
@@ -30,7 +30,7 @@ class Cv(Base):
 class CvTerm(Base):
     """Class for the CHADO 'cvterm' table"""
     # Columns
-    cvterm_id = sqlalchemy.Column(sqlalchemy.BIGINT, nullable=False, primary_key=True, autoincrement=True)
+    cvterm_id = sqlalchemy.Column(BIGINT, nullable=False, primary_key=True, autoincrement=True)
     cv_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(
         Cv.cv_id, onupdate="CASCADE", ondelete="CASCADE", deferrable=True, initially="DEFERRED"), nullable=False)
     dbxref_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(
@@ -67,7 +67,15 @@ class CvTerm(Base):
 
     # Comparison
     def __eq__(self, other):
-        return isinstance(other, CvTerm) and self.__dict__ == other.__dict__
+        if isinstance(other, CvTerm) \
+                and self.cv_id == other.cv_id \
+                and self.dbxref_id == other.dbxref_id \
+                and self.name == other.name \
+                and self.definition == other.definition \
+                and self.is_obsolete == other.is_obsolete \
+                and self.is_relationshiptype == other.is_relationshiptype:
+            return True
+        return False
 
     def __ne__(self, other):
         return not self == other
@@ -76,7 +84,7 @@ class CvTerm(Base):
 class CvTermProp(Base):
     """Class for the CHADO 'cvtermprop' table"""
     # Columns
-    cvtermprop_id = sqlalchemy.Column(sqlalchemy.BIGINT, nullable=False, primary_key=True, autoincrement=True)
+    cvtermprop_id = sqlalchemy.Column(BIGINT, nullable=False, primary_key=True, autoincrement=True)
     cvterm_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(
         CvTerm.cvterm_id, onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
     type_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(
@@ -109,7 +117,7 @@ class CvTermProp(Base):
 class CvTermRelationship(Base):
     """Class for the CHADO 'cvterm_relationship' table"""
     # Columns
-    cvterm_relationship_id = sqlalchemy.Column(sqlalchemy.BIGINT, nullable=False, primary_key=True, autoincrement=True)
+    cvterm_relationship_id = sqlalchemy.Column(BIGINT, nullable=False, primary_key=True, autoincrement=True)
     type_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(
         CvTerm.cvterm_id, onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
     subject_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(
@@ -144,7 +152,7 @@ class CvTermRelationship(Base):
 class CvTermSynonym(Base):
     """Class for the CHADO 'cvtermsynonym' table"""
     # Columns
-    cvtermsynonym_id = sqlalchemy.Column(sqlalchemy.BIGINT, nullable=False, primary_key=True, autoincrement=True)
+    cvtermsynonym_id = sqlalchemy.Column(BIGINT, nullable=False, primary_key=True, autoincrement=True)
     cvterm_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(
         CvTerm.cvterm_id, onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
     synonym = sqlalchemy.Column(sqlalchemy.VARCHAR(1024), nullable=False)
@@ -175,7 +183,7 @@ class CvTermSynonym(Base):
 class CvTermDbxRef(Base):
     """Class for the CHADO 'cvterm_dbxref' table"""
     # Columns
-    cvterm_dbxref_id = sqlalchemy.Column(sqlalchemy.BIGINT, nullable=False, primary_key=True, autoincrement=True)
+    cvterm_dbxref_id = sqlalchemy.Column(BIGINT, nullable=False, primary_key=True, autoincrement=True)
     cvterm_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(
         CvTerm.cvterm_id, onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
     dbxref_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(

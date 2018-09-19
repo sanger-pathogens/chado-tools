@@ -73,7 +73,7 @@ class TestUtils(unittest.TestCase):
         self.assertNotIn("zebrafish genetics", content["faculties"])
 
     def test_ontology_parser(self):
-        # checks that an ontology file is parsed correctly
+        # checks if an ontology file is parsed correctly
         filename = os.path.join(data_dir, "utils_obo_example.obo")
         content = utils.parse_ontology(filename)
         self.assertEqual(len(content), 2)
@@ -89,6 +89,29 @@ class TestUtils(unittest.TestCase):
         test_list = [1.123, None, 'hello', True, 'A', 8, False]
         string = utils.list_to_string(test_list, "_")
         self.assertEqual(string, "1.123__hello_t_A_8_f")
+
+    def test_filter_objects(self):
+        # checks if a function correctly filters objects in a list according to keyword arguments
+        john = utils.EmptyObject(name="John", age=42, sex="m")
+        mike = utils.EmptyObject(name="Mike", age=23, sex="m")
+        persons = [john, mike]
+        filtered_persons = utils.filter_objects(persons, name="Mike", sex="m")
+        self.assertEqual(len(filtered_persons), 1)
+        self.assertEqual(filtered_persons[0], mike)
+        with self.assertRaises(AttributeError):
+            utils.filter_objects(persons, heads=2)
+
+    def test_list_to_dict(self):
+        # checks if a function correctly converts a list into a dictionary
+        john = utils.EmptyObject(name="John")
+        mike = utils.EmptyObject(name="Mike")
+        persons = [john, mike]
+        persons_dict = utils.list_to_dict(persons, "name")
+        self.assertEqual(len(persons_dict), 2)
+        self.assertIn("John", persons_dict)
+        self.assertEqual(persons_dict["John"], john)
+        with self.assertRaises(AttributeError):
+            utils.list_to_dict(persons, "age")
 
     def test_current_date(self):
         # checks if a function returns the current date in the correct format

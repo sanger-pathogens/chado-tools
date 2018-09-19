@@ -6,8 +6,9 @@ Python3 command line script providing various tools for accessing CHADO database
 
 ## Prerequisites
 
-* PostgreSQL 9.6 or higher
 * Python 3.6 or higher
+* PostgreSQL 9.6 or higher
+* SQLite (for testing only)
 
 ## Installation from source
 
@@ -58,13 +59,12 @@ The usage is:
 | create                | create a new instance of the CHADO schema                            |
 | dump                  | dump a CHADO database into an archive file                           |
 | restore               | restore a CHADO database from an archive file                        |
-| import                | import data from a text file into a table of a CHADO database        |
-| export                | export data from a table of a CHADO database into a text file        |
 | query                 | query a CHADO database and export the result into a text file        |
 | stats                 | obtain statistics to updates in a CHADO database                     |
 | list                  | list all entities of a specified type in the CHADO database          |
 | insert                | insert a new entity of a specified type into the CHADO database      |
 | delete                | delete an entity of a specified type from the CHADO database         |
+| import                | import entities of a specified type into the CHADO database          |
 ------------------------------------------------------------------------------------------------
 
 ## Examples

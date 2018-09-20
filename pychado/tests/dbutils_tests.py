@@ -17,14 +17,15 @@ class TestConnection(unittest.TestCase):
         self.assertTrue(os.path.exists(os.path.abspath(dbutils.default_configuration_file())))
         self.connectionParameters = utils.parse_yaml(dbutils.default_configuration_file())
         self.dsn = dbutils.generate_dsn(self.connectionParameters)
+        self.uri = dbutils.generate_uri(self.connectionParameters)
 
     def tearDown(self):
         self.connectionParameters.clear()
 
     def test_factory_settings(self):
         # Tests if the settings in the default connection file are equivalent to the factory settings
-        factorySettings = utils.parse_yaml(dbutils.factory_settings_configuration_file())
-        self.assertEqual(self.connectionParameters, factorySettings)
+        factory_settings = utils.parse_yaml(dbutils.factory_settings_configuration_file())
+        self.assertEqual(self.connectionParameters, factory_settings)
 
     def test_connection_parameters(self):
         # Tests if the default connection file contains all required parameters
@@ -61,7 +62,7 @@ class TestConnection(unittest.TestCase):
               + self.connectionParameters["host"] + ":" \
               + self.connectionParameters["port"] + "/" \
               + self.connectionParameters["database"]
-        self.assertEqual(dbutils.generate_uri(self.connectionParameters), uri)
+        self.assertEqual(self.uri, uri)
 
     def test_connection_dsn(self):
         # Tests the correct creation of a database connection string in keyword/value format
@@ -70,32 +71,35 @@ class TestConnection(unittest.TestCase):
               + " password=" + self.connectionParameters["password"] \
               + " host=" + self.connectionParameters["host"] \
               + " port=" + self.connectionParameters["port"]
-        self.assertEqual(dbutils.generate_dsn(self.connectionParameters), dsn)
+        self.assertEqual(self.dsn, dsn)
 
     def test_connect(self):
         # Tests that a connection to the default database can be established and that queries can be executed
-        result = dbutils.connect_and_execute_query(self.dsn, "SELECT 1 + 2")
-        self.assertEqual(result[0][0], 3)
+        conn = dbutils.open_connection(self.uri)
+        self.assertFalse(conn.closed)
+        result = dbutils.execute_query(conn, "SELECT 1 + 2").scalar()
+        self.assertEqual(result, 3)
+        dbutils.close_connection(conn)
+        self.assertTrue(conn.closed)
 
     def test_exists(self):
         # Test the "exists" function by checking for existence of the obligatory template0 database
-        self.assertTrue(dbutils.exists(self.dsn, "template0"))
+        self.assertTrue(dbutils.exists(self.uri, "template0"))
 
-    def test_dump_restore(self):
+    def test_integration(self):
         # Test the basic functionality for creation and deletion of databases
         # NOTE: This test depends on an example SQL schema in the tests/data directory.
         # If the schema is changed, the test might fail.
 
         # Generate a random database name
-        dbname = dbutils.random_database(self.dsn)
+        dbname = dbutils.random_database(self.uri)
         parameters = self.connectionParameters.copy()
         parameters["database"] = dbname
         uri = dbutils.generate_uri(parameters)
-        dsn = dbutils.generate_dsn(parameters)
 
         # Create the database and check it exists
-        dbutils.create_database(self.dsn, dbname)
-        self.assertTrue(dbutils.exists(self.dsn, dbname))
+        dbutils.create_database(self.uri, dbname)
+        self.assertTrue(dbutils.exists(self.uri, dbname))
 
         # Set up the database according to a test schema
         test_schema = os.path.join(data_dir, "dbutils_example_schema.sql")
@@ -103,9 +107,13 @@ class TestConnection(unittest.TestCase):
         dbutils.setup_database(uri, test_schema)
 
         # Check if the database is correctly set up
-        result = dbutils.connect_and_execute_query(dsn, "SELECT * FROM species ORDER BY legs ASC")
+        conn = dbutils.open_connection(uri)
+        result_proxy = dbutils.execute_query(conn, "SELECT * FROM species ORDER BY legs ASC")
+        result = result_proxy.fetchall()
         self.assertEqual(len(result), 4)
-        self.assertIn("leech", result[0])
+        self.assertEqual(result[0]["name"], "leech")
+        result_proxy.close()
+        dbutils.close_connection(conn)
 
         # Dump the database and check for the archive file
         archive_file = "tmp.dump"
@@ -114,71 +122,32 @@ class TestConnection(unittest.TestCase):
 
         # Restore the database and check it exists
         dbutils.restore_database(uri, archive_file)
-        self.assertTrue(dbutils.exists(self.dsn, dbname))
+        self.assertTrue(dbutils.exists(self.uri, dbname))
 
         # Check if the database is still correctly set up
-        result = dbutils.connect_and_execute_query(dsn, "SELECT name FROM species WHERE extinct = TRUE")
+        conn = dbutils.open_connection(uri)
+        result_proxy = dbutils.execute_query(conn, "SELECT name FROM species WHERE extinct = TRUE")
+        result = result_proxy.fetchall()
         self.assertEqual(len(result), 1)
-        self.assertEqual("diplodocus", result[0][0])
+        self.assertEqual(result[0]["name"], "diplodocus")
+        result_proxy.close()
+        dbutils.close_connection(conn)
+
+        # Export the entire table to a file and check that the result is as expected
+        temp_file = os.path.join(os.getcwd(), "tmp.csv")
+        dbutils.query_to_file(uri, "SELECT name, class, legs, extinct FROM species ORDER BY legs ASC", {}, temp_file,
+                              ";", True)
+        self.assertTrue(os.path.exists(temp_file))
+        output_file = os.path.join(data_dir, "dbutils_species_table.csv")
+        self.assertTrue(os.path.exists(output_file))
+        self.assertTrue(filecmp.cmp(temp_file, output_file))
 
         # Drop the database, remove the archive file and check that everything is gone
-        dbutils.drop_database(self.dsn, dbname)
-        self.assertFalse(dbutils.exists(self.dsn, dbname))
+        dbutils.drop_database(self.uri, dbname)
+        self.assertFalse(dbutils.exists(self.uri, dbname))
         os.remove(archive_file)
+        os.remove(temp_file)
         self.assertFalse(os.path.exists(archive_file))
-
-    def test_import_export(self):
-        # Test the basic functionality for import and export of data
-        # NOTE: This test depends on an example SQL schema in the tests/data directory.
-        # If the schema is changed, the test might fail.
-
-        # Generate a random database name
-        dbname = dbutils.random_database(self.dsn)
-        parameters = self.connectionParameters.copy()
-        parameters["database"] = dbname
-        dsn = dbutils.generate_dsn(parameters)
-
-        # Create the database and check it exists
-        dbutils.create_database(self.dsn, dbname)
-        self.assertTrue(dbutils.exists(self.dsn, dbname))
-
-        # Create a table
-        command_file = os.path.join(data_dir, "dbutils_create_table_command.sql")
-        self.assertTrue(os.path.exists(command_file))
-        command = utils.read_text(command_file)
-        dbutils.connect_and_execute_statement(dsn, command)
-
-        # Import data
-        input_file = os.path.join(data_dir, "dbutils_ascii_copy_file_semicolons.csv")
-        self.assertTrue(os.path.exists(input_file))
-        table_name = "species"
-        dbutils.copy_from_file(dsn, table_name, input_file, ";")
-
-        # Check if the data are correctly imported
-        result = dbutils.connect_and_execute_query(dsn, "SELECT * FROM species ORDER BY legs ASC")
-        self.assertEqual(len(result), 4)
-        self.assertIn("leech", result[0])
-
-        # Query the database and check that the result is as expected
-        temp_file = os.path.join(os.getcwd(), "tmp.csv")
-        dbutils.query_to_file(dsn, "SELECT * FROM species ORDER BY legs ASC", (), temp_file, ";", True)
-        self.assertTrue(os.path.exists(temp_file))
-        output_file = os.path.join(data_dir, "dbutils_ascii_copy_file_sorted.csv")
-        self.assertTrue(os.path.exists(output_file))
-        self.assertTrue(filecmp.cmp(temp_file, output_file))
-        os.remove(temp_file)
-
-        # Export data and check the data are correctly exported
-        dbutils.copy_to_file(dsn, table_name, temp_file, "\t", False)
-        self.assertTrue(os.path.exists(temp_file))
-        output_file = os.path.join(data_dir, "dbutils_ascii_copy_file_tabs.csv")
-        self.assertTrue(os.path.exists(output_file))
-        self.assertTrue(filecmp.cmp(temp_file, output_file))
-
-        # Drop the database, remove the temporary file and check that everything is gone
-        dbutils.drop_database(self.dsn, dbname)
-        self.assertFalse(dbutils.exists(self.dsn, dbname))
-        os.remove(temp_file)
         self.assertFalse(os.path.exists(temp_file))
 
 
@@ -194,13 +163,13 @@ class TestDownload(unittest.TestCase):
     def test_download_schema(self):
         # Tests the download of a file from a given url
         url = dbutils.default_schema_url()
-        dbutils.download_schema(url)
+        utils.download_file(url)
         url = url + "_arbitraryString"
         with self.assertRaises(urllib.error.HTTPError):
-            dbutils.download_schema(url)
+            utils.download_file(url)
         url = "http://xyzxyz.xyzxyz"
         with self.assertRaises(urllib.error.URLError):
-            dbutils.download_schema(url)
+            utils.download_file(url)
 
 
 if __name__ == '__main__':

@@ -13,7 +13,7 @@ FROM
 	JOIN
 	cvterm cvt USING (cvterm_id)                                                    -- connect with ontology
 	JOIN
-	cv USING (cv_id)
+	"cv" USING (cv_id)
 	JOIN
 	feature_relationship relation1 ON fcvt.feature_id = relation1.subject_id		-- connect gene product...
 	JOIN
@@ -31,7 +31,7 @@ WHERE
 	AND
 	relation2.type_id IN (SELECT cvterm_id FROM cvterm WHERE name = 'part_of')	    -- transcript is 'part of' gene, at least in the Sanger pathogen DBs
 	AND
-	{{ORGANISM_CONDITION}}	                                                        -- a specific organism, or all
+	:ORGANISM_CONDITION                                                             -- a specific organism, or all
 	AND
 	feature1.is_obsolete = 'f'														-- ignore obsolete features
 ORDER BY

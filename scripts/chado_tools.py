@@ -53,8 +53,6 @@ def general_commands() -> dict:
         "create": "create a new instance of the CHADO schema",
         "dump": "dump a CHADO database into an archive file",
         "restore": "restore a CHADO database from an archive file",
-        "import": "import data from a text file to a table of a CHADO database",
-        "export": "export data from a table of a CHADO database to a text file",
         "query": "query a CHADO database and export the result to a text file",
         "stats": "obtain statistics to updates in a CHADO database"
     }
@@ -65,15 +63,17 @@ def wrapper_commands() -> dict:
     return {
         "list": "list all entities of a specified type in the CHADO database",
         "insert": "insert a new entity of a specified type into the CHADO database",
-        "delete": "delete an entity of a specified type from the CHADO database"
+        "delete": "delete an entity of a specified type from the CHADO database",
+        "import": "import entities of a specified type into the CHADO database"
     }
 
 
 def list_commands() -> dict:
     """Lists the available sub-commands of the 'chado list' command with corresponding descriptions"""
     return {
-        "organisms": "list all organisms in the CHADO database (genus, species, abbreviation)",
-        "products": "list all products of transcripts in the CHADO database"
+        "organisms": "list all organisms in the CHADO database",
+        "cvterms": "list all CV terms in the CHADO database",
+        "genedb_products": "list all products of transcripts in the CHADO database"
     }
 
 
@@ -88,6 +88,13 @@ def delete_commands() -> dict:
     """Lists the available sub-commands of the 'chado delete' command with corresponding descriptions"""
     return {
         "organism": "delete an organism from the CHADO database"
+    }
+
+
+def import_commands() -> dict:
+    """Lists the available sub-commands of the 'chado import' command with corresponding descriptions"""
+    return {
+        "cv_terms": "import CV terms into the CHADO database"
     }
 
 
@@ -149,10 +156,6 @@ def add_arguments_by_command(command: str, parser: argparse.ArgumentParser):
         add_dump_arguments(parser)
     elif command == "restore":
         add_restore_arguments(parser)
-    elif command == "import":
-        add_import_arguments(parser)
-    elif command == "export":
-        add_export_arguments(parser)
     elif command == "query":
         add_query_arguments(parser)
     elif command == "stats":
@@ -163,6 +166,8 @@ def add_arguments_by_command(command: str, parser: argparse.ArgumentParser):
         add_insert_arguments(parser)
     elif command == "delete":
         add_delete_arguments(parser)
+    elif command == "import":
+        add_import_arguments(parser)
     else:
         print("Command '" + parser.prog + "' is not available.")
 
@@ -187,20 +192,6 @@ def add_restore_arguments(parser: argparse.ArgumentParser):
     parser.add_argument("archive", help="archive file")
 
 
-def add_import_arguments(parser: argparse.ArgumentParser):
-    """Defines formal arguments for the 'chado import' sub-command"""
-    parser.add_argument("-d", "--delimiter", default="\t",
-                        help="Character delimiting fields in input file (default: tab)")
-    parser.add_argument("-f", "--input_file", default="", help="file from which data are imported (default: stdin)")
-    parser.add_argument("table", help="table into which data are imported")
-
-
-def add_export_arguments(parser: argparse.ArgumentParser):
-    """Defines formal arguments for the 'chado export' sub-command"""
-    add_general_export_arguments(parser)
-    parser.add_argument("table", help="table from which data are exported")
-
-
 def add_query_arguments(parser: argparse.ArgumentParser):
     """Defines formal arguments for the 'chado query' sub-command"""
     add_general_export_arguments(parser)
@@ -213,7 +204,7 @@ def add_stats_arguments(parser: argparse.ArgumentParser):
     """Defines formal arguments for the 'chado stats' sub-command"""
     add_general_export_arguments(parser)
     parser.add_argument("-a", "--abbreviation", default="all", dest="organism",
-                     help="restrict to a certain organism, defined by its abbreviation/short name (default: all)")
+                        help="restrict to a certain organism, defined by its abbreviation/short name (default: all)")
     parser.add_argument("--start_date", required=True, help="date for maximum age of updates, format 'YYYYMMDD'")
     parser.add_argument("--end_date", default="", help="date for minimum age of updates, format 'YYYYMMDD' "
                                                        "(default: today)")
@@ -235,8 +226,10 @@ def add_list_arguments_by_command(command: str, parser: argparse.ArgumentParser)
     """Defines formal arguments for a specified sub-command of 'chado list'"""
     if command == "organisms":
         add_list_organisms_arguments(parser)
-    elif command == "products":
-        add_list_product_arguments(parser)
+    elif command == "cvterms":
+        add_list_cvterms_arguments(parser)
+    elif command == "genedb_products":
+        add_list_genedb_product_arguments(parser)
     else:
         print("Command '" + parser.prog + "' is not available.")
 
@@ -246,8 +239,14 @@ def add_list_organisms_arguments(parser: argparse.ArgumentParser):
     pass
 
 
-def add_list_product_arguments(parser: argparse.ArgumentParser):
-    """Defines formal arguments for the 'chado list products' sub-command"""
+def add_list_cvterms_arguments(parser: argparse.ArgumentParser):
+    """Defines formal arguments for the 'chado list cvterms' sub-command"""
+    parser.add_argument("--vocabulary", default="all", help="restrict to a vocabulary, e.g. 'relationship'")
+    parser.add_argument("--database", default="all", help="restrict to a database, e.g. 'GO'")
+
+
+def add_list_genedb_product_arguments(parser: argparse.ArgumentParser):
+    """Defines formal arguments for the 'chado list genedb_products' sub-command"""
     parser.add_argument("-a", "--abbreviation", dest="organism", default="all",
                         help="restrict to a certain organism, defined by its abbreviation/short name (default: all)")
 
@@ -303,3 +302,33 @@ def add_delete_organism_arguments(parser: argparse.ArgumentParser):
     """Defines formal arguments for the 'chado delete organism' sub-command"""
     parser.add_argument("-a", "--abbreviation", required=True, dest="organism",
                         help="abbreviation/short name of the organism")
+
+
+def add_import_arguments(parser: argparse.ArgumentParser):
+    """Defines formal arguments for the 'chado import' sub-command"""
+    parser.epilog = "For detailed usage information type '" + parser.prog + " <command> -h'"
+    subparsers = parser.add_subparsers()
+    for command, description in import_commands().items():
+        # Create subparser and add general and specific formal arguments
+        sub = subparsers.add_parser(command, description=description, help=description)
+        add_general_arguments(sub)
+        add_import_arguments_by_command(command, sub)
+
+
+def add_import_arguments_by_command(command: str, parser: argparse.ArgumentParser):
+    """Defines formal arguments for a specified sub-command of 'chado import'"""
+    if command == "cv_terms":
+        add_import_cvterms_arguments(parser)
+    else:
+        print("Command '" + parser.prog + "' is not available.")
+
+
+def add_import_cvterms_arguments(parser: argparse.ArgumentParser):
+    """Defines formal arguments for the 'chado import cv_terms' sub-command"""
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("-f", "--input_file", default="", help="file containing CV terms")
+    group.add_argument("-u", "--input_url", default="", help="URL to a file containing CV terms")
+    parser.add_argument("-A", "--database_authority", required=True,
+                        help="database authority of the terms in the file, e.g. 'GO'")
+    parser.add_argument("-F", "--format", default="obo", choices={"obo", "owl"},
+                        help="format of the file (default: obo)")

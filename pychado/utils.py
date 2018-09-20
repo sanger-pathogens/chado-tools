@@ -2,7 +2,9 @@ import sys
 import os
 import datetime
 import subprocess
+import urllib.request
 import yaml
+import pronto.parser
 
 
 class EmptyObject:
@@ -88,6 +90,16 @@ def dump_yaml(filename: str, data: dict) -> None:
     close(stream)
 
 
+def parse_ontology(filename: str, format="obo") -> pronto.Ontology:
+    """Function parsing an OBO/OWL file"""
+    if format == "owl":
+        print("Parsing OWL file ...")
+        return pronto.Ontology(filename, parser="OwlXMLParser")
+    else:
+        print("Parsing OBO file ...")
+        return pronto.Ontology(filename, parser="OboParser")
+
+
 def list_to_string(the_list: list, delimiter: str) -> str:
     """Function concatenating all elements of a list"""
     the_string = []
@@ -105,6 +117,34 @@ def list_to_string(the_list: list, delimiter: str) -> str:
     return delimiter.join(the_string)
 
 
+def filter_objects(entries: list, **kwargs) -> list:
+    """Filters a list of objects of any type according to given keyword arguments"""
+    filtered_entries = []
+    for entry in entries:
+        for key, value in kwargs.items():
+            if getattr(entry, key) != value:
+                break
+        else:
+            filtered_entries.append(entry)
+    return filtered_entries
+
+
+def list_to_dict(entries: list, key: str) -> dict:
+    """Converts a list of objects of any type into a dictionary, using a specified object parameter as key"""
+    dictionary = {}
+    for entry in entries:
+        current_key = getattr(entry, key)
+        dictionary[current_key] = entry
+    return dictionary
+
+
 def current_date() -> str:
     """Function returning the current date in format 'YYYYMMDD"""
     return datetime.date.today().strftime('%Y%m%d')
+
+
+def download_file(url: str) -> str:
+    """Downloads a file from the internet"""
+    print("Downloading file from URL " + url + " ...")
+    file, headers = urllib.request.urlretrieve(url)
+    return file

@@ -7,8 +7,12 @@ def load_list_query(specifier: str, arguments) -> str:
     query = ""
     if specifier == "organisms":
         query = utils.read_text(pkg_resources.resource_filename("pychado", "sql/list_organisms.sql"))
-    elif specifier == "products":
-        template = utils.read_text(pkg_resources.resource_filename("pychado", "sql/list_products.sql"))
+    elif specifier == "cvterms":
+        template = utils.read_text(pkg_resources.resource_filename("pychado", "sql/list_cvterms.sql"))
+        template = set_vocabulary_condition(template, arguments)
+        query = set_database_condition(template, arguments)
+    elif specifier == "genedb_products":
+        template = utils.read_text(pkg_resources.resource_filename("pychado", "sql/list_genedb_products.sql"))
         query = set_organism_condition(template, arguments)
     return query
 
@@ -38,54 +42,74 @@ def load_delete_statement(specifier: str, arguments) -> str:
 
 
 def set_organism_condition(query: str, arguments) -> str:
-    """Replaces a placeholder in a query with a condition restricting results to certain organisms"""
-    if not hasattr(arguments, "organism") or arguments.organism == "all":
-        modified_query = query.replace('{{ORGANISM_CONDITION}}', 'TRUE')
+    """Replaces a placeholder in a query with a condition restricting results to a certain organism"""
+    if arguments.organism == "all":
+        modified_query = query.replace(':ORGANISM_CONDITION', 'TRUE')
     else:
-        condition = utils.read_text(pkg_resources.resource_filename("pychado", "sql/condition_organism.sql"))
-        modified_query = query.replace('{{ORGANISM_CONDITION}}', condition)
+        modified_query = query.replace(':ORGANISM_CONDITION', "abbreviation = :organism")
     return modified_query
 
 
-def specify_list_parameters(specifier: str, arguments) -> tuple:
-    """Specifies the parameters that complete the SQL query of a 'chado list' command"""
-    if specifier == "products":
-        if arguments.organism != "all":
-            params = (arguments.organism, )
-        else:
-            params = tuple()
+def set_database_condition(query: str, arguments) -> str:
+    """Replaces a placeholder in a query with a condition restricting results to a certain database"""
+    if arguments.database == "all":
+        modified_query = query.replace(':DB_CONDITION', 'TRUE')
     else:
-        params = tuple()
+        modified_query = query.replace(':DB_CONDITION', "db.name = :database_name")
+    return modified_query
+
+
+def set_vocabulary_condition(query: str, arguments) -> str:
+    """Replaces a placeholder in a query with a condition restricting results to a certain vocabulary"""
+    if arguments.vocabulary == "all":
+        modified_query = query.replace(':CV_CONDITION', 'TRUE')
+    else:
+        modified_query = query.replace(':CV_CONDITION', "cv.name = :cv_name")
+    return modified_query
+
+
+def specify_list_parameters(specifier: str, arguments) -> dict:
+    """Specifies the parameters that complete the SQL query of a 'chado list' command"""
+    params = {}
+    if specifier == "cvterms":
+        if arguments.vocabulary != "all":
+            params["cv_name"] = arguments.vocabulary
+        if arguments.database != "all":
+            params["database_name"] = arguments.database
+    elif specifier == "products":
+        if arguments.organism != "all":
+            params["organism"] = arguments.organism
     return params
 
 
-def specify_stats_parameters(arguments) -> tuple:
+def specify_stats_parameters(arguments) -> dict:
     """Specifies the parameters that complete the SQL query of a 'chado stats' command"""
     end_date = arguments.end_date
     if not end_date:
         end_date = utils.current_date()
+    params = {"start_date": arguments.start_date, "end_date": end_date}
     if arguments.organism != "all":
-        params = (arguments.start_date, end_date, arguments.organism)
-    else:
-        params = (arguments.start_date, end_date)
+        params["organism"] = arguments.organism
     return params
 
 
-def specify_insert_parameters(specifier: str, arguments) -> tuple:
+def specify_insert_parameters(specifier: str, arguments) -> dict:
     """Specifies the parameters that complete the SQL query of a 'chado insert' command"""
+    params = {}
     if specifier == "organism":
         if not arguments.common_name:
             arguments.common_name = arguments.abbreviation
-        params = (arguments.genus, arguments.species, arguments.abbreviation, arguments.common_name, arguments.comment)
-    else:
-        params = tuple()
+        params["genus"] = arguments.genus
+        params["species"] = arguments.species
+        params["abbreviation"] = arguments.abbreviation
+        params["common_name"] = arguments.common_name
+        params["comment"] = arguments.comment
     return params
 
 
-def specify_delete_parameters(specifier: str, arguments) -> tuple:
+def specify_delete_parameters(specifier: str, arguments) -> dict:
     """Specifies the parameters that complete the SQL query of a 'chado delete' command"""
+    params = {}
     if specifier == "organism":
-        params = (arguments.organism, )
-    else:
-        params = tuple()
+        params["organism"] = arguments.organism
     return params

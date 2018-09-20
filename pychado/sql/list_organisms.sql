@@ -1,1 +1,8 @@
-SELECT DISTINCT genus, species, abbreviation FROM organism
+SELECT
+    abbreviation,
+    genus,
+    species,
+    common_name,
+    comment
+FROM
+    organism

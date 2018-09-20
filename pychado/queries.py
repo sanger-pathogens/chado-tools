@@ -11,8 +11,8 @@ def load_list_query(specifier: str, arguments) -> str:
         template = utils.read_text(pkg_resources.resource_filename("pychado", "sql/list_cvterms.sql"))
         template = set_vocabulary_condition(template, arguments)
         query = set_database_condition(template, arguments)
-    elif specifier == "products":
-        template = utils.read_text(pkg_resources.resource_filename("pychado", "sql/list_products.sql"))
+    elif specifier == "genedb_products":
+        template = utils.read_text(pkg_resources.resource_filename("pychado", "sql/list_genedb_products.sql"))
         query = set_organism_condition(template, arguments)
     return query
 

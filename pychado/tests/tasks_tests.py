@@ -163,12 +163,13 @@ class TestTasks(unittest.TestCase):
     @unittest.mock.patch('pychado.queries.specify_list_parameters')
     @unittest.mock.patch('pychado.queries.load_list_query')
     @unittest.mock.patch('pychado.dbutils.query_to_file')
-    def test_list_products(self, mock_query, mock_load, mock_specify):
-        # Checks that the function listing products is correctly called
+    def test_list_genedb_products(self, mock_query, mock_load, mock_specify):
+        # Checks that the function listing GeneDB products is correctly called
         self.assertIs(mock_query, dbutils.query_to_file)
         self.assertIs(mock_load, queries.load_list_query)
         self.assertIs(mock_specify, queries.specify_list_parameters)
-        args = chado_tools.parse_arguments(["chado", "list", "products", "-H", "-d", ";", "-o", "testfile", "testdb"])
+        args = chado_tools.parse_arguments(["chado", "list", "genedb_products", "-H", "-d", ";", "-o", "testfile",
+                                            "testdb"])
         mock_load.return_value = "testquery"
         mock_specify.return_value = {"testkey": "testvalue"}
         tasks.run_sub_command_with_arguments("list", "products", args, self.connectionParameters)

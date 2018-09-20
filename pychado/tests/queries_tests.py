@@ -13,7 +13,7 @@ class TestQueries(unittest.TestCase):
         self.assertTrue(pkg_resources.resource_exists("pychado", "sql/stats.sql"))
         self.assertTrue(pkg_resources.resource_exists("pychado", "sql/list_organisms.sql"))
         self.assertTrue(pkg_resources.resource_exists("pychado", "sql/list_cvterms.sql"))
-        self.assertTrue(pkg_resources.resource_exists("pychado", "sql/list_products.sql"))
+        self.assertTrue(pkg_resources.resource_exists("pychado", "sql/list_genedb_products.sql"))
         self.assertTrue(pkg_resources.resource_exists("pychado", "sql/insert_organism.sql"))
         self.assertTrue(pkg_resources.resource_exists("pychado", "sql/delete_organism.sql"))
 
@@ -34,7 +34,7 @@ class TestQueries(unittest.TestCase):
         self.assertIn("SELECT", query)
 
         args = utils.EmptyObject(organism="all")
-        query = queries.load_list_query("products", args)
+        query = queries.load_list_query("genedb_products", args)
         self.assertIn("SELECT", query)
 
         args = utils.EmptyObject()
@@ -106,12 +106,12 @@ class TestQueries(unittest.TestCase):
         self.assertEqual(len(params), 0)
 
         # chado list products
-        args = chado_tools.parse_arguments(["chado", "list", "products", "-a", "testorganism", "testdb"])
+        args = chado_tools.parse_arguments(["chado", "list", "genedb_products", "-a", "testorganism", "testdb"])
         params = queries.specify_list_parameters("products", args)
         self.assertEqual(len(params), 1)
         self.assertEqual(params["organism"], "testorganism")
 
-        args = chado_tools.parse_arguments(["chado", "list", "products", "testdb"])
+        args = chado_tools.parse_arguments(["chado", "list", "genedb_products", "testdb"])
         params = queries.specify_list_parameters("products", args)
         self.assertEqual(len(params), 0)
 

@@ -73,7 +73,7 @@ def list_commands() -> dict:
     return {
         "organisms": "list all organisms in the CHADO database",
         "cvterms": "list all CV terms in the CHADO database",
-        "products": "list all products of transcripts in the CHADO database"
+        "genedb_products": "list all products of transcripts in the CHADO database"
     }
 
 
@@ -228,8 +228,8 @@ def add_list_arguments_by_command(command: str, parser: argparse.ArgumentParser)
         add_list_organisms_arguments(parser)
     elif command == "cvterms":
         add_list_cvterms_arguments(parser)
-    elif command == "products":
-        add_list_product_arguments(parser)
+    elif command == "genedb_products":
+        add_list_genedb_product_arguments(parser)
     else:
         print("Command '" + parser.prog + "' is not available.")
 
@@ -245,8 +245,8 @@ def add_list_cvterms_arguments(parser: argparse.ArgumentParser):
     parser.add_argument("--database", default="all", help="restrict to a database, e.g. 'GO'")
 
 
-def add_list_product_arguments(parser: argparse.ArgumentParser):
-    """Defines formal arguments for the 'chado list products' sub-command"""
+def add_list_genedb_product_arguments(parser: argparse.ArgumentParser):
+    """Defines formal arguments for the 'chado list genedb_products' sub-command"""
     parser.add_argument("-a", "--abbreviation", dest="organism", default="all",
                         help="restrict to a certain organism, defined by its abbreviation/short name (default: all)")
 

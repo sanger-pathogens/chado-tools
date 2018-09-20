@@ -33,7 +33,7 @@ class TestCommands(unittest.TestCase):
         commands = chado_tools.list_commands()
         self.assertIn("organisms", commands)
         self.assertIn("cvterms", commands)
-        self.assertIn("products", commands)
+        self.assertIn("genedb_products", commands)
 
     def test_insert_commands(self):
         commands = chado_tools.insert_commands()
@@ -148,9 +148,9 @@ class TestArguments(unittest.TestCase):
         self.assertEqual(parsed_args["database"], "testdatabase")
         self.assertEqual(parsed_args["dbname"], "testdb")
 
-    def test_list_products_args(self):
-        # Tests if the command line arguments for the subcommand 'chado list products' are parsed correctly
-        args = ["chado", "list", "products", "-H", "-d", ";", "-o", "testfile", "-a", "testorganism", "testdb"]
+    def test_list_genedb_products_args(self):
+        # Tests if the command line arguments for the subcommand 'chado list genedb_products' are parsed correctly
+        args = ["chado", "list", "genedb_products", "-H", "-d", ";", "-o", "testfile", "-a", "testorganism", "testdb"]
         parsed_args = vars(chado_tools.parse_arguments(args))
         self.assertTrue(parsed_args["include_header"])
         self.assertEqual(parsed_args["delimiter"], ";")

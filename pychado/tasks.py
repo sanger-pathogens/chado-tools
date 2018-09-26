@@ -1,5 +1,5 @@
 from pychado import utils, dbutils, queries
-from pychado.io import load_cvterms
+from pychado.io import load_ontology
 
 
 def read_configuration_file(filename: str) -> dict:
@@ -33,7 +33,7 @@ def check_access(connection_parameters: dict, database: str, task: str) -> bool:
             return False
 
 
-def run_command_with_arguments(command: str, arguments, connection_parameters: dict) -> None:
+def run_command_with_arguments(command: str, sub_command: str, arguments, connection_parameters: dict) -> None:
     """Runs a specified sub-command with the supplied arguments"""
 
     # Create connection strings
@@ -75,18 +75,7 @@ def run_command_with_arguments(command: str, arguments, connection_parameters: d
         parameters = queries.specify_stats_parameters(arguments)
         dbutils.query_to_file(connection_uri, query, parameters, arguments.output_file, arguments.delimiter,
                               arguments.include_header)
-    else:
-        print("Functionality '" + command + "' is not yet implemented.")
-
-
-def run_sub_command_with_arguments(command: str, sub_command: str, arguments, connection_parameters: dict) -> None:
-    """Runs a specified sub-command with the supplied arguments"""
-
-    # Create connection strings
-    connection_uri = dbutils.generate_uri(connection_parameters)
-
-    # Run the command
-    if command == "list":
+    elif command == "list":
         # List all entities of a specified type in the CHADO database and export the result to a text file
         query = queries.load_list_query(sub_command, arguments)
         parameters = queries.specify_list_parameters(sub_command, arguments)
@@ -97,18 +86,26 @@ def run_sub_command_with_arguments(command: str, sub_command: str, arguments, co
         statement = queries.load_insert_statement(sub_command)
         parameters = queries.specify_insert_parameters(sub_command, arguments)
         dbutils.connect_and_execute(connection_uri, statement, parameters)
-        print("Inserted a new " + sub_command + " into the database.")
     elif command == "delete":
         # Delete an entity of a specified type from the CHADO database
         statement = queries.load_delete_statement(sub_command, arguments)
         parameters = queries.specify_delete_parameters(sub_command, arguments)
         dbutils.connect_and_execute(connection_uri, statement, parameters)
-        print("Deleted an existing " + sub_command + " from the database.")
     elif command == "import":
         # Import entities of a specified type into the CHADO database
-        file = arguments.input_file
-        if arguments.input_url:
-            file = utils.download_file(arguments.input_url)
-        load_cvterms.run(file, arguments.format, connection_uri, arguments.database_authority)
+        run_import_command(sub_command, arguments, connection_uri)
     else:
         print("Functionality '" + command + "' is not yet implemented.")
+
+
+def run_import_command(specifier: str, arguments, uri: str) -> None:
+    """Imports data from a file into a database"""
+    file = arguments.input_file
+    if arguments.input_url:
+        file = utils.download_file(arguments.input_url)
+
+    if specifier == "ontology":
+        loader = load_ontology.OntologyLoader(uri, arguments.verbose)
+        loader.load(file, arguments.format, arguments.database_authority)
+    else:
+        print("Functionality 'import " + specifier + "' is not yet implemented.")

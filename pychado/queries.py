@@ -79,6 +79,10 @@ def specify_list_parameters(specifier: str, arguments) -> dict:
     elif specifier == "products":
         if arguments.organism != "all":
             params["organism"] = arguments.organism
+    elif specifier == "organisms":
+        pass
+    else:
+        print("Functionality 'insert " + specifier + "' is not yet implemented.")
     return params
 
 
@@ -104,6 +108,8 @@ def specify_insert_parameters(specifier: str, arguments) -> dict:
         params["abbreviation"] = arguments.abbreviation
         params["common_name"] = arguments.common_name
         params["comment"] = arguments.comment
+    else:
+        print("Functionality 'insert " + specifier + "' is not yet implemented.")
     return params
 
 
@@ -112,4 +118,6 @@ def specify_delete_parameters(specifier: str, arguments) -> dict:
     params = {}
     if specifier == "organism":
         params["organism"] = arguments.organism
+    else:
+        print("Functionality 'delete " + specifier + "' is not yet implemented.")
     return params

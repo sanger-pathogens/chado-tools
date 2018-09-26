@@ -4,6 +4,8 @@ import unittest
 import subprocess
 import string
 import random
+import io
+from contextlib import redirect_stdout
 from pychado import utils
 
 modules_dir = os.path.dirname(os.path.abspath(utils.__file__))
@@ -72,23 +74,11 @@ class TestUtils(unittest.TestCase):
         self.assertIn("parasites and microbes", content["faculties"])
         self.assertNotIn("zebrafish genetics", content["faculties"])
 
-    def test_ontology_parser(self):
-        # checks if an ontology file is parsed correctly
-        filename = os.path.join(data_dir, "utils_obo_example.obo")
-        content = utils.parse_ontology(filename)
-        self.assertEqual(len(content), 2)
-        self.assertIn("test:0000001", content)
-        term = content["test:0000001"]
-        self.assertEqual(term.name, "diplodocus")
-        self.assertEqual(term.desc, "definition of a diplodocus")
-        self.assertEqual(term.other["namespace"][0], "animals")
-        self.assertEqual(len(term.relations), 1)
-
     def test_list_to_string(self):
         # checks if a list is correctly concatenated
         test_list = [1.123, None, 'hello', True, 'A', 8, False]
-        string = utils.list_to_string(test_list, "_")
-        self.assertEqual(string, "1.123__hello_t_A_8_f")
+        test_string = utils.list_to_string(test_list, "_")
+        self.assertEqual(test_string, "1.123__hello_t_A_8_f")
 
     def test_filter_objects(self):
         # checks if a function correctly filters objects in a list according to keyword arguments
@@ -120,6 +110,15 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(int(date[0]), 2)
         self.assertTrue(int(date[4:5]) <= 12)
         self.assertTrue(int(date[6:7]) <= 31)
+
+    def test_verbose_printer(self):
+        # tests the verpose printer
+        printer = utils.VerbosePrinter(True, "-")
+        f = io.StringIO()
+        with redirect_stdout(f):
+            printer.print(["AAA", "BBB"])
+            printed = f.getvalue()
+        self.assertEqual(printed, "AAA-BBB\n")
 
 
 if __name__ == '__main__':

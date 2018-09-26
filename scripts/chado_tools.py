@@ -14,10 +14,11 @@ def main():
     # Parse the supplied command line arguments
     arguments = parse_arguments(sys.argv)
     command = sys.argv[1]
+    sub_command = ""
 
     if command in setup_commands():
         # Set database connection parameters
-        pychado.tasks.run_command_with_arguments(command, arguments, dict())
+        pychado.tasks.run_command_with_arguments(command, sub_command, arguments, dict())
 
     else:
         # Check database access
@@ -27,11 +28,9 @@ def main():
 
             # Run the command
             connection_parameters["database"] = arguments.dbname
-            if command in general_commands():
-                pychado.tasks.run_command_with_arguments(command, arguments, connection_parameters)
-            else:
+            if command not in general_commands():
                 sub_command = sys.argv[2]
-                pychado.tasks.run_sub_command_with_arguments(command, sub_command, arguments, connection_parameters)
+            pychado.tasks.run_command_with_arguments(command, sub_command, arguments, connection_parameters)
 
         # Print run time
         if arguments.verbose:
@@ -94,7 +93,7 @@ def delete_commands() -> dict:
 def import_commands() -> dict:
     """Lists the available sub-commands of the 'chado import' command with corresponding descriptions"""
     return {
-        "cv_terms": "import CV terms into the CHADO database"
+        "ontology": "import an ontology into the CHADO database"
     }
 
 
@@ -149,7 +148,7 @@ def add_general_export_arguments(parser: argparse.ArgumentParser):
 def add_arguments_by_command(command: str, parser: argparse.ArgumentParser):
     """Defines formal arguments for a specified sub-command"""
     if command == "connect":
-        add_connect_arguments(parser)
+        pass
     elif command == "create":
         add_create_arguments(parser)
     elif command == "dump":
@@ -170,11 +169,6 @@ def add_arguments_by_command(command: str, parser: argparse.ArgumentParser):
         add_import_arguments(parser)
     else:
         print("Command '" + parser.prog + "' is not available.")
-
-
-def add_connect_arguments(parser: argparse.ArgumentParser):
-    """Defines formal arguments for the 'chado connect' sub-command"""
-    pass
 
 
 def add_create_arguments(parser: argparse.ArgumentParser):
@@ -225,18 +219,13 @@ def add_list_arguments(parser: argparse.ArgumentParser):
 def add_list_arguments_by_command(command: str, parser: argparse.ArgumentParser):
     """Defines formal arguments for a specified sub-command of 'chado list'"""
     if command == "organisms":
-        add_list_organisms_arguments(parser)
+        pass
     elif command == "cvterms":
         add_list_cvterms_arguments(parser)
     elif command == "genedb_products":
         add_list_genedb_product_arguments(parser)
     else:
         print("Command '" + parser.prog + "' is not available.")
-
-
-def add_list_organisms_arguments(parser: argparse.ArgumentParser):
-    """Defines formal arguments for the 'chado list organisms' sub-command"""
-    pass
 
 
 def add_list_cvterms_arguments(parser: argparse.ArgumentParser):
@@ -317,14 +306,14 @@ def add_import_arguments(parser: argparse.ArgumentParser):
 
 def add_import_arguments_by_command(command: str, parser: argparse.ArgumentParser):
     """Defines formal arguments for a specified sub-command of 'chado import'"""
-    if command == "cv_terms":
-        add_import_cvterms_arguments(parser)
+    if command == "ontology":
+        add_import_ontology_arguments(parser)
     else:
         print("Command '" + parser.prog + "' is not available.")
 
 
-def add_import_cvterms_arguments(parser: argparse.ArgumentParser):
-    """Defines formal arguments for the 'chado import cv_terms' sub-command"""
+def add_import_ontology_arguments(parser: argparse.ArgumentParser):
+    """Defines formal arguments for the 'chado import ontology' sub-command"""
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("-f", "--input_file", default="", help="file containing CV terms")
     group.add_argument("-u", "--input_url", default="", help="URL to a file containing CV terms")

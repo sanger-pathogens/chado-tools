@@ -14,6 +14,24 @@ class EmptyObject:
             setattr(self, key, value)
 
 
+class VerbosePrinter:
+    """Class printing messages if verbose argument is set"""
+
+    def __init__(self, verbose: bool, separator=";"):
+        """Constructor"""
+        self.verbose = verbose
+        self.separator = separator
+
+    def print(self, message):
+        """Prints a message if set to verbose. If the message is a list, the method prints all elements,
+        separated by the set separator"""
+        if self.verbose:
+            if isinstance(message, list):
+                print(*message, sep=self.separator)
+            else:
+                print(message)
+
+
 def open_file_read(filename: str):
     """Function opening a (potentially gzipped) text file for read access"""
     if not filename:
@@ -88,16 +106,6 @@ def dump_yaml(filename: str, data: dict) -> None:
     stream = open_file_write(filename)
     yaml.dump(data, stream)
     close(stream)
-
-
-def parse_ontology(filename: str, format="obo") -> pronto.Ontology:
-    """Function parsing an OBO/OWL file"""
-    if format == "owl":
-        print("Parsing OWL file ...")
-        return pronto.Ontology(filename, parser="OwlXMLParser")
-    else:
-        print("Parsing OBO file ...")
-        return pronto.Ontology(filename, parser="OboParser")
 
 
 def list_to_string(the_list: list, delimiter: str) -> str:

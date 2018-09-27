@@ -107,12 +107,12 @@ class TestQueries(unittest.TestCase):
 
         # chado list products
         args = chado_tools.parse_arguments(["chado", "list", "genedb_products", "-a", "testorganism", "testdb"])
-        params = queries.specify_list_parameters("products", args)
+        params = queries.specify_list_parameters("genedb_products", args)
         self.assertEqual(len(params), 1)
         self.assertEqual(params["organism"], "testorganism")
 
         args = chado_tools.parse_arguments(["chado", "list", "genedb_products", "testdb"])
-        params = queries.specify_list_parameters("products", args)
+        params = queries.specify_list_parameters("genedb_products", args)
         self.assertEqual(len(params), 0)
 
     def test_specify_stats_parameters(self):

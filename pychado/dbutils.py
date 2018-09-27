@@ -1,11 +1,10 @@
 import shutil
 import pkg_resources
 import subprocess
-import string
-import random
 import urllib.parse
 import getpass
 import sqlalchemy
+import sqlalchemy_utils
 from pychado import utils
 
 
@@ -108,52 +107,36 @@ def execute_statement(connection: sqlalchemy.engine.base.Connection, statement: 
         connection.execute(statement)
 
 
-def get_keys(connection: sqlalchemy.engine.base.Connection, table: str) -> set:
-    """Retrieves the keys of a table in an opened database"""
-    sql = "SELECT * FROM " + table + " LIMIT 0"
-    result = execute_query(connection, sql)
-    return set(result.keys())
-
-
-def exists(uri: str, dbname: str) -> bool:
+def exists(uri: str) -> bool:
     """Checks if a database exists"""
-    sql = utils.read_text(pkg_resources.resource_filename("pychado", "sql/check_if_database_exists.sql"))
-    conn = open_connection(uri)
-    result = execute_query(conn, sql, {"datname": dbname}).scalar()
-    close_connection(conn)
-    return result != 0
+    return sqlalchemy_utils.database_exists(uri)
 
 
-def random_database(uri: str) -> str:
-    """Generates a random database name and makes sure the name is not yet in use"""
-    dbname = "template0"
-    while exists(uri, dbname):
-        dbname = "".join(random.choices(string.ascii_lowercase, k=10))
-    return dbname
-
-
-def create_database(uri: str, dbname: str) -> None:
+def create_database(uri: str) -> None:
     """Creates a database"""
-    sql = "CREATE DATABASE " + dbname
-    connect_and_execute(uri, sql, autocommit=True)
+    sqlalchemy_utils.create_database(uri)
     print("Database has been created.")
 
 
-def drop_database(uri: str, dbname: str) -> None:
+def drop_database(uri: str, force=False) -> None:
     """Deletes a database"""
-    sql = "DROP DATABASE " + dbname
-    connect_and_execute(uri, sql, autocommit=True)
+    if not force:
+        dbname = uri.split("/")[-1]
+        if input("Are you sure you want to drop the database '" + dbname + "' [y/n]?\n").lower() != "y":
+            print("Database is conserved.")
+            return
+    sqlalchemy_utils.drop_database(uri)
     print("Database has been deleted.")
 
 
-def dump_database(uri: str, archive: str):
+def dump_database(uri: str, archive: str) -> None:
     """Dumps a database into an archive file"""
     command = ["pg_dump", "-f", archive, "--format=custom", uri]
     subprocess.run(command)
     print("Database has been dumped.")
 
 
-def restore_database(uri: str, archive: str, remove_privileges=True):
+def restore_database(uri: str, archive: str, remove_privileges=True) -> None:
     """Restores a database from an archive file"""
     command = ["pg_restore", "--clean", "--if-exists"]
     if remove_privileges:
@@ -170,6 +153,20 @@ def setup_database(uri: str, schema_file: str) -> None:
     print("Database schema has been set up.")
 
 
+def dump_users(uri: str, filename: str) -> None:
+    """Exports a list of database users to file"""
+    command = ["pg_dumpall", "-d", uri, "--roles-only", "-f", filename]
+    subprocess.run(command)
+    print("Database users have been exported to file.")
+
+
+def restore_users(uri: str, filename: str) -> None:
+    """Imports a list of database users from file"""
+    command = ["psql", "-q", "-f", filename, uri]
+    subprocess.run(command)
+    print("Database users have been imported from file.")
+
+
 def connect_to_database(uri: str) -> None:
     """Connects to a database for an interactive session"""
     print("Establishing connection to database...")
@@ -178,11 +175,9 @@ def connect_to_database(uri: str) -> None:
     print("Connection to database closed.")
 
 
-def connect_and_execute(uri: str, statement: str, params=None, autocommit=False) -> None:
+def connect_and_execute(uri: str, statement: str, params=None) -> None:
     """Connects to a database and executes a single statement"""
     connection = open_connection(uri)
-    if autocommit:
-        connection.execution_options(isolation_level="AUTOCOMMIT")
     execute_statement(connection, statement, params)
     close_connection(connection)
 
@@ -195,18 +190,10 @@ def query_to_file(uri: str, query: str, params: dict, filename: str, delimiter: 
     rows = []
     if header:
         rows = [result.keys()]
-    while True:
-        try:
-            result_row = result.fetchone()
-            if not result_row:
-                break
-            row = [value for key, value in result_row.items()]
-            rows.append(row)
-        except UnicodeDecodeError:
-            print("WARNING: Unable to decode row")
-            break
-    if not result.closed:
-        result.close()
+    for result_row in result.fetchall():
+        row = [value for key, value in result_row.items()]
+        rows.append(row)
+    result.close()
     close_connection(conn)
 
     # Write table to file

@@ -14,9 +14,6 @@ class TestCommands(unittest.TestCase):
     def test_general_commands(self):
         commands = chado_tools.general_commands()
         self.assertIn("connect", commands)
-        self.assertIn("create", commands)
-        self.assertIn("dump", commands)
-        self.assertIn("restore", commands)
         self.assertIn("query", commands)
         self.assertIn("stats", commands)
         self.assertNotIn("non_existent_command", commands)
@@ -27,7 +24,17 @@ class TestCommands(unittest.TestCase):
         self.assertIn("insert", commands)
         self.assertIn("delete", commands)
         self.assertIn("import", commands)
+        self.assertIn("admin", commands)
         self.assertNotIn("non_existent_command", commands)
+
+    def test_admin_commands(self):
+        commands = chado_tools.admin_commands()
+        self.assertIn("create", commands)
+        self.assertIn("drop", commands)
+        self.assertIn("dump", commands)
+        self.assertIn("restore", commands)
+        self.assertIn("dump_users", commands)
+        self.assertIn("restore_users", commands)
 
     def test_list_commands(self):
         commands = chado_tools.list_commands()
@@ -67,24 +74,45 @@ class TestArguments(unittest.TestCase):
         self.assertNotIn("non_existent_argument", parsed_args)
 
     def test_create_args(self):
-        # Tests if the command line arguments for the subcommand 'chado create' are parsed correctly
-        args = ["chado", "create", "-s", "testschema", "testdb"]
+        # Tests if the command line arguments for the subcommand 'chado admin create' are parsed correctly
+        args = ["chado", "admin", "create", "-s", "testschema", "testdb"]
         parsed_args = vars(chado_tools.parse_arguments(args))
+        self.assertEqual(parsed_args["dbname"], "testdb")
         self.assertEqual(parsed_args["schema"], "testschema")
 
+    def test_drop_args(self):
+        # Tests if the command line arguments for the subcommand 'chado admin drop' are parsed correctly
+        args = ["chado", "admin", "drop", "testdb"]
+        parsed_args = vars(chado_tools.parse_arguments(args))
+        self.assertEqual(parsed_args["dbname"], "testdb")
+
     def test_dump_args(self):
-        # Tests if the command line arguments for the subcommand 'chado dump' are parsed correctly
-        args = ["chado", "dump", "testdb", "testarchive"]
+        # Tests if the command line arguments for the subcommand 'chado admin dump' are parsed correctly
+        args = ["chado", "admin", "dump", "testdb", "testarchive"]
         parsed_args = vars(chado_tools.parse_arguments(args))
         self.assertEqual(parsed_args["dbname"], "testdb")
         self.assertEqual(parsed_args["archive"], "testarchive")
 
     def test_restore_args(self):
-        # Tests if the command line arguments for the subcommand 'chado restore' are parsed correctly
-        args = ["chado", "restore", "testdb", "testarchive"]
+        # Tests if the command line arguments for the subcommand 'chado admin restore' are parsed correctly
+        args = ["chado", "admin", "restore", "testdb", "testarchive"]
         parsed_args = vars(chado_tools.parse_arguments(args))
         self.assertEqual(parsed_args["dbname"], "testdb")
         self.assertEqual(parsed_args["archive"], "testarchive")
+
+    def test_dump_users_args(self):
+        # Tests if the command line arguments for the subcommand 'chado admin dump_users' are parsed correctly
+        args = ["chado", "admin", "dump_users", "testdb", "testfile"]
+        parsed_args = vars(chado_tools.parse_arguments(args))
+        self.assertEqual(parsed_args["dbname"], "testdb")
+        self.assertEqual(parsed_args["file"], "testfile")
+
+    def test_restore_users_args(self):
+        # Tests if the command line arguments for the subcommand 'chado admin restore_users' are parsed correctly
+        args = ["chado", "admin", "restore_users", "testdb", "testfile"]
+        parsed_args = vars(chado_tools.parse_arguments(args))
+        self.assertEqual(parsed_args["dbname"], "testdb")
+        self.assertEqual(parsed_args["file"], "testfile")
 
     def test_query_args(self):
         # Tests if the command line arguments for the subcommand 'chado query' are parsed correctly

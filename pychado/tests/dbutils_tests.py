@@ -1,4 +1,6 @@
 import os
+import string
+import random
 import unittest.mock
 import urllib.error
 import filecmp
@@ -21,6 +23,16 @@ class TestConnection(unittest.TestCase):
 
     def tearDown(self):
         self.connectionParameters.clear()
+
+    def random_database(self) -> str:
+        """Generates a random database name and makes sure the name is not yet in use"""
+        parameters = self.connectionParameters.copy()
+        parameters["database"] = "postgres"
+        uri = dbutils.generate_uri(parameters)
+        while dbutils.exists(uri):
+            parameters["database"] = "".join(random.choices(string.ascii_lowercase, k=10))
+            uri = dbutils.generate_uri(parameters)
+        return uri
 
     def test_factory_settings(self):
         # Tests if the settings in the default connection file are equivalent to the factory settings
@@ -82,24 +94,17 @@ class TestConnection(unittest.TestCase):
         dbutils.close_connection(conn)
         self.assertTrue(conn.closed)
 
-    def test_exists(self):
-        # Test the "exists" function by checking for existence of the obligatory template0 database
-        self.assertTrue(dbutils.exists(self.uri, "template0"))
-
     def test_integration(self):
         # Test the basic functionality for creation and deletion of databases
         # NOTE: This test depends on an example SQL schema in the tests/data directory.
         # If the schema is changed, the test might fail.
 
         # Generate a random database name
-        dbname = dbutils.random_database(self.uri)
-        parameters = self.connectionParameters.copy()
-        parameters["database"] = dbname
-        uri = dbutils.generate_uri(parameters)
+        uri = self.random_database()
 
         # Create the database and check it exists
-        dbutils.create_database(self.uri, dbname)
-        self.assertTrue(dbutils.exists(self.uri, dbname))
+        dbutils.create_database(uri)
+        self.assertTrue(dbutils.exists(uri))
 
         # Set up the database according to a test schema
         test_schema = os.path.join(data_dir, "dbutils_example_schema.sql")
@@ -122,7 +127,7 @@ class TestConnection(unittest.TestCase):
 
         # Restore the database and check it exists
         dbutils.restore_database(uri, archive_file)
-        self.assertTrue(dbutils.exists(self.uri, dbname))
+        self.assertTrue(dbutils.exists(uri))
 
         # Check if the database is still correctly set up
         conn = dbutils.open_connection(uri)
@@ -143,8 +148,8 @@ class TestConnection(unittest.TestCase):
         self.assertTrue(filecmp.cmp(temp_file, output_file))
 
         # Drop the database, remove the archive file and check that everything is gone
-        dbutils.drop_database(self.uri, dbname)
-        self.assertFalse(dbutils.exists(self.uri, dbname))
+        dbutils.drop_database(uri, True)
+        self.assertFalse(dbutils.exists(uri))
         os.remove(archive_file)
         os.remove(temp_file)
         self.assertFalse(os.path.exists(archive_file))

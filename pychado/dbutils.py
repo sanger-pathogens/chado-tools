@@ -153,10 +153,12 @@ def dump_database(uri: str, archive: str):
     print("Database has been dumped.")
 
 
-def restore_database(uri: str, archive: str):
+def restore_database(uri: str, archive: str, remove_privileges=True):
     """Restores a database from an archive file"""
-    command = ["pg_restore", "--clean", "--if-exists", "--no-owner", "--no-privileges", "--format=custom",
-               "-d", uri, archive]
+    command = ["pg_restore", "--clean", "--if-exists"]
+    if remove_privileges:
+        command.extend(["--no-owner", "--no-privileges"])
+    command.extend(["--format=custom", "-d", uri, archive])
     subprocess.run(command)
     print("Database has been restored.")
 
@@ -193,10 +195,18 @@ def query_to_file(uri: str, query: str, params: dict, filename: str, delimiter: 
     rows = []
     if header:
         rows = [result.keys()]
-    for result_row in result.fetchall():
-        row = [value for key, value in result_row.items()]
-        rows.append(row)
-    result.close()
+    while True:
+        try:
+            result_row = result.fetchone()
+            if not result_row:
+                break
+            row = [value for key, value in result_row.items()]
+            rows.append(row)
+        except UnicodeDecodeError:
+            print("WARNING: Unable to decode row")
+            break
+    if not result.closed:
+        result.close()
     close_connection(conn)
 
     # Write table to file

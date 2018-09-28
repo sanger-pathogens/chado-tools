@@ -45,7 +45,7 @@ class TestCommands(unittest.TestCase):
 
     def test_import_commands(self):
         commands = chado_tools.import_commands()
-        self.assertIn("cv_terms", commands)
+        self.assertIn("ontology", commands)
 
 
 class TestArguments(unittest.TestCase):
@@ -177,9 +177,9 @@ class TestArguments(unittest.TestCase):
         self.assertEqual(parsed_args["organism"], "testorganism")
         self.assertEqual(parsed_args["dbname"], "testdb")
 
-    def test_import_cvterms_args(self):
+    def test_import_ontology_args(self):
         # Tests if the command line arguments for the subcommand 'chado import cv_terms' are parsed correctly
-        args = ["chado", "import", "cv_terms", "-f", "testfile", "-A", "testauthority", "-F", "owl", "testdb"]
+        args = ["chado", "import", "ontology", "-f", "testfile", "-A", "testauthority", "-F", "owl", "testdb"]
         parsed_args = vars(chado_tools.parse_arguments(args))
         self.assertEqual(parsed_args["input_file"], "testfile")
         self.assertEqual(parsed_args["input_url"], "")
@@ -188,7 +188,7 @@ class TestArguments(unittest.TestCase):
         self.assertEqual(parsed_args["dbname"], "testdb")
 
         # Test the default values / alternatives
-        args = ["chado", "import", "cv_terms", "-u", "testurl", "-A", "testauthority", "testdb"]
+        args = ["chado", "import", "ontology", "-u", "testurl", "-A", "testauthority", "testdb"]
         parsed_args = vars(chado_tools.parse_arguments(args))
         self.assertEqual(parsed_args["input_file"], "")
         self.assertEqual(parsed_args["input_url"], "testurl")

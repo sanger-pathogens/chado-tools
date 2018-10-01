@@ -52,12 +52,16 @@ class OntologyLoader(io.DatabaseLoader):
 
         # Find/create parent vocabulary and db of ontology terms in file; load dependencies
         default_db_entry = self._handle_db(db_authority)
-        self._handle_cv(pronto.Term(""), default_namespace)
+        default_cv_entry = self._handle_cv(pronto.Term(""), default_namespace)
         comment_term, synonym_type_terms, relationship_terms = self._load_and_check_dependencies()
 
         # Create global containers to reduce the number of database requests
         all_dbxref_entries = {}                                                     # type: Dict[str, general.DbxRef]
         all_cvterm_entries = {}                                                     # type: Dict[str, cv.CvTerm]
+
+        # Handle typedefs
+        for typedef in ontology.typedefs:                                           # type: pronto.Relationship
+            self._handle_typedef(typedef, default_db_entry, default_cv_entry)
 
         # First loop over all terms retrieved from the file: handle vocabulary, dbxref, CV terms, synonyms, comments
         for term in ontology_terms.values():                                        # type: pronto.Term
@@ -122,6 +126,26 @@ class OntologyLoader(io.DatabaseLoader):
                 raise io.DatabaseError("CV term for relationship '" + term + "' not present in database")
 
         return comment_term, synonym_type_terms, relationship_terms
+
+    def _handle_typedef(self, typedef: pronto.Relationship, default_db: general.Db, default_cv: cv.Cv):
+        """Inserts CV terms for relationship ontology terms (so-called "typedefs")"""
+
+        # Check if a relationship CV term with this name already exists
+        cvterm_entry = self.query_table(cv.CvTerm, name=typedef.obo_name, is_relationshiptype=1).first()
+        if not cvterm_entry:
+
+            # Create dbxref
+            dbxref = create_dbxref(default_db.name, typedef.obo_name)
+            term = pronto.Term(dbxref, typedef.obo_name)
+            dbxref_entry = self._handle_dbxref(term, default_db)
+
+            # Create CV term
+            cvterm_entry = cv.CvTerm(cv_id=default_cv.cv_id, dbxref_id=dbxref_entry.dbxref_id,
+                                     name=typedef.obo_name, is_relationshiptype=1)
+            self.session.add(cvterm_entry)
+            self.session.flush()
+            self._cvterm_inserts += 1
+            self.printer.print("Inserted CV term '" + cvterm_entry.name + "' for dbxref " + dbxref)
 
     def _handle_db(self, db_authority: str) -> general.Db:
         """Returns an entry from the db table"""
@@ -522,7 +546,8 @@ class OntologyLoader(io.DatabaseLoader):
             if dbxref not in ontology_terms:
 
                 # Find the corresponding CV term in the database
-                cvterm_entry = self.query_table(cv.CvTerm, dbxref_id=dbxref_entry.dbxref_id).first()  # type: cv.CvTerm
+                cvterm_entry = self.query_table(cv.CvTerm, dbxref_id=dbxref_entry.dbxref_id,
+                                                is_relationshiptype=0).first()      # type: cv.CvTerm
                 if not cvterm_entry:
                     continue
 

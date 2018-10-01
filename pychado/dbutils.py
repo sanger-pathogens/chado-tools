@@ -136,12 +136,10 @@ def dump_database(uri: str, archive: str) -> None:
     print("Database has been dumped.")
 
 
-def restore_database(uri: str, archive: str, remove_privileges=True) -> None:
+def restore_database(uri: str, archive: str) -> None:
     """Restores a database from an archive file"""
-    command = ["pg_restore", "--clean", "--if-exists"]
-    if remove_privileges:
-        command.extend(["--no-owner", "--no-privileges"])
-    command.extend(["--format=custom", "-d", uri, archive])
+    command = ["pg_restore", "--clean", "--if-exists", "--no-owner", "--no-privileges", "--format=custom",
+               "-d", uri, archive]
     subprocess.run(command)
     print("Database has been restored.")
 

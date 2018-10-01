@@ -14,7 +14,7 @@ Python3 command line script providing various tools for accessing CHADO database
 
 Download the latest release from this github repository, or clone the repository to obtain the most recent updates.
 
-Modify the file with [default connection settings](pychado/data/defaultDatabase.yml) such that it contains the settings for and existing PostgreSQL database server to which you can connect.
+Modify the file with [default connection settings](pychado/data/defaultDatabase.yml) such that it contains the settings for an existing PostgreSQL database server to which you can connect.
 
 Then run the tests:
 

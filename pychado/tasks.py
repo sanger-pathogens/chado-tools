@@ -69,12 +69,6 @@ def run_command_with_arguments(command: str, sub_command: str, arguments, connec
         # Restore a PostgreSQL database from an archive file
         dbutils.create_database(connection_uri)
         dbutils.restore_database(connection_uri, arguments.archive)
-    elif command == "admin" and sub_command == "dump_users":
-        # Export the users of a PostgreSQL database server to file
-        dbutils.dump_users(connection_uri, arguments.file)
-    elif command == "admin" and sub_command == "restore_users":
-        # Import the users of a PostgreSQL database server from file
-        dbutils.restore_users(connection_uri, arguments.file)
     elif command == "query":
         # Query a PostgreSQL database and export the result to a text file
         if arguments.query:

@@ -153,20 +153,6 @@ def setup_database(uri: str, schema_file: str) -> None:
     print("Database schema has been set up.")
 
 
-def dump_users(uri: str, filename: str) -> None:
-    """Exports a list of database users to file"""
-    command = ["pg_dumpall", "-d", uri, "--roles-only", "-f", filename]
-    subprocess.run(command)
-    print("Database users have been exported to file.")
-
-
-def restore_users(uri: str, filename: str) -> None:
-    """Imports a list of database users from file"""
-    command = ["psql", "-q", "-f", filename, uri]
-    subprocess.run(command)
-    print("Database users have been imported from file.")
-
-
 def connect_to_database(uri: str) -> None:
     """Connects to a database for an interactive session"""
     print("Establishing connection to database...")

@@ -1,5 +1,5 @@
 import unittest.mock
-from scripts import chado_tools
+from terminal import chado_tools
 from pychado import tasks, queries, dbutils, utils
 from pychado.io import load_ontology
 
@@ -115,24 +115,6 @@ class TestTasks(unittest.TestCase):
         tasks.run_command_with_arguments(args[1], args[2], parsed_args, self.uri)
         mock_create.assert_called_with(self.uri)
         mock_restore.assert_called_with(self.uri, "testarchive")
-
-    @unittest.mock.patch('pychado.dbutils.dump_users')
-    def test_dump_users(self, mock_dump):
-        # Checks that the function exporting a list of users is correctly called
-        self.assertIs(mock_dump, dbutils.dump_users)
-        args = ["chado", "admin", "dump_users", "testdb", "testfile"]
-        parsed_args = chado_tools.parse_arguments(args)
-        tasks.run_command_with_arguments(args[1], args[2], parsed_args, self.uri)
-        mock_dump.assert_called_with(self.uri, "testfile")
-
-    @unittest.mock.patch('pychado.dbutils.restore_users')
-    def test_restore_users(self, mock_restore):
-        # Checks that the function importing a list of users is correctly called
-        self.assertIs(mock_restore, dbutils.restore_users)
-        args = ["chado", "admin", "restore_users", "testdb", "testfile"]
-        parsed_args = chado_tools.parse_arguments(args)
-        tasks.run_command_with_arguments(args[1], args[2], parsed_args, self.uri)
-        mock_restore.assert_called_with(self.uri, "testfile")
 
     @unittest.mock.patch('pychado.utils.read_text')
     @unittest.mock.patch('pychado.dbutils.query_to_file')

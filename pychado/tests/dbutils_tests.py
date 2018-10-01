@@ -5,6 +5,7 @@ import unittest.mock
 import urllib.error
 import filecmp
 import getpass
+import sqlalchemy_utils
 from pychado import dbutils, utils
 
 modules_dir = os.path.dirname(os.path.abspath(dbutils.__file__))
@@ -93,6 +94,26 @@ class TestConnection(unittest.TestCase):
         self.assertEqual(result, 3)
         dbutils.close_connection(conn)
         self.assertTrue(conn.closed)
+
+    @unittest.mock.patch('builtins.input')
+    @unittest.mock.patch('sqlalchemy_utils.drop_database')
+    def test_drop_on_demand(self, mock_drop, mock_input):
+        # Tests that a database is only dropped after confirmation by the user
+        self.assertIs(mock_drop, sqlalchemy_utils.drop_database)
+        self.assertIs(mock_input, input)
+
+        mock_input.return_value = 'n'
+        dbutils.drop_database(self.uri)
+        mock_drop.assert_not_called()
+
+        mock_drop.reset_mock()
+        mock_input.return_value = 'y'
+        dbutils.drop_database(self.uri)
+        mock_drop.assert_called()
+
+        mock_drop.reset_mock()
+        dbutils.drop_database(self.uri, True)
+        mock_drop.assert_called()
 
     def test_integration(self):
         # Test the basic functionality for creation and deletion of databases

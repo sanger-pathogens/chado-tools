@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import sys
 import os
 import pkg_resources
@@ -71,9 +69,7 @@ def admin_commands() -> dict:
         "create": "create a new instance of the CHADO schema",
         "drop": "drop a CHADO database",
         "dump": "dump a CHADO database into an archive file",
-        "restore": "restore a CHADO database from an archive file",
-        "dump_users": "export the list of users of a CHADO database to a file",
-        "restore_users": "import the list of users for a CHADO database from a file"
+        "restore": "restore a CHADO database from an archive file"
     }
 
 
@@ -198,10 +194,6 @@ def add_admin_arguments_by_command(command: str, parser: argparse.ArgumentParser
         add_dump_arguments(parser)
     elif command == "restore":
         add_restore_arguments(parser)
-    elif command == "dump_users":
-        add_dump_users_arguments(parser)
-    elif command == "restore_users":
-        add_restore_users_arguments(parser)
     else:
         print("Command '" + parser.prog + "' is not available.")
 
@@ -219,16 +211,6 @@ def add_dump_arguments(parser: argparse.ArgumentParser):
 def add_restore_arguments(parser: argparse.ArgumentParser):
     """Defines formal arguments for the 'chado admin restore' sub-command"""
     parser.add_argument("archive", help="archive file")
-
-
-def add_dump_users_arguments(parser: argparse.ArgumentParser):
-    """Defines formal arguments for the 'chado admin dump_users' sub-command"""
-    parser.add_argument("file", help="file to which users are exported")
-
-
-def add_restore_users_arguments(parser: argparse.ArgumentParser):
-    """Defines formal arguments for the 'chado admin restore_users' sub-command"""
-    parser.add_argument("file", help="file from which users are imported")
 
 
 def add_query_arguments(parser: argparse.ArgumentParser):

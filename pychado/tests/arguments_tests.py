@@ -1,5 +1,5 @@
 import unittest
-from scripts import chado_tools
+from terminal import chado_tools
 
 
 class TestCommands(unittest.TestCase):
@@ -33,8 +33,6 @@ class TestCommands(unittest.TestCase):
         self.assertIn("drop", commands)
         self.assertIn("dump", commands)
         self.assertIn("restore", commands)
-        self.assertIn("dump_users", commands)
-        self.assertIn("restore_users", commands)
 
     def test_list_commands(self):
         commands = chado_tools.list_commands()
@@ -99,20 +97,6 @@ class TestArguments(unittest.TestCase):
         parsed_args = vars(chado_tools.parse_arguments(args))
         self.assertEqual(parsed_args["dbname"], "testdb")
         self.assertEqual(parsed_args["archive"], "testarchive")
-
-    def test_dump_users_args(self):
-        # Tests if the command line arguments for the subcommand 'chado admin dump_users' are parsed correctly
-        args = ["chado", "admin", "dump_users", "testdb", "testfile"]
-        parsed_args = vars(chado_tools.parse_arguments(args))
-        self.assertEqual(parsed_args["dbname"], "testdb")
-        self.assertEqual(parsed_args["file"], "testfile")
-
-    def test_restore_users_args(self):
-        # Tests if the command line arguments for the subcommand 'chado admin restore_users' are parsed correctly
-        args = ["chado", "admin", "restore_users", "testdb", "testfile"]
-        parsed_args = vars(chado_tools.parse_arguments(args))
-        self.assertEqual(parsed_args["dbname"], "testdb")
-        self.assertEqual(parsed_args["file"], "testfile")
 
     def test_query_args(self):
         # Tests if the command line arguments for the subcommand 'chado query' are parsed correctly

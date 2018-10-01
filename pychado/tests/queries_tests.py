@@ -1,6 +1,6 @@
 import unittest
 import pkg_resources
-from scripts import chado_tools
+from terminal import chado_tools
 from pychado import queries, utils
 
 

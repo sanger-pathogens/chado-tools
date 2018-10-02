@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import sys
 import os
 import pkg_resources
@@ -15,22 +13,22 @@ def main():
     arguments = parse_arguments(sys.argv)
     command = sys.argv[1]
     sub_command = ""
+    if command in wrapper_commands():
+        sub_command = sys.argv[2]
 
     if command in setup_commands():
-        # Set database connection parameters
-        pychado.tasks.run_command_with_arguments(command, sub_command, arguments, dict())
 
+        # Set database connection parameters
+        pychado.tasks.setup(command)
     else:
+
         # Check database access
         start_time = time.time()
-        connection_parameters = pychado.tasks.read_configuration_file(arguments.config)
-        if pychado.tasks.check_access(connection_parameters, arguments.dbname, command):
+        connection_string = pychado.tasks.create_connection_string(arguments.config, arguments.dbname)
+        if pychado.tasks.check_access(connection_string, sub_command):
 
             # Run the command
-            connection_parameters["database"] = arguments.dbname
-            if command not in general_commands():
-                sub_command = sys.argv[2]
-            pychado.tasks.run_command_with_arguments(command, sub_command, arguments, connection_parameters)
+            pychado.tasks.run_command_with_arguments(command, sub_command, arguments, connection_string)
 
         # Print run time
         if arguments.verbose:
@@ -49,9 +47,6 @@ def general_commands() -> dict:
     """Lists the available general sub-commands of the 'chado' command with corresponding descriptions"""
     return {
         "connect": "connect to a CHADO database for an interactive session",
-        "create": "create a new instance of the CHADO schema",
-        "dump": "dump a CHADO database into an archive file",
-        "restore": "restore a CHADO database from an archive file",
         "query": "query a CHADO database and export the result to a text file",
         "stats": "obtain statistics to updates in a CHADO database"
     }
@@ -63,7 +58,18 @@ def wrapper_commands() -> dict:
         "list": "list all entities of a specified type in the CHADO database",
         "insert": "insert a new entity of a specified type into the CHADO database",
         "delete": "delete an entity of a specified type from the CHADO database",
-        "import": "import entities of a specified type into the CHADO database"
+        "import": "import entities of a specified type into the CHADO database",
+        "admin": "perform administrative tasks, such as creating or dumping a CHADO database"
+    }
+
+
+def admin_commands() -> dict:
+    """Lists the available sub-commands of the 'chado admin' command with corresponding descriptions"""
+    return {
+        "create": "create a new instance of the CHADO schema",
+        "drop": "drop a CHADO database",
+        "dump": "dump a CHADO database into an archive file",
+        "restore": "restore a CHADO database from an archive file"
     }
 
 
@@ -149,12 +155,8 @@ def add_arguments_by_command(command: str, parser: argparse.ArgumentParser):
     """Defines formal arguments for a specified sub-command"""
     if command == "connect":
         pass
-    elif command == "create":
-        add_create_arguments(parser)
-    elif command == "dump":
-        add_dump_arguments(parser)
-    elif command == "restore":
-        add_restore_arguments(parser)
+    elif command == "admin":
+        add_admin_arguments(parser)
     elif command == "query":
         add_query_arguments(parser)
     elif command == "stats":
@@ -171,18 +173,43 @@ def add_arguments_by_command(command: str, parser: argparse.ArgumentParser):
         print("Command '" + parser.prog + "' is not available.")
 
 
+def add_admin_arguments(parser: argparse.ArgumentParser):
+    """Defines formal arguments for the 'chado admin' sub-command"""
+    parser.epilog = "For detailed usage information type '" + parser.prog + " <command> -h'"
+    subparsers = parser.add_subparsers()
+    for command, description in admin_commands().items():
+        # Create subparser and add general and specific formal arguments
+        sub = subparsers.add_parser(command, description=description, help=description)
+        add_general_arguments(sub)
+        add_admin_arguments_by_command(command, sub)
+
+
+def add_admin_arguments_by_command(command: str, parser: argparse.ArgumentParser):
+    """Defines formal arguments for a specified sub-command of 'chado admin'"""
+    if command == "create":
+        add_create_arguments(parser)
+    elif command == "drop":
+        pass
+    elif command == "dump":
+        add_dump_arguments(parser)
+    elif command == "restore":
+        add_restore_arguments(parser)
+    else:
+        print("Command '" + parser.prog + "' is not available.")
+
+
 def add_create_arguments(parser: argparse.ArgumentParser):
-    """Defines formal arguments for the 'chado create' sub-command"""
+    """Defines formal arguments for the 'chado admin create' sub-command"""
     parser.add_argument("-s", "--schema", default="", help="File with database schema (default: GMOD schema 1.31)")
 
 
 def add_dump_arguments(parser: argparse.ArgumentParser):
-    """Defines formal arguments for the 'chado dump' sub-command"""
+    """Defines formal arguments for the 'chado admin dump' sub-command"""
     parser.add_argument("archive", help="archive file to be created")
 
 
 def add_restore_arguments(parser: argparse.ArgumentParser):
-    """Defines formal arguments for the 'chado restore' sub-command"""
+    """Defines formal arguments for the 'chado admin restore' sub-command"""
     parser.add_argument("archive", help="archive file")
 
 

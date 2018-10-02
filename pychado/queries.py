@@ -76,13 +76,13 @@ def specify_list_parameters(specifier: str, arguments) -> dict:
             params["cv_name"] = arguments.vocabulary
         if arguments.database != "all":
             params["database_name"] = arguments.database
-    elif specifier == "products":
+    elif specifier == "genedb_products":
         if arguments.organism != "all":
             params["organism"] = arguments.organism
     elif specifier == "organisms":
         pass
     else:
-        print("Functionality 'insert " + specifier + "' is not yet implemented.")
+        print("Functionality 'list " + specifier + "' is not yet implemented.")
     return params
 
 

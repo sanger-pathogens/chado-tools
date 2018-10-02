@@ -2,18 +2,19 @@ from pychado import utils, dbutils, queries
 from pychado.io import load_ontology
 
 
-def read_configuration_file(filename: str) -> dict:
-    """Reads data from a configuration file into a dictionary"""
+def create_connection_string(filename: str, dbname: str) -> str:
+    """Reads database connection parameters from a configuration file and generates a connection string"""
     if not filename:
         filename = dbutils.default_configuration_file()
-    return utils.parse_yaml(filename)
+    connection_parameters = utils.parse_yaml(filename)
+    connection_parameters["database"] = dbname
+    return dbutils.generate_uri(connection_parameters)
 
 
-def check_access(connection_parameters: dict, database: str, task: str) -> bool:
+def check_access(connection_uri: str, task: str) -> bool:
     """Checks if the database of interest exists and is accessible. If the database doesn't exist, but the
     task implies its creation, create it. Otherwise exit the program."""
-    connection_uri = dbutils.generate_uri(connection_parameters)
-    exists = dbutils.exists(connection_uri, database)
+    exists = dbutils.exists(connection_uri)
     if exists:
         if task in ["create", "restore"]:
             # Database already exists, we should not overwrite it. Return without further action
@@ -24,8 +25,7 @@ def check_access(connection_parameters: dict, database: str, task: str) -> bool:
             return True
     else:
         if task in ["create", "restore"]:
-            # Database doesn't exist, but task implies its creation. Create it
-            dbutils.create_database(connection_uri, database)
+            # Database doesn't exist, but task implies its creation
             return True
         else:
             # Database doesn't exist, and task can't be completed. Return without further action
@@ -33,33 +33,41 @@ def check_access(connection_parameters: dict, database: str, task: str) -> bool:
             return False
 
 
-def run_command_with_arguments(command: str, sub_command: str, arguments, connection_parameters: dict) -> None:
-    """Runs a specified sub-command with the supplied arguments"""
-
-    # Create connection strings
-    connection_uri = dbutils.generate_uri(connection_parameters)
-
-    # Run the command
+def setup(command: str) -> None:
+    """Initiates or resets the default connection parameters"""
     if command == "init":
         # Set the default connection parameters
         dbutils.set_default_parameters()
     elif command == "reset":
         # Reset the default connection parameters to factory settings
         dbutils.reset_default_parameters()
-    elif command == "connect":
+    else:
+        print("Functionality '" + command + "' is not yet implemented.")
+
+
+def run_command_with_arguments(command: str, sub_command: str, arguments, connection_uri: str) -> None:
+    """Runs a specified sub-command with the supplied arguments"""
+
+    # Run the command
+    if command == "connect":
         # Connect to a PostgreSQL database for an interactive session
         dbutils.connect_to_database(connection_uri)
-    elif command == "create":
+    elif command == "admin" and sub_command == "create":
         # Setup a PostgreSQL database according to a schema
+        dbutils.create_database(connection_uri)
         schema = arguments.schema
         if not schema:
             schema = utils.download_file(dbutils.default_schema_url())
         dbutils.setup_database(connection_uri, schema)
-    elif command == "dump":
+    elif command == "admin" and sub_command == "drop":
+        # Drop a PostgreSQL database
+        dbutils.drop_database(connection_uri)
+    elif command == "admin" and sub_command == "dump":
         # Dump a PostgreSQL database into an archive file
         dbutils.dump_database(connection_uri, arguments.archive)
-    elif command == "restore":
+    elif command == "admin" and sub_command == "restore":
         # Restore a PostgreSQL database from an archive file
+        dbutils.create_database(connection_uri)
         dbutils.restore_database(connection_uri, arguments.archive)
     elif command == "query":
         # Query a PostgreSQL database and export the result to a text file

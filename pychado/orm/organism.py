@@ -93,12 +93,12 @@ class OrganismProp(base.Base):
     type = sqlalchemy.orm.relationship(cv.CvTerm, foreign_keys=type_id, backref="organismprop_type")
 
     # Initialisation
-    def __init__(self, organism_id, type_id, value, rank=None, organismprop_id=None):
+    def __init__(self, organism_id, type_id, value=None, rank=0, organismprop_id=None):
         for key, val in locals().items():
             if key != self:
                 setattr(self, key, val)
 
     # Representation
     def __repr__(self):
-        return "<pub.PubAuthor(organismprop_id={0}, organism_id={1}, type_id={2}, value='{3}', rank={4})>".format(
-            self.organismprop_id, self.organism_id, self.type_id, self.value, self.rank)
+        return "<organism.OrganismProp(organismprop_id={0}, organism_id={1}, type_id={2}, value='{3}', rank={4})>"\
+            .format(self.organismprop_id, self.organism_id, self.type_id, self.value, self.rank)

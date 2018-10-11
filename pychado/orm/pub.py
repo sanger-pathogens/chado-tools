@@ -170,12 +170,12 @@ class PubProp(base.Base):
     type = sqlalchemy.orm.relationship(cv.CvTerm, foreign_keys=type_id, backref="pubprop_type")
 
     # Initialisation
-    def __init__(self, pub_id, type_id, value, rank=0, pubprop_id=None):
+    def __init__(self, pub_id, type_id, value=None, rank=0, pubprop_id=None):
         for key, val in locals().items():
             if key != self:
                 setattr(self, key, val)
 
     # Representation
     def __repr__(self):
-        return "<pub.PubAuthor(pubprop_id={0}, pub_id={1}, type_id={2}, value='{3}', rank={4})>".format(
+        return "<pub.PubProp(pubprop_id={0}, pub_id={1}, type_id={2}, value='{3}', rank={4})>".format(
             self.pubprop_id, self.pub_id, self.type_id, self.value, self.rank)

@@ -16,10 +16,10 @@ def main():
     if command in wrapper_commands():
         sub_command = sys.argv[2]
 
-    if command in setup_commands():
+    if command in init_commands():
 
         # Set database connection parameters
-        pychado.tasks.setup(command)
+        pychado.tasks.init(command)
     else:
 
         # Check database access
@@ -35,8 +35,8 @@ def main():
             print("Runtime: {0:.2f} s".format(time.time()-start_time))
 
 
-def setup_commands() -> dict:
-    """Lists the available 'setup' sub-commands of the 'chado' command with corresponding descriptions"""
+def init_commands() -> dict:
+    """Lists the available sub-commands of the 'chado' command for database initiation"""
     return {
         "init": "set the default connection parameters",
         "reset": "reset the default connection parameters to factory settings"
@@ -66,10 +66,11 @@ def wrapper_commands() -> dict:
 def admin_commands() -> dict:
     """Lists the available sub-commands of the 'chado admin' command with corresponding descriptions"""
     return {
-        "create": "create a new instance of the CHADO schema",
+        "create": "create a new CHADO database",
         "drop": "drop a CHADO database",
         "dump": "dump a CHADO database into an archive file",
-        "restore": "restore a CHADO database from an archive file"
+        "restore": "restore a CHADO database from an archive file",
+        "setup": "set up a blank CHADO database according to a given schema"
     }
 
 
@@ -117,7 +118,7 @@ def parse_arguments(input_arguments: list) -> argparse.Namespace:
     # Add subparsers for all sub-commands
     subparsers = parser.add_subparsers()
 
-    for command, description in setup_commands().items():
+    for command, description in init_commands().items():
         # Create subparser
         subparsers.add_parser(command, description=description, help=description)
 
@@ -187,20 +188,17 @@ def add_admin_arguments(parser: argparse.ArgumentParser):
 def add_admin_arguments_by_command(command: str, parser: argparse.ArgumentParser):
     """Defines formal arguments for a specified sub-command of 'chado admin'"""
     if command == "create":
-        add_create_arguments(parser)
+        pass
     elif command == "drop":
         pass
     elif command == "dump":
         add_dump_arguments(parser)
     elif command == "restore":
         add_restore_arguments(parser)
+    elif command == "setup":
+        add_setup_arguments(parser)
     else:
         print("Command '" + parser.prog + "' is not available.")
-
-
-def add_create_arguments(parser: argparse.ArgumentParser):
-    """Defines formal arguments for the 'chado admin create' sub-command"""
-    parser.add_argument("-s", "--schema", default="", help="File with database schema (default: GMOD schema 1.31)")
 
 
 def add_dump_arguments(parser: argparse.ArgumentParser):
@@ -211,6 +209,14 @@ def add_dump_arguments(parser: argparse.ArgumentParser):
 def add_restore_arguments(parser: argparse.ArgumentParser):
     """Defines formal arguments for the 'chado admin restore' sub-command"""
     parser.add_argument("archive", help="archive file")
+
+
+def add_setup_arguments(parser: argparse.ArgumentParser):
+    """Defines formal arguments for the 'chado admin setup' sub-command"""
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("-s", "--schema", choices={"gmod", "basic", "audit"}, default="gmod",
+                       help="Database schema (default: GMOD schema 1.31)")
+    group.add_argument("-f", "--schema_file", default="", help="File with database schema")
 
 
 def add_query_arguments(parser: argparse.ArgumentParser):

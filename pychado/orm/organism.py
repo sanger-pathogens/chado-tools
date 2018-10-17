@@ -5,7 +5,7 @@ from pychado.orm import base, general, cv
 # Object-relational mappings for the CHADO Organism module
 
 
-class Organism(base.Base):
+class Organism(base.PublicBase):
     """Class for the CHADO 'organism' table"""
     # Columns
     organism_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)
@@ -40,7 +40,7 @@ class Organism(base.Base):
                     self.infraspecific_name, self.type_id, self.comment)
 
 
-class OrganismDbxRef(base.Base):
+class OrganismDbxRef(base.PublicBase):
     """Class for the CHADO 'organism_dbxref' table"""
     # Columns
     organism_dbxref_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)
@@ -71,7 +71,7 @@ class OrganismDbxRef(base.Base):
             self.organism_dbxref_id, self.organism_id, self.dbxref_id)
 
 
-class OrganismProp(base.Base):
+class OrganismProp(base.PublicBase):
     """Class for the CHADO 'organismprop' table"""
     # Columns
     organismprop_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)

@@ -4,7 +4,7 @@ from pychado.orm import base, general, cv
 # Object-relational mappings for the CHADO Publication module
 
 
-class Pub(base.Base):
+class Pub(base.PublicBase):
     """Class for the CHADO 'pub' table"""
     # Columns
     pub_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)
@@ -48,7 +48,7 @@ class Pub(base.Base):
                     self.pubplace)
 
 
-class PubDbxRef(base.Base):
+class PubDbxRef(base.PublicBase):
     """Class for the CHADO 'pub_dbxref' table"""
     # Columns
     pub_dbxref_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)
@@ -80,7 +80,7 @@ class PubDbxRef(base.Base):
             self.pub_dbxref_id, self.pub_id, self.dbxref_id, self.is_current)
 
 
-class PubRelationship(base.Base):
+class PubRelationship(base.PublicBase):
     """Class for the CHADO 'pub_relationship' table"""
     # Columns
     pub_relationship_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)
@@ -115,7 +115,7 @@ class PubRelationship(base.Base):
             self.pub_relationship_id, self.subject_id, self.object_id, self.type_id)
 
 
-class PubAuthor(base.Base):
+class PubAuthor(base.PublicBase):
     """Class for the CHADO 'pubauthor' table"""
     # Columns
     pubauthor_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)
@@ -148,7 +148,7 @@ class PubAuthor(base.Base):
                                        self.givennames, self.suffix)
 
 
-class PubProp(base.Base):
+class PubProp(base.PublicBase):
     """Class for the CHADO 'pubprop' table"""
     # Columns
     pubprop_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)

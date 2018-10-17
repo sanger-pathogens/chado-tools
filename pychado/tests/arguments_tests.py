@@ -5,8 +5,8 @@ from terminal import chado_tools
 class TestCommands(unittest.TestCase):
     """Tests if all implemented commands and sub-commands are available through the entry point"""
 
-    def test_setup_commands(self):
-        commands = chado_tools.setup_commands()
+    def test_init_commands(self):
+        commands = chado_tools.init_commands()
         self.assertIn("init", commands)
         self.assertIn("reset", commands)
         self.assertNotIn("non_existent_command", commands)
@@ -33,6 +33,7 @@ class TestCommands(unittest.TestCase):
         self.assertIn("drop", commands)
         self.assertIn("dump", commands)
         self.assertIn("restore", commands)
+        self.assertIn("setup", commands)
 
     def test_list_commands(self):
         commands = chado_tools.list_commands()
@@ -73,10 +74,9 @@ class TestArguments(unittest.TestCase):
 
     def test_create_args(self):
         # Tests if the command line arguments for the subcommand 'chado admin create' are parsed correctly
-        args = ["chado", "admin", "create", "-s", "testschema", "testdb"]
+        args = ["chado", "admin", "create", "testdb"]
         parsed_args = vars(chado_tools.parse_arguments(args))
         self.assertEqual(parsed_args["dbname"], "testdb")
-        self.assertEqual(parsed_args["schema"], "testschema")
 
     def test_drop_args(self):
         # Tests if the command line arguments for the subcommand 'chado admin drop' are parsed correctly
@@ -97,6 +97,25 @@ class TestArguments(unittest.TestCase):
         parsed_args = vars(chado_tools.parse_arguments(args))
         self.assertEqual(parsed_args["dbname"], "testdb")
         self.assertEqual(parsed_args["archive"], "testarchive")
+
+    def test_setup_args(self):
+        # Tests if the command line arguments for the subcommand 'chado admin setup' are parsed correctly
+        args = ["chado", "admin", "setup", "-s", "basic", "testdb"]
+        parsed_args = vars(chado_tools.parse_arguments(args))
+        self.assertEqual(parsed_args["dbname"], "testdb")
+        self.assertEqual(parsed_args["schema"], "basic")
+        self.assertEqual(parsed_args["schema_file"], "")
+
+        # Test the default values / alternatives
+        args = ["chado", "admin", "setup", "testdb"]
+        parsed_args = vars(chado_tools.parse_arguments(args))
+        self.assertEqual(parsed_args["schema"], "gmod")
+        self.assertEqual(parsed_args["schema_file"], "")
+
+        args = ["chado", "admin", "setup", "-f", "testschema", "testdb"]
+        parsed_args = vars(chado_tools.parse_arguments(args))
+        self.assertEqual(parsed_args["schema"], "gmod")
+        self.assertEqual(parsed_args["schema_file"], "testschema")
 
     def test_query_args(self):
         # Tests if the command line arguments for the subcommand 'chado query' are parsed correctly

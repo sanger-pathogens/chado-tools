@@ -10,7 +10,8 @@ class TestIO(unittest.TestCase):
         # Establishes a database connection and creates tables
         global loader
         loader = io.DatabaseLoader("sqlite:///:memory:")
-        base.Base.metadata.create_all(loader.engine)
+        loader.engine.execute("ATTACH DATABASE ':memory:' AS public")
+        base.PublicBase.metadata.create_all(loader.engine)
 
     def test_find_or_create(self):
         # Tests the functionality for checking if entries exist in the database, and for creating new entries

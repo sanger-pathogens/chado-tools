@@ -4,7 +4,7 @@ from pychado.orm import base, general
 # Object-relational mappings for the CHADO Controlled Vocabulary (CV) module
 
 
-class Cv(base.Base):
+class Cv(base.PublicBase):
     """Class for the CHADO 'cv' table"""
     # Columns
     cv_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)
@@ -26,7 +26,7 @@ class Cv(base.Base):
         return "<cv.Cv(cv_id={0}, name='{1}', definition='{2}')>".format(self.cv_id, self.name, self.definition)
 
 
-class CvTerm(base.Base):
+class CvTerm(base.PublicBase):
     """Class for the CHADO 'cvterm' table"""
     # Columns
     cvterm_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)
@@ -79,7 +79,7 @@ class CvTerm(base.Base):
         return not self == other
 
 
-class CvTermProp(base.Base):
+class CvTermProp(base.PublicBase):
     """Class for the CHADO 'cvtermprop' table"""
     # Columns
     cvtermprop_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)
@@ -112,7 +112,7 @@ class CvTermProp(base.Base):
             self.cvtermprop_id, self.cvterm_id, self.type_id, self.value, self.rank)
 
 
-class CvTermRelationship(base.Base):
+class CvTermRelationship(base.PublicBase):
     """Class for the CHADO 'cvterm_relationship' table"""
     # Columns
     cvterm_relationship_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)
@@ -147,7 +147,7 @@ class CvTermRelationship(base.Base):
             self.cvterm_relationship_id, self.type_id, self.subject_id, self.object_id)
 
 
-class CvTermSynonym(base.Base):
+class CvTermSynonym(base.PublicBase):
     """Class for the CHADO 'cvtermsynonym' table"""
     # Columns
     cvtermsynonym_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)
@@ -178,7 +178,7 @@ class CvTermSynonym(base.Base):
             self.cvtermsynonym_id, self.cvterm_id, self.synonym, self.type_id)
 
 
-class CvTermDbxRef(base.Base):
+class CvTermDbxRef(base.PublicBase):
     """Class for the CHADO 'cvterm_dbxref' table"""
     # Columns
     cvterm_dbxref_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)
@@ -210,7 +210,7 @@ class CvTermDbxRef(base.Base):
             self.cvterm_dbxref_id, self.cvterm_id, self.dbxref_id, self.is_for_definition)
 
 
-class CvTermPath(base.Base):
+class CvTermPath(base.PublicBase):
     """Class for the CHADO 'cvtermpath' table"""
     # Columns
     cvtermpath_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)
@@ -251,7 +251,7 @@ class CvTermPath(base.Base):
                                            self.cv_id, self.pathdistance)
 
 
-class DbxRefProp(base.Base):
+class DbxRefProp(base.PublicBase):
     """Class for the CHADO 'dbxrefprop' table"""
     # Columns
     dbxrefprop_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)

@@ -1,4 +1,4 @@
-from pychado import utils, dbutils, queries
+from pychado import utils, dbutils, queries, ddl
 from pychado.io import load_ontology
 
 
@@ -33,7 +33,7 @@ def check_access(connection_uri: str, task: str) -> bool:
             return False
 
 
-def setup(command: str) -> None:
+def init(command: str) -> None:
     """Initiates or resets the default connection parameters"""
     if command == "init":
         # Set the default connection parameters
@@ -53,12 +53,8 @@ def run_command_with_arguments(command: str, sub_command: str, arguments, connec
         # Connect to a PostgreSQL database for an interactive session
         dbutils.connect_to_database(connection_uri)
     elif command == "admin" and sub_command == "create":
-        # Setup a PostgreSQL database according to a schema
+        # Create a PostgreSQL database
         dbutils.create_database(connection_uri)
-        schema = arguments.schema
-        if not schema:
-            schema = utils.download_file(dbutils.default_schema_url())
-        dbutils.setup_database(connection_uri, schema)
     elif command == "admin" and sub_command == "drop":
         # Drop a PostgreSQL database
         dbutils.drop_database(connection_uri)
@@ -69,6 +65,21 @@ def run_command_with_arguments(command: str, sub_command: str, arguments, connec
         # Restore a PostgreSQL database from an archive file
         dbutils.create_database(connection_uri)
         dbutils.restore_database(connection_uri, arguments.archive)
+    elif command == "admin" and sub_command == "setup":
+        # Setup a PostgreSQL database according to a schema
+        if arguments.schema_file or arguments.schema == "gmod":
+            schema_file = arguments.schema_file
+            if not schema_file:
+                schema_file = utils.download_file(dbutils.default_schema_url())
+            dbutils.setup_database(connection_uri, schema_file)
+        else:
+            if arguments.schema == "basic":
+                generator = ddl.PublicSchemaEngine(connection_uri)
+            elif arguments.schema == "audit":
+                generator = ddl.AuditSchemaEngine(connection_uri)
+            else:
+                generator = ddl.ChadoEngine(connection_uri)
+            generator.create()
     elif command == "query":
         # Query a PostgreSQL database and export the result to a text file
         if arguments.query:

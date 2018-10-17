@@ -108,7 +108,7 @@ def dump_yaml(filename: str, data: dict) -> None:
     close(stream)
 
 
-def list_to_string(the_list: list, delimiter: str) -> str:
+def list_to_string(the_list: list, delimiter: str, prefix=None) -> str:
     """Function concatenating all elements of a list"""
     the_string = []
     for element in the_list:
@@ -122,7 +122,10 @@ def list_to_string(the_list: list, delimiter: str) -> str:
             the_string.append("")
         else:
             the_string.append(str(element))
-    return delimiter.join(the_string)
+    if not prefix:
+        return delimiter.join(the_string)
+    else:
+        return delimiter.join([prefix + "." + item for item in the_string])
 
 
 def filter_objects(entries: list, **kwargs) -> list:

@@ -15,7 +15,8 @@ class TestLoadCvterms(unittest.TestCase):
         # Establishes a database connection and creates tables
         global loader
         loader = load_ontology.OntologyLoader("sqlite:///:memory:")
-        base.Base.metadata.create_all(loader.engine)
+        loader.engine.execute("ATTACH DATABASE ':memory:' AS public")
+        base.PublicBase.metadata.create_all(loader.engine)
 
     @staticmethod
     def insert_dependencies():

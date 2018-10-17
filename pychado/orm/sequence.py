@@ -6,7 +6,7 @@ from pychado.orm import base, general, cv, organism, pub
 # Object-relational mappings for the CHADO Sequence/Feature module
 
 
-class Feature(base.Base):
+class Feature(base.PublicBase):
     """Class for the CHADO 'feature' table"""
     # Columns
     feature_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)
@@ -40,7 +40,7 @@ class Feature(base.Base):
     # Relationships
     dbxref = sqlalchemy.orm.relationship(general.DbxRef, foreign_keys=dbxref_id, backref="feature_dbxref")
     organism = sqlalchemy.orm.relationship(organism.Organism, foreign_keys=organism_id, backref="feature_organism")
-    type = sqlalchemy.orm.relationship(cv.CvTerm, foreign_keys=type_id, backref="cvtermprop_type")
+    type = sqlalchemy.orm.relationship(cv.CvTerm, foreign_keys=type_id, backref="feature_type")
 
     # Initialisation
     def __init__(self, dbxref_id, organism_id, type_id, uniquename, name=None, residues=None, seqlen=None,
@@ -59,7 +59,7 @@ class Feature(base.Base):
                     self.type_id, self.is_analysis, self.is_obsolete, self.timeaccessioned, self.timelastmodified)
 
 
-class FeatureCvTerm(base.Base):
+class FeatureCvTerm(base.PublicBase):
     """Class for the CHADO 'feature_cvterm' table"""
     # Columns
     feature_cvterm_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)
@@ -97,7 +97,7 @@ class FeatureCvTerm(base.Base):
                                    self.rank)
 
 
-class FeatureCvTermDbxRef(base.Base):
+class FeatureCvTermDbxRef(base.PublicBase):
     """Class for the CHADO 'feature_cvterm_dbxref' table"""
     # Columns
     feature_cvterm_dbxref_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)
@@ -129,7 +129,7 @@ class FeatureCvTermDbxRef(base.Base):
             format(self.feature_cvterm_dbxref_id, self.feature_cvterm_id, self.dbxref_id)
 
 
-class FeatureCvTermProp(base.Base):
+class FeatureCvTermProp(base.PublicBase):
     """Class for the CHADO 'feature_cvtermprop' table"""
     # Columns
     feature_cvtermprop_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)
@@ -164,7 +164,7 @@ class FeatureCvTermProp(base.Base):
                                                 self.value, self.rank)
 
 
-class FeatureDbxRef(base.Base):
+class FeatureDbxRef(base.PublicBase):
     """Class for the CHADO 'feature_dbxref' table"""
     # Columns
     feature_dbxref_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)
@@ -196,7 +196,7 @@ class FeatureDbxRef(base.Base):
             format(self.feature_dbxref_id, self.feature_id, self.dbxref_id, self.is_current)
 
 
-class FeaturePub(base.Base):
+class FeaturePub(base.PublicBase):
     """Class for the CHADO 'feature_pub' table"""
     # Columns
     feature_pub_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)
@@ -227,7 +227,7 @@ class FeaturePub(base.Base):
             format(self.feature_pub_id, self.feature_id, self.pub_id)
 
 
-class FeaturePubProp(base.Base):
+class FeaturePubProp(base.PublicBase):
     """Class for the CHADO 'feature_pubprop' table"""
     # Columns
     feature_pubprop_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)
@@ -261,7 +261,7 @@ class FeaturePubProp(base.Base):
                "rank={4})>".format(self.feature_pubprop_id, self.feature_pub_id, self.type_id, self.value, self.rank)
 
 
-class FeatureRelationship(base.Base):
+class FeatureRelationship(base.PublicBase):
     """Class for the CHADO 'feature_relationship' table"""
     # Columns
     feature_relationship_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)
@@ -299,7 +299,7 @@ class FeatureRelationship(base.Base):
                                                              self.object_id, self.type_id, self.value, self.rank)
 
 
-class FeatureRelationshipPub(base.Base):
+class FeatureRelationshipPub(base.PublicBase):
     """Class for the CHADO 'feature_relationship_pub' table"""
     # Columns
     feature_relationship_pub_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)
@@ -331,7 +331,7 @@ class FeatureRelationshipPub(base.Base):
                "pub_id={2})>".format(self.feature_relationship_pub_id, self.feature_relationship_id, self.pub_id)
 
 
-class FeatureRelationshipProp(base.Base):
+class FeatureRelationshipProp(base.PublicBase):
     """Class for the CHADO 'feature_relationshipprop' table"""
     # Columns
     feature_relationshipprop_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)
@@ -367,7 +367,7 @@ class FeatureRelationshipProp(base.Base):
             format(self.feature_relationshipprop_id, self.feature_relationship_id, self.type_id, self.value, self.rank)
 
 
-class FeatureRelationshipPropPub(base.Base):
+class FeatureRelationshipPropPub(base.PublicBase):
     """Class for the CHADO 'feature_relationshipprop_pub' table"""
     # Columns
     feature_relationshipprop_pub_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True,
@@ -385,8 +385,9 @@ class FeatureRelationshipPropPub(base.Base):
                       sqlalchemy.Index("feature_relationshipprop_pub_idx2", pub_id))
 
     # Relationships
-    feature_relationship = sqlalchemy.orm.relationship(FeatureRelationship, foreign_keys=feature_relationshipprop_id,
-                                                       backref="feature_relationshipprop_pub_feature_relationshipprop")
+    feature_relationshipprop = sqlalchemy.orm.relationship(
+        FeatureRelationshipProp, foreign_keys=feature_relationshipprop_id,
+        backref="feature_relationshipprop_pub_feature_relationshipprop")
     pub = sqlalchemy.orm.relationship(pub.Pub, foreign_keys=pub_id, backref="feature_relationshipprop_pub_pub")
 
     # Initialisation
@@ -402,7 +403,7 @@ class FeatureRelationshipPropPub(base.Base):
             format(self.feature_relationshipprop_pub_id, self.feature_relationshipprop_id, self.pub_id)
 
 
-class Synonym(base.Base):
+class Synonym(base.PublicBase):
     """Class for the CHADO 'synonym' table"""
     # Columns
     synonym_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)
@@ -432,7 +433,7 @@ class Synonym(base.Base):
             format(self.synonym_id, self.name, self.type_id, self.synonym_sgml)
 
 
-class FeatureSynonym(base.Base):
+class FeatureSynonym(base.PublicBase):
     """Class for the CHADO 'feature_synonym' table"""
     # Columns
     feature_synonym_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)
@@ -454,8 +455,8 @@ class FeatureSynonym(base.Base):
 
     # Relationships
     synonym = sqlalchemy.orm.relationship(Synonym, foreign_keys=synonym_id, backref="feature_synonym_synonym")
-    feature = sqlalchemy.orm.relationship(Synonym, foreign_keys=feature_id, backref="feature_synonym_feature")
-    pub = sqlalchemy.orm.relationship(Synonym, foreign_keys=pub_id, backref="feature_synonym_pub")
+    feature = sqlalchemy.orm.relationship(Feature, foreign_keys=feature_id, backref="feature_synonym_feature")
+    pub = sqlalchemy.orm.relationship(pub.Pub, foreign_keys=pub_id, backref="feature_synonym_pub")
 
     # Initialisation
     def __init__(self, synonym_id, feature_id, pub_id, is_current=True, is_internal=False, feature_synonym_id=None):
@@ -470,7 +471,7 @@ class FeatureSynonym(base.Base):
                                                           self.pub_id, self.is_current, self.is_internal)
 
 
-class FeatureLoc(base.Base):
+class FeatureLoc(base.PublicBase):
     """Class for the CHADO 'featureloc' table"""
     # Columns
     featureloc_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)
@@ -497,8 +498,8 @@ class FeatureLoc(base.Base):
                       sqlalchemy.Index("featureloc_idx3", srcfeature_id, fmin, fmax))
 
     # Relationships
-    feature = sqlalchemy.orm.relationship(Synonym, foreign_keys=feature_id, backref="featureloc_feature")
-    srcfeature = sqlalchemy.orm.relationship(Synonym, foreign_keys=feature_id, backref="featureloc_srcfeature")
+    feature = sqlalchemy.orm.relationship(Feature, foreign_keys=feature_id, backref="featureloc_feature")
+    srcfeature = sqlalchemy.orm.relationship(Feature, foreign_keys=feature_id, backref="featureloc_srcfeature")
 
     # Initialisation
     def __init__(self, feature_id, srcfeature_id, type_id, uniquename, fmin=0, is_fmin_partial=False, fmax=0,
@@ -517,7 +518,7 @@ class FeatureLoc(base.Base):
                                                    self.phase, self.residue_info, self.locgroup, self.rank)
 
 
-class FeatureLocPub(base.Base):
+class FeatureLocPub(base.PublicBase):
     """Class for the CHADO 'featureloc_pub' table"""
     # Columns
     featureloc_pub_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)
@@ -549,7 +550,7 @@ class FeatureLocPub(base.Base):
             format(self.featureloc_pub_id, self.featureloc_id, self.pub_id)
 
 
-class FeatureProp(base.Base):
+class FeatureProp(base.PublicBase):
     """Class for the CHADO 'featureprop' table"""
     # Columns
     featureprop_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)
@@ -582,7 +583,7 @@ class FeatureProp(base.Base):
             format(self.featureprop_id, self.feature_id, self.type_id, self.value, self.rank)
 
 
-class FeaturePropPub(base.Base):
+class FeaturePropPub(base.PublicBase):
     """Class for the CHADO 'featureprop_pub' table"""
     # Columns
     featureprop_pub_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)

@@ -1,5 +1,5 @@
 import sqlalchemy.sql.functions
-from pychado.orm import base
+from . import base
 
 # Object-relational mappings for the CHADO 'audit' module
 # Note: the 'type' column can alternatively be defined as CHAR with additional CHECK constraint.
@@ -8,13 +8,13 @@ from pychado.orm import base
 
 
 class Audit(base.AuditBase):
-    """Abstract base class for tables in the CHADO 'audit' schema"""
+    """Parent class for tables in the CHADO 'audit' schema"""
 
     # Sequences
     audit_sequence = sqlalchemy.Sequence('audit_id_seq', metadata=base.AuditBase.metadata)
 
     # Columns
-    audit_id = sqlalchemy.Column(base.BIGINT, audit_sequence, nullable=False,
+    audit_id = sqlalchemy.Column(sqlalchemy.BIGINT, audit_sequence, nullable=False,
                                  server_default=audit_sequence.next_value(), primary_key=True)
     type = sqlalchemy.Column(base.operation_type, nullable=False)
     # type = sqlalchemy.Column('type', sqlalchemy.CHAR(6), nullable=False)

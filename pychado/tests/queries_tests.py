@@ -1,7 +1,7 @@
 import unittest
 import pkg_resources
 from terminal import chado_tools
-from pychado import queries, utils
+from .. import queries, utils
 
 
 class TestQueries(unittest.TestCase):

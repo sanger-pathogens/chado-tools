@@ -1,7 +1,7 @@
 import unittest.mock
 from terminal import chado_tools
-from pychado import tasks, queries, dbutils, utils
-from pychado.io import load_ontology
+from .. import tasks, queries, dbutils, utils, ddl
+from ..io import load_ontology
 
 
 class TestTasks(unittest.TestCase):
@@ -113,15 +113,29 @@ class TestTasks(unittest.TestCase):
         mock_create.assert_called_with(self.uri)
         mock_restore.assert_called_with(self.uri, "testarchive")
 
-    @unittest.mock.patch('pychado.utils.download_file')
-    @unittest.mock.patch('pychado.dbutils.setup_database')
-    def test_setup(self, mock_setup, mock_download):
-        # Checks that the function setting up a database schema is correctly called
-        self.assertIs(mock_setup, dbutils.setup_database)
-        self.assertIs(mock_download, utils.download_file)
+    @unittest.mock.patch('pychado.tasks.run_setup_command')
+    def test_run_setup(self, mock_run):
+        # Checks that database setup is correctly run
+        self.assertIs(mock_run, tasks.run_setup_command)
         args = ["chado", "admin", "setup", "-f", "testschema", "testdb"]
         parsed_args = chado_tools.parse_arguments(args)
         tasks.run_command_with_arguments(args[1], args[2], parsed_args, self.uri)
+        mock_run.assert_called_with(parsed_args, self.uri)
+
+    @unittest.mock.patch('pychado.ddl.AuditSchemaSetupClient')
+    @unittest.mock.patch('pychado.ddl.PublicSchemaSetupClient')
+    @unittest.mock.patch('pychado.utils.download_file')
+    @unittest.mock.patch('pychado.dbutils.setup_database')
+    def test_setup(self, mock_setup, mock_download, mock_public_schema, mock_audit_schema):
+        # Checks that the function setting up a database schema is correctly called
+        self.assertIs(mock_setup, dbutils.setup_database)
+        self.assertIs(mock_download, utils.download_file)
+        self.assertIs(mock_public_schema, ddl.PublicSchemaSetupClient)
+        self.assertIs(mock_audit_schema, ddl.AuditSchemaSetupClient)
+
+        args = ["chado", "admin", "setup", "-f", "testschema", "testdb"]
+        parsed_args = chado_tools.parse_arguments(args)
+        tasks.run_setup_command(parsed_args, self.uri)
         mock_download.assert_not_called()
         mock_setup.assert_called_with(self.uri, "testschema")
 
@@ -130,9 +144,25 @@ class TestTasks(unittest.TestCase):
         mock_download.return_value = "downloaded_schema"
         args = ["chado", "admin", "setup", "testdb"]
         parsed_args = chado_tools.parse_arguments(args)
-        tasks.run_command_with_arguments(args[1], args[2], parsed_args, self.uri)
+        tasks.run_setup_command(parsed_args, self.uri)
         mock_download.assert_called()
         mock_setup.assert_called_with(self.uri, "downloaded_schema")
+
+        mock_public_schema.reset_mock()
+        mock_audit_schema.reset_mock()
+        args = ["chado", "admin", "setup", "-s", "basic", "testdb"]
+        parsed_args = chado_tools.parse_arguments(args)
+        tasks.run_setup_command(parsed_args, self.uri)
+        mock_public_schema.assert_called()
+        mock_audit_schema.assert_not_called()
+
+        mock_public_schema.reset_mock()
+        mock_audit_schema.reset_mock()
+        args = ["chado", "admin", "setup", "-s", "audit", "testdb"]
+        parsed_args = chado_tools.parse_arguments(args)
+        tasks.run_setup_command(parsed_args, self.uri)
+        mock_public_schema.assert_not_called()
+        mock_audit_schema.assert_called()
 
     @unittest.mock.patch('pychado.utils.read_text')
     @unittest.mock.patch('pychado.dbutils.query_to_file')
@@ -252,10 +282,10 @@ class TestTasks(unittest.TestCase):
         mock_run.assert_called_with("ontology", parsed_args, self.uri)
 
     @unittest.mock.patch('pychado.utils.download_file')
-    @unittest.mock.patch('pychado.io.load_ontology.OntologyLoader.load')
+    @unittest.mock.patch('pychado.io.load_ontology.OntologyClient.load')
     def test_import_ontology(self, mock_import, mock_download):
         # Checks that the function importing an ontology into the database is correctly called
-        self.assertIs(mock_import, load_ontology.OntologyLoader.load)
+        self.assertIs(mock_import, load_ontology.OntologyClient.load)
         self.assertIs(mock_download, utils.download_file)
         args = ["chado", "import", "ontology", "-f", "testfile", "-A", "testauthority", "-F", "owl", "testdb"]
         parsed_args = chado_tools.parse_arguments(args)

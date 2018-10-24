@@ -1,18 +1,18 @@
 import copy
 from typing import List, Dict
 import pronto
-from pychado import utils
-from pychado.io import io
-from pychado.orm import general, cv
+from .. import utils
+from ..io import io
+from ..orm import general, cv
 
 
-class OntologyLoader(io.DatabaseLoader):
+class OntologyClient(io.IOClient):
 
     def __init__(self, uri: str, verbose=False):
         """Constructor"""
 
         # Connect to database
-        io.DatabaseLoader.__init__(self, uri)
+        super().__init__(uri)
 
         # Set up printer
         self.printer = utils.VerbosePrinter(verbose)
@@ -84,7 +84,7 @@ class OntologyLoader(io.DatabaseLoader):
         self._mark_obsolete_terms(ontology_terms, default_db_entry)
 
         # Commit changes
-        self.commit()
+        self.session.commit()
         self._print_statistics()
 
     def _load_and_check_dependencies(self) -> (cv.CvTerm, Dict[str, cv.CvTerm], Dict[str, cv.CvTerm]):
@@ -127,7 +127,9 @@ class OntologyLoader(io.DatabaseLoader):
         """Returns an entry from the db table"""
         db_entry = self.query_table(general.Db, name=db_authority).first()         # type: general.Db
         if not db_entry:
-            db_entry = self.insert_into_table(general.Db, name=db_authority)       # type: general.Db
+            db_entry = general.Db(name=db_authority)
+            self.session.add(db_entry)
+            self.session.flush()
             self.printer.print("Inserted DB '" + db_authority + "'")
             self._db_inserts += 1
         return db_entry
@@ -145,7 +147,9 @@ class OntologyLoader(io.DatabaseLoader):
         # Get the corresponding CV in the database - create it, if not yet available
         cv_entry = self.query_table(cv.Cv, name=namespace).first()                 # type: cv.Cv
         if not cv_entry:
-            cv_entry = self.insert_into_table(cv.Cv, name=namespace)               # type: cv.Cv
+            cv_entry = cv.Cv(name=namespace)
+            self.session.add(cv_entry)
+            self.session.flush()
             self.printer.print("Inserted CV '" + namespace + "'")
             self._cv_inserts += 1
         return cv_entry
@@ -565,6 +569,11 @@ class OntologyLoader(io.DatabaseLoader):
         all_relationships = self.query_table(cv.CvTermRelationship).all()          # type: List[cv.CvTermRelationship]
 
         return all_cvs, all_dbxrefs, all_cvterms, all_comments, all_synonyms, all_crossrefs, all_relationships
+
+
+class OntologySetupClient(io.IOSetupClient, OntologyClient):
+    """Helper class for setting up a CHADO database schema AND loading an ontology"""
+    pass
 
 
 def parse_ontology(filename: str, file_format="obo") -> pronto.Ontology:

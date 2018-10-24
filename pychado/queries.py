@@ -1,5 +1,5 @@
 import pkg_resources
-from pychado import utils
+from . import utils
 
 
 def load_list_query(specifier: str, arguments) -> str:

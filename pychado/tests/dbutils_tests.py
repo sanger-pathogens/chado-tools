@@ -1,19 +1,17 @@
 import os
-import string
-import random
 import unittest.mock
 import urllib.error
 import filecmp
 import getpass
 import sqlalchemy_utils
-from pychado import dbutils, utils
-
-modules_dir = os.path.dirname(os.path.abspath(dbutils.__file__))
-data_dir = os.path.join(modules_dir, 'tests', 'data')
+from .. import dbutils, utils
 
 
 class TestConnection(unittest.TestCase):
     """Tests for database connections"""
+
+    modules_dir = os.path.dirname(os.path.abspath(dbutils.__file__))
+    data_dir = os.path.join(modules_dir, 'tests', 'data')
 
     def setUp(self):
         # Checks if the default connection file is available and reads in the parameters
@@ -24,16 +22,6 @@ class TestConnection(unittest.TestCase):
 
     def tearDown(self):
         self.connectionParameters.clear()
-
-    def random_database(self) -> str:
-        """Generates a random database name and makes sure the name is not yet in use"""
-        parameters = self.connectionParameters.copy()
-        parameters["database"] = "postgres"
-        uri = dbutils.generate_uri(parameters)
-        while dbutils.exists(uri):
-            parameters["database"] = "".join(random.choices(string.ascii_lowercase, k=10))
-            uri = dbutils.generate_uri(parameters)
-        return uri
 
     def test_factory_settings(self):
         # Tests if the settings in the default connection file are equivalent to the factory settings
@@ -86,6 +74,14 @@ class TestConnection(unittest.TestCase):
               + " port=" + self.connectionParameters["port"]
         self.assertEqual(self.dsn, dsn)
 
+    def test_random_database_uri(self):
+        # Tests that a function creates a URI of a database that does not exist
+        uri = dbutils.random_database_uri(self.connectionParameters)
+        self.assertFalse(dbutils.exists(uri))
+        pos = self.uri.rfind("/")
+        self.assertEqual(uri[:pos], self.uri[:pos])
+        self.assertNotEqual(uri[pos:], self.uri[pos:])
+
     def test_connect(self):
         # Tests that a connection to the default database can be established and that queries can be executed
         conn = dbutils.open_connection(self.uri)
@@ -120,15 +116,13 @@ class TestConnection(unittest.TestCase):
         # NOTE: This test depends on an example SQL schema in the tests/data directory.
         # If the schema is changed, the test might fail.
 
-        # Generate a random database name
-        uri = self.random_database()
-
-        # Create the database and check it exists
+        # Generate a database with a random name and check it exists
+        uri = dbutils.random_database_uri(self.connectionParameters)
         dbutils.create_database(uri)
         self.assertTrue(dbutils.exists(uri))
 
         # Set up the database according to a test schema
-        test_schema = os.path.join(data_dir, "dbutils_example_schema.sql")
+        test_schema = os.path.join(self.data_dir, "dbutils_example_schema.sql")
         self.assertTrue(os.path.exists(test_schema))
         dbutils.setup_database(uri, test_schema)
 
@@ -161,10 +155,10 @@ class TestConnection(unittest.TestCase):
 
         # Export the entire table to a file and check that the result is as expected
         temp_file = os.path.join(os.getcwd(), "tmp.csv")
-        dbutils.query_to_file(uri, "SELECT name, class, legs, extinct FROM species ORDER BY legs ASC", {}, temp_file,
+        dbutils.query_to_file(uri, "SELECT name, clade, legs, extinct FROM species ORDER BY legs ASC", {}, temp_file,
                               ";", True)
         self.assertTrue(os.path.exists(temp_file))
-        output_file = os.path.join(data_dir, "dbutils_species_table.csv")
+        output_file = os.path.join(self.data_dir, "dbutils_species_table.csv")
         self.assertTrue(os.path.exists(output_file))
         self.assertTrue(filecmp.cmp(temp_file, output_file))
 

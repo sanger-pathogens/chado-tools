@@ -1,5 +1,5 @@
-from pychado import utils, dbutils, queries, ddl
-from pychado.io import load_ontology
+from . import utils, dbutils, queries, ddl
+from .io import load_ontology
 
 
 def create_connection_string(filename: str, dbname: str) -> str:
@@ -67,19 +67,7 @@ def run_command_with_arguments(command: str, sub_command: str, arguments, connec
         dbutils.restore_database(connection_uri, arguments.archive)
     elif command == "admin" and sub_command == "setup":
         # Setup a PostgreSQL database according to a schema
-        if arguments.schema_file or arguments.schema == "gmod":
-            schema_file = arguments.schema_file
-            if not schema_file:
-                schema_file = utils.download_file(dbutils.default_schema_url())
-            dbutils.setup_database(connection_uri, schema_file)
-        else:
-            if arguments.schema == "basic":
-                generator = ddl.PublicSchemaEngine(connection_uri)
-            elif arguments.schema == "audit":
-                generator = ddl.AuditSchemaEngine(connection_uri)
-            else:
-                generator = ddl.ChadoEngine(connection_uri)
-            generator.create()
+        run_setup_command(arguments, connection_uri)
     elif command == "query":
         # Query a PostgreSQL database and export the result to a text file
         if arguments.query:
@@ -117,6 +105,23 @@ def run_command_with_arguments(command: str, sub_command: str, arguments, connec
         print("Functionality '" + command + "' is not yet implemented.")
 
 
+def run_setup_command(arguments, uri: str) -> None:
+    # Sets up a PostgreSQL database according to a schema
+    if arguments.schema_file or arguments.schema == "gmod":
+        schema_file = arguments.schema_file
+        if not schema_file:
+            schema_file = utils.download_file(dbutils.default_schema_url())
+        dbutils.setup_database(uri, schema_file)
+    else:
+        if arguments.schema == "basic":
+            generator = ddl.PublicSchemaSetupClient(uri)
+        elif arguments.schema == "audit":
+            generator = ddl.AuditSchemaSetupClient(uri)
+        else:
+            generator = ddl.ChadoClient(uri)
+        generator.create()
+
+
 def run_import_command(specifier: str, arguments, uri: str) -> None:
     """Imports data from a file into a database"""
     file = arguments.input_file
@@ -124,7 +129,7 @@ def run_import_command(specifier: str, arguments, uri: str) -> None:
         file = utils.download_file(arguments.input_url)
 
     if specifier == "ontology":
-        loader = load_ontology.OntologyLoader(uri, arguments.verbose)
+        loader = load_ontology.OntologyClient(uri, arguments.verbose)
         loader.load(file, arguments.format, arguments.database_authority)
     else:
         print("Functionality 'import " + specifier + "' is not yet implemented.")

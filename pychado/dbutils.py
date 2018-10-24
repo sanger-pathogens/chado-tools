@@ -5,7 +5,7 @@ import urllib.parse
 import getpass
 import sqlalchemy
 import sqlalchemy_utils
-from pychado import utils
+from . import utils
 
 
 def set_default_parameters() -> None:
@@ -110,6 +110,17 @@ def execute_statement(connection: sqlalchemy.engine.base.Connection, statement: 
 def exists(uri: str) -> bool:
     """Checks if a database exists"""
     return sqlalchemy_utils.database_exists(uri)
+
+
+def random_database_uri(connection_parameters: dict) -> str:
+    """Generates a random database name and makes sure the name is not yet in use"""
+    parameters = connection_parameters.copy()
+    while True:
+        parameters["database"] = utils.random_string(10)
+        uri = generate_uri(parameters)
+        if not exists(uri):
+            break
+    return uri
 
 
 def create_database(uri: str) -> None:

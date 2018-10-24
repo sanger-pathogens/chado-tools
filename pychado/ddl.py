@@ -3,32 +3,44 @@ import sqlalchemy.orm.attributes
 import sqlalchemy.engine
 import sqlalchemy.schema
 import sqlalchemy.event
-from pychado import utils
-from pychado.orm import base, general, cv, organism, pub, sequence, audit
+from . import utils
+from .orm import base, general, cv, organism, pub, sequence, audit
 
 
-class ChadoEngine:
-    """Base Class for setting up a CHADO database"""
+class ChadoClient(object):
+    """Base Class for access to a CHADO database"""
 
     def __init__(self, uri: str):
         """Constructor - connect to database"""
         self.uri = uri
-        self.engine = sqlalchemy.create_engine(uri)                                 # type: sqlalchemy.engine.Engine
+        self.engine = sqlalchemy.create_engine(self.uri)                            # type: sqlalchemy.engine.Engine
         session_maker = sqlalchemy.orm.sessionmaker(bind=self.engine)
         self.session = session_maker()                                              # type: sqlalchemy.orm.Session
-
-        self.base = base.PublicBase
-        self.metadata = self.base.metadata
-        self.schema = self.metadata.schema
 
     def __del__(self):
         """Destructor - disconnect from database"""
         self.session.close()
-        self.engine.dispose()
+        # self.engine.dispose()
 
     def create(self):
-        """Basis function for schema creation"""
+        """Basis function defined for completeness of the API"""
         pass
+
+
+class SchemaSetupClient(ChadoClient):
+    """Base Class for setting up a CHADO database schema"""
+
+    def __init__(self, uri: str):
+        super().__init__(uri)
+        self.base = base.PublicBase
+        self.metadata = self.base.metadata
+        self.schema = self.metadata.schema
+
+    def create(self):
+        """Main function for filling the schema with life"""
+
+        # Create the tables
+        self.metadata.create_all(self.engine, tables=self.metadata.sorted_tables)
 
     def create_schema(self) -> None:
         """Creates a schema in the target database, if it doesn't exist yet"""
@@ -85,32 +97,23 @@ class ChadoEngine:
                + " FOR EACH ROW EXECUTE PROCEDURE " + function_name + "();"
 
 
-class PublicSchemaEngine(ChadoEngine):
+class PublicSchemaSetupClient(SchemaSetupClient):
     """Class for setting up the general tables of a CHADO database"""
 
     def __init__(self, uri: str):
         """Constructor"""
-        ChadoEngine.__init__(self, uri)
+        super().__init__(uri)
         self.modules = [general, cv, organism, pub, sequence]
 
-    def create(self):
-        """Main function for filling the schema with life"""
 
-        # Create the schema
-        self.create_schema()
-
-        # Create the tables
-        self.metadata.create_all(self.engine, tables=self.metadata.sorted_tables)
-
-
-class AuditSchemaEngine(ChadoEngine):
+class AuditSchemaSetupClient(SchemaSetupClient):
     """Class for setting up an audit schema for a CHADO database"""
 
     def __init__(self, uri: str):
         """Constructor"""
-        ChadoEngine.__init__(self, uri)
-        self.base = base.AuditBase
+        super().__init__(uri)
         self.modules = [audit]
+        self.base = base.AuditBase
         self.metadata = self.base.metadata
         self.schema = self.metadata.schema
         self.master_table = audit.Audit.__table__
@@ -118,8 +121,8 @@ class AuditSchemaEngine(ChadoEngine):
     def create(self):
         """Main function for filling the schema with life"""
 
-        # Make sure all required tables in the public schema exists
-        public_engine = PublicSchemaEngine(self.uri)
+        # Make sure all required tables in the public schema exist
+        public_engine = PublicSchemaSetupClient(self.uri)
         public_engine.create()
         data_tables = public_engine.metadata.sorted_tables
 

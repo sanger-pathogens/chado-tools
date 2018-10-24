@@ -1,5 +1,5 @@
 import sqlalchemy.orm
-from pychado.orm import base, general, cv
+from . import base, general, cv
 
 # Object-relational mappings for the CHADO Publication module
 
@@ -7,7 +7,7 @@ from pychado.orm import base, general, cv
 class Pub(base.PublicBase):
     """Class for the CHADO 'pub' table"""
     # Columns
-    pub_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)
+    pub_id = sqlalchemy.Column(sqlalchemy.BIGINT, nullable=False, primary_key=True, autoincrement=True)
     title = sqlalchemy.Column(sqlalchemy.TEXT, nullable=True)
     volumetitle = sqlalchemy.Column(sqlalchemy.TEXT, nullable=True)
     volume = sqlalchemy.Column(sqlalchemy.VARCHAR(255), nullable=True)
@@ -51,7 +51,7 @@ class Pub(base.PublicBase):
 class PubDbxRef(base.PublicBase):
     """Class for the CHADO 'pub_dbxref' table"""
     # Columns
-    pub_dbxref_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)
+    pub_dbxref_id = sqlalchemy.Column(sqlalchemy.BIGINT, nullable=False, primary_key=True, autoincrement=True)
     pub_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(
         Pub.pub_id, onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
     dbxref_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(
@@ -66,7 +66,7 @@ class PubDbxRef(base.PublicBase):
 
     # Relationships
     pub = sqlalchemy.orm.relationship(Pub, foreign_keys=pub_id, backref="pub_dbxref_pub")
-    dbxref = sqlalchemy.orm.relationship(general.DbxRef, backref="pub_dbxref_dbxref")
+    dbxref = sqlalchemy.orm.relationship(general.DbxRef, foreign_keys=dbxref_id, backref="pub_dbxref_dbxref")
 
     # Initialisation
     def __init__(self, pub_id, dbxref_id, is_current=True, pub_dbxref_id=None):
@@ -83,7 +83,7 @@ class PubDbxRef(base.PublicBase):
 class PubRelationship(base.PublicBase):
     """Class for the CHADO 'pub_relationship' table"""
     # Columns
-    pub_relationship_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)
+    pub_relationship_id = sqlalchemy.Column(sqlalchemy.BIGINT, nullable=False, primary_key=True, autoincrement=True)
     subject_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(
         Pub.pub_id, onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
     object_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(
@@ -118,7 +118,7 @@ class PubRelationship(base.PublicBase):
 class PubAuthor(base.PublicBase):
     """Class for the CHADO 'pubauthor' table"""
     # Columns
-    pubauthor_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)
+    pubauthor_id = sqlalchemy.Column(sqlalchemy.BIGINT, nullable=False, primary_key=True, autoincrement=True)
     pub_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(
         Pub.pub_id, onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
     rank = sqlalchemy.Column(sqlalchemy.INTEGER, nullable=False)
@@ -151,7 +151,7 @@ class PubAuthor(base.PublicBase):
 class PubProp(base.PublicBase):
     """Class for the CHADO 'pubprop' table"""
     # Columns
-    pubprop_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)
+    pubprop_id = sqlalchemy.Column(sqlalchemy.BIGINT, nullable=False, primary_key=True, autoincrement=True)
     pub_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(
         Pub.pub_id, onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
     type_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(

@@ -8,7 +8,6 @@ Python3 command line script providing various tools for accessing CHADO database
 
 * Python 3.6 or higher
 * PostgreSQL 9.6 or higher
-* SQLite (for testing only)
 
 ## Installation from source
 
@@ -69,6 +68,7 @@ The usage is:
 Create a new CHADO database called `eukaryotes` according to the current GMOD schema:
 
     chado admin create eukaryotes
+    chado admin setup -s gmod eukaryotes
     
 Dump this database into an archive called `eukaryotes.dump`:
 

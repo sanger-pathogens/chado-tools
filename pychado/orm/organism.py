@@ -1,5 +1,5 @@
 import sqlalchemy.orm
-from pychado.orm import base, general, cv
+from . import base, general, cv
 
 
 # Object-relational mappings for the CHADO Organism module
@@ -8,7 +8,7 @@ from pychado.orm import base, general, cv
 class Organism(base.PublicBase):
     """Class for the CHADO 'organism' table"""
     # Columns
-    organism_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)
+    organism_id = sqlalchemy.Column(sqlalchemy.BIGINT, nullable=False, primary_key=True, autoincrement=True)
     abbreviation = sqlalchemy.Column(sqlalchemy.VARCHAR(255), nullable=True)
     genus = sqlalchemy.Column(sqlalchemy.VARCHAR(255), nullable=False)
     species = sqlalchemy.Column(sqlalchemy.VARCHAR(255), nullable=False)
@@ -43,7 +43,7 @@ class Organism(base.PublicBase):
 class OrganismDbxRef(base.PublicBase):
     """Class for the CHADO 'organism_dbxref' table"""
     # Columns
-    organism_dbxref_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)
+    organism_dbxref_id = sqlalchemy.Column(sqlalchemy.BIGINT, nullable=False, primary_key=True, autoincrement=True)
     organism_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(
         Organism.organism_id, onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
     dbxref_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(
@@ -74,7 +74,7 @@ class OrganismDbxRef(base.PublicBase):
 class OrganismProp(base.PublicBase):
     """Class for the CHADO 'organismprop' table"""
     # Columns
-    organismprop_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)
+    organismprop_id = sqlalchemy.Column(sqlalchemy.BIGINT, nullable=False, primary_key=True, autoincrement=True)
     organism_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(
         Organism.organism_id, onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
     type_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(

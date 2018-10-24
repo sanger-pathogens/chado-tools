@@ -3,8 +3,9 @@ import os
 import datetime
 import subprocess
 import urllib.request
+import string
+import random
 import yaml
-import pronto.parser
 
 
 class EmptyObject:
@@ -147,6 +148,16 @@ def list_to_dict(entries: list, key: str) -> dict:
         current_key = getattr(entry, key)
         dictionary[current_key] = entry
     return dictionary
+
+
+def random_string(n: int) -> str:
+    """Generates a random string of n lowercase letters"""
+    return "".join(random.choices(string.ascii_lowercase, k=n))
+
+
+def random_integer(n: int) -> int:
+    """Generates a random integer in the range [0, n]"""
+    return random.randint(0, n)
 
 
 def current_date() -> str:

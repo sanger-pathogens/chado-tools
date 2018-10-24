@@ -1,7 +1,6 @@
 import sqlalchemy.orm
 import sqlalchemy.sql.functions
-
-from pychado.orm import base, general, cv, organism, pub
+from . import base, general, cv, organism, pub
 
 # Object-relational mappings for the CHADO Sequence/Feature module
 
@@ -9,7 +8,7 @@ from pychado.orm import base, general, cv, organism, pub
 class Feature(base.PublicBase):
     """Class for the CHADO 'feature' table"""
     # Columns
-    feature_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)
+    feature_id = sqlalchemy.Column(sqlalchemy.BIGINT, nullable=False, primary_key=True, autoincrement=True)
     dbxref_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(
         general.DbxRef.dbxref_id, onupdate="CASCADE", ondelete="SET NULL"), nullable=True)
     organism_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(
@@ -62,7 +61,7 @@ class Feature(base.PublicBase):
 class FeatureCvTerm(base.PublicBase):
     """Class for the CHADO 'feature_cvterm' table"""
     # Columns
-    feature_cvterm_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)
+    feature_cvterm_id = sqlalchemy.Column(sqlalchemy.BIGINT, nullable=False, primary_key=True, autoincrement=True)
     feature_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(
         Feature.feature_id, onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
     cvterm_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(
@@ -100,7 +99,8 @@ class FeatureCvTerm(base.PublicBase):
 class FeatureCvTermDbxRef(base.PublicBase):
     """Class for the CHADO 'feature_cvterm_dbxref' table"""
     # Columns
-    feature_cvterm_dbxref_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)
+    feature_cvterm_dbxref_id = sqlalchemy.Column(sqlalchemy.BIGINT, nullable=False, primary_key=True,
+                                                 autoincrement=True)
     feature_cvterm_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(
         FeatureCvTerm.feature_cvterm_id, onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
     dbxref_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(
@@ -132,7 +132,7 @@ class FeatureCvTermDbxRef(base.PublicBase):
 class FeatureCvTermProp(base.PublicBase):
     """Class for the CHADO 'feature_cvtermprop' table"""
     # Columns
-    feature_cvtermprop_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)
+    feature_cvtermprop_id = sqlalchemy.Column(sqlalchemy.BIGINT, nullable=False, primary_key=True, autoincrement=True)
     feature_cvterm_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(
         FeatureCvTerm.feature_cvterm_id, onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
     type_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(
@@ -167,7 +167,7 @@ class FeatureCvTermProp(base.PublicBase):
 class FeatureDbxRef(base.PublicBase):
     """Class for the CHADO 'feature_dbxref' table"""
     # Columns
-    feature_dbxref_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)
+    feature_dbxref_id = sqlalchemy.Column(sqlalchemy.BIGINT, nullable=False, primary_key=True, autoincrement=True)
     feature_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(
         Feature.feature_id, onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
     dbxref_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(
@@ -199,7 +199,7 @@ class FeatureDbxRef(base.PublicBase):
 class FeaturePub(base.PublicBase):
     """Class for the CHADO 'feature_pub' table"""
     # Columns
-    feature_pub_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)
+    feature_pub_id = sqlalchemy.Column(sqlalchemy.BIGINT, nullable=False, primary_key=True, autoincrement=True)
     feature_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(
         Feature.feature_id, onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
     pub_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(
@@ -230,7 +230,7 @@ class FeaturePub(base.PublicBase):
 class FeaturePubProp(base.PublicBase):
     """Class for the CHADO 'feature_pubprop' table"""
     # Columns
-    feature_pubprop_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)
+    feature_pubprop_id = sqlalchemy.Column(sqlalchemy.BIGINT, nullable=False, primary_key=True, autoincrement=True)
     feature_pub_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(
         FeaturePub.feature_pub_id, onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
     type_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(
@@ -264,7 +264,7 @@ class FeaturePubProp(base.PublicBase):
 class FeatureRelationship(base.PublicBase):
     """Class for the CHADO 'feature_relationship' table"""
     # Columns
-    feature_relationship_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)
+    feature_relationship_id = sqlalchemy.Column(sqlalchemy.BIGINT, nullable=False, primary_key=True, autoincrement=True)
     subject_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(
         Feature.feature_id, onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
     object_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(
@@ -302,7 +302,8 @@ class FeatureRelationship(base.PublicBase):
 class FeatureRelationshipPub(base.PublicBase):
     """Class for the CHADO 'feature_relationship_pub' table"""
     # Columns
-    feature_relationship_pub_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)
+    feature_relationship_pub_id = sqlalchemy.Column(sqlalchemy.BIGINT, nullable=False, primary_key=True,
+                                                    autoincrement=True)
     feature_relationship_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(
         FeatureRelationship.feature_relationship_id, onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
     pub_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(
@@ -334,7 +335,8 @@ class FeatureRelationshipPub(base.PublicBase):
 class FeatureRelationshipProp(base.PublicBase):
     """Class for the CHADO 'feature_relationshipprop' table"""
     # Columns
-    feature_relationshipprop_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)
+    feature_relationshipprop_id = sqlalchemy.Column(sqlalchemy.BIGINT, nullable=False, primary_key=True,
+                                                    autoincrement=True)
     feature_relationship_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(
         FeatureRelationship.feature_relationship_id, onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
     type_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(
@@ -370,7 +372,7 @@ class FeatureRelationshipProp(base.PublicBase):
 class FeatureRelationshipPropPub(base.PublicBase):
     """Class for the CHADO 'feature_relationshipprop_pub' table"""
     # Columns
-    feature_relationshipprop_pub_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True,
+    feature_relationshipprop_pub_id = sqlalchemy.Column(sqlalchemy.BIGINT, nullable=False, primary_key=True,
                                                         autoincrement=True)
     feature_relationshipprop_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(
         FeatureRelationshipProp.feature_relationshipprop_id, onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
@@ -406,7 +408,7 @@ class FeatureRelationshipPropPub(base.PublicBase):
 class Synonym(base.PublicBase):
     """Class for the CHADO 'synonym' table"""
     # Columns
-    synonym_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)
+    synonym_id = sqlalchemy.Column(sqlalchemy.BIGINT, nullable=False, primary_key=True, autoincrement=True)
     name = sqlalchemy.Column(sqlalchemy.VARCHAR(255), nullable=False)
     type_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(
         cv.CvTerm.cvterm_id, onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
@@ -436,7 +438,7 @@ class Synonym(base.PublicBase):
 class FeatureSynonym(base.PublicBase):
     """Class for the CHADO 'feature_synonym' table"""
     # Columns
-    feature_synonym_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)
+    feature_synonym_id = sqlalchemy.Column(sqlalchemy.BIGINT, nullable=False, primary_key=True, autoincrement=True)
     synonym_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(
         Synonym.synonym_id, onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
     feature_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(
@@ -474,7 +476,7 @@ class FeatureSynonym(base.PublicBase):
 class FeatureLoc(base.PublicBase):
     """Class for the CHADO 'featureloc' table"""
     # Columns
-    featureloc_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)
+    featureloc_id = sqlalchemy.Column(sqlalchemy.BIGINT, nullable=False, primary_key=True, autoincrement=True)
     feature_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(
         Feature.feature_id, onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
     srcfeature_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(
@@ -502,9 +504,8 @@ class FeatureLoc(base.PublicBase):
     srcfeature = sqlalchemy.orm.relationship(Feature, foreign_keys=feature_id, backref="featureloc_srcfeature")
 
     # Initialisation
-    def __init__(self, feature_id, srcfeature_id, type_id, uniquename, fmin=0, is_fmin_partial=False, fmax=0,
-                 is_fmax_partial=False, strand=False, phase=False, residue_info=None, locgroup=0, rank=0,
-                 featureloc_id=None):
+    def __init__(self, feature_id, srcfeature_id, fmin=0, is_fmin_partial=False, fmax=0, is_fmax_partial=False,
+                 strand=None, phase=None, residue_info=None, locgroup=0, rank=0, featureloc_id=None):
         for key, value in locals().items():
             if key != self:
                 setattr(self, key, value)
@@ -521,7 +522,7 @@ class FeatureLoc(base.PublicBase):
 class FeatureLocPub(base.PublicBase):
     """Class for the CHADO 'featureloc_pub' table"""
     # Columns
-    featureloc_pub_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)
+    featureloc_pub_id = sqlalchemy.Column(sqlalchemy.BIGINT, nullable=False, primary_key=True, autoincrement=True)
     featureloc_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(
         FeatureLoc.featureloc_id, onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
     pub_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(
@@ -553,7 +554,7 @@ class FeatureLocPub(base.PublicBase):
 class FeatureProp(base.PublicBase):
     """Class for the CHADO 'featureprop' table"""
     # Columns
-    featureprop_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)
+    featureprop_id = sqlalchemy.Column(sqlalchemy.BIGINT, nullable=False, primary_key=True, autoincrement=True)
     feature_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(
         Feature.feature_id, onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
     type_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(
@@ -586,7 +587,7 @@ class FeatureProp(base.PublicBase):
 class FeaturePropPub(base.PublicBase):
     """Class for the CHADO 'featureprop_pub' table"""
     # Columns
-    featureprop_pub_id = sqlalchemy.Column(base.BIGINT, nullable=False, primary_key=True, autoincrement=True)
+    featureprop_pub_id = sqlalchemy.Column(sqlalchemy.BIGINT, nullable=False, primary_key=True, autoincrement=True)
     featureprop_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(
         FeatureProp.featureprop_id, onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
     pub_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(

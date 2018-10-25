@@ -1,5 +1,5 @@
 import unittest
-from terminal import chado_tools
+from pychado_scripts import chado_tools
 
 
 class TestCommands(unittest.TestCase):
@@ -15,12 +15,11 @@ class TestCommands(unittest.TestCase):
         commands = chado_tools.general_commands()
         self.assertIn("connect", commands)
         self.assertIn("query", commands)
-        self.assertIn("stats", commands)
         self.assertNotIn("non_existent_command", commands)
 
     def test_wrapper_commands(self):
         commands = chado_tools.wrapper_commands()
-        self.assertIn("list", commands)
+        self.assertIn("extract", commands)
         self.assertIn("insert", commands)
         self.assertIn("delete", commands)
         self.assertIn("import", commands)
@@ -35,11 +34,12 @@ class TestCommands(unittest.TestCase):
         self.assertIn("restore", commands)
         self.assertIn("setup", commands)
 
-    def test_list_commands(self):
-        commands = chado_tools.list_commands()
+    def test_extract_commands(self):
+        commands = chado_tools.extract_commands()
         self.assertIn("organisms", commands)
         self.assertIn("cvterms", commands)
         self.assertIn("genedb_products", commands)
+        self.assertIn("stats", commands)
 
     def test_insert_commands(self):
         commands = chado_tools.insert_commands()
@@ -137,9 +137,9 @@ class TestArguments(unittest.TestCase):
         self.assertEqual(parsed_args["query"], "")
         self.assertEqual(parsed_args["input_file"], "testqueryfile")
 
-    def test_stats_args(self):
-        # Tests if the command line arguments for the subcommand 'chado stats' are parsed correctly
-        args = ["chado", "stats", "-H", "-d", ";", "-o", "testfile", "-a", "testorganism",
+    def test_extract_stats_args(self):
+        # Tests if the command line arguments for the subcommand 'chado extract stats' are parsed correctly
+        args = ["chado", "extract", "stats", "-H", "-d", ";", "-o", "testfile", "-a", "testorganism",
                 "--start_date", "testdate", "--end_date", "testdate2", "testdb"]
         parsed_args = vars(chado_tools.parse_arguments(args))
         self.assertTrue(parsed_args["include_header"])
@@ -151,26 +151,26 @@ class TestArguments(unittest.TestCase):
         self.assertEqual(parsed_args["dbname"], "testdb")
 
         # Test the default values
-        args = ["chado", "stats", "--start_date", "testdate", "testdb"]
+        args = ["chado", "extract", "stats", "--start_date", "testdate", "testdb"]
         parsed_args = vars(chado_tools.parse_arguments(args))
         self.assertFalse(parsed_args["include_header"])
         self.assertEqual(parsed_args["delimiter"], "\t")
         self.assertEqual(parsed_args["output_file"], "")
-        self.assertEqual(parsed_args["organism"], "all")
+        self.assertEqual(parsed_args["organism"], None)
         self.assertEqual(parsed_args["end_date"], "")
 
-    def test_list_organisms_args(self):
-        # Tests if the command line arguments for the subcommand 'chado list organisms' are parsed correctly
-        args = ["chado", "list", "organisms", "-H", "-d", ";", "-o", "testfile", "testdb"]
+    def test_extract_organisms_args(self):
+        # Tests if the command line arguments for the subcommand 'chado extract organisms' are parsed correctly
+        args = ["chado", "extract", "organisms", "-H", "-d", ";", "-o", "testfile", "testdb"]
         parsed_args = vars(chado_tools.parse_arguments(args))
         self.assertTrue(parsed_args["include_header"])
         self.assertEqual(parsed_args["delimiter"], ";")
         self.assertEqual(parsed_args["output_file"], "testfile")
         self.assertEqual(parsed_args["dbname"], "testdb")
 
-    def test_list_cvterms_args(self):
-        # Tests if the command line arguments for the subcommand 'chado list cvterms' are parsed correctly
-        args = ["chado", "list", "cvterms", "--vocabulary", "testcv", "--database", "testdatabase", "testdb"]
+    def test_extract_cvterms_args(self):
+        # Tests if the command line arguments for the subcommand 'chado extract cvterms' are parsed correctly
+        args = ["chado", "extract", "cvterms", "--vocabulary", "testcv", "--database", "testdatabase", "testdb"]
         parsed_args = vars(chado_tools.parse_arguments(args))
         self.assertFalse(parsed_args["include_header"])
         self.assertEqual(parsed_args["delimiter"], "\t")
@@ -179,9 +179,10 @@ class TestArguments(unittest.TestCase):
         self.assertEqual(parsed_args["database"], "testdatabase")
         self.assertEqual(parsed_args["dbname"], "testdb")
 
-    def test_list_genedb_products_args(self):
-        # Tests if the command line arguments for the subcommand 'chado list genedb_products' are parsed correctly
-        args = ["chado", "list", "genedb_products", "-H", "-d", ";", "-o", "testfile", "-a", "testorganism", "testdb"]
+    def test_extract_genedb_products_args(self):
+        # Tests if the command line arguments for the subcommand 'chado extract genedb_products' are parsed correctly
+        args = ["chado", "extract", "genedb_products", "-H", "-d", ";", "-o", "testfile", "-a", "testorganism",
+                "testdb"]
         parsed_args = vars(chado_tools.parse_arguments(args))
         self.assertTrue(parsed_args["include_header"])
         self.assertEqual(parsed_args["delimiter"], ";")
@@ -192,12 +193,13 @@ class TestArguments(unittest.TestCase):
     def test_insert_organism_args(self):
         # Tests if the command line arguments for the subcommand 'chado insert organism' are parsed correctly
         args = ["chado", "insert", "organism", "-g", "testgenus", "-s", "testspecies", "-a", "testabbreviation",
-                "--common_name", "testname", "--comment", "testcomment", "testdb"]
+                "--common_name", "testname", "--infraspecific_name", "testinfra", "--comment", "testcomment", "testdb"]
         parsed_args = vars(chado_tools.parse_arguments(args))
         self.assertEqual(parsed_args["genus"], "testgenus")
         self.assertEqual(parsed_args["species"], "testspecies")
         self.assertEqual(parsed_args["abbreviation"], "testabbreviation")
         self.assertEqual(parsed_args["common_name"], "testname")
+        self.assertEqual(parsed_args["infraspecific_name"], "testinfra")
         self.assertEqual(parsed_args["comment"], "testcomment")
         self.assertEqual(parsed_args["dbname"], "testdb")
 

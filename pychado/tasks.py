@@ -1,5 +1,5 @@
 from . import utils, dbutils, queries, ddl
-from .io import load_ontology
+from .io import direct, ontology
 
 
 def create_connection_string(filename: str, dbname: str) -> str:
@@ -70,34 +70,18 @@ def run_command_with_arguments(command: str, sub_command: str, arguments, connec
         run_setup_command(arguments, connection_uri)
     elif command == "query":
         # Query a PostgreSQL database and export the result to a text file
-        if arguments.query:
-            query = arguments.query
-        else:
-            query = utils.read_text(arguments.input_file)
-        dbutils.query_to_file(connection_uri, query, {}, arguments.output_file, arguments.delimiter,
+        query = (arguments.query or utils.read_text(arguments.input_file))
+        dbutils.query_to_file(connection_uri, query, arguments.output_file, arguments.delimiter,
                               arguments.include_header)
-    elif command == "stats":
-        # Obtain statistics to updates in a CHADO database
-        query = queries.load_stats_query(arguments)
-        parameters = queries.specify_stats_parameters(arguments)
-        dbutils.query_to_file(connection_uri, query, parameters, arguments.output_file, arguments.delimiter,
-                              arguments.include_header)
-    elif command == "list":
-        # List all entities of a specified type in the CHADO database and export the result to a text file
-        query = queries.load_list_query(sub_command, arguments)
-        parameters = queries.specify_list_parameters(sub_command, arguments)
-        dbutils.query_to_file(connection_uri, query, parameters, arguments.output_file, arguments.delimiter,
-                              arguments.include_header)
+    elif command == "extract":
+        # Run a pre-compiled query against the CHADO database
+        run_select_command(sub_command, arguments, connection_uri)
     elif command == "insert":
         # Insert a new entity of a specified type into the CHADO database
-        statement = queries.load_insert_statement(sub_command)
-        parameters = queries.specify_insert_parameters(sub_command, arguments)
-        dbutils.connect_and_execute(connection_uri, statement, parameters)
+        run_insert_command(sub_command, arguments, connection_uri)
     elif command == "delete":
         # Delete an entity of a specified type from the CHADO database
-        statement = queries.load_delete_statement(sub_command, arguments)
-        parameters = queries.specify_delete_parameters(sub_command, arguments)
-        dbutils.connect_and_execute(connection_uri, statement, parameters)
+        run_delete_command(sub_command, arguments, connection_uri)
     elif command == "import":
         # Import entities of a specified type into the CHADO database
         run_import_command(sub_command, arguments, connection_uri)
@@ -114,12 +98,49 @@ def run_setup_command(arguments, uri: str) -> None:
         dbutils.setup_database(uri, schema_file)
     else:
         if arguments.schema == "basic":
-            generator = ddl.PublicSchemaSetupClient(uri)
+            client = ddl.PublicSchemaSetupClient(uri)
         elif arguments.schema == "audit":
-            generator = ddl.AuditSchemaSetupClient(uri)
+            client = ddl.AuditSchemaSetupClient(uri)
         else:
-            generator = ddl.ChadoClient(uri)
-        generator.create()
+            client = ddl.ChadoClient(uri)
+        client.create()
+
+
+def run_select_command(specifier: str, arguments, uri: str) -> None:
+    # Run a pre-compiled query against a database
+    template = queries.load_query(specifier)
+    if specifier == "organisms":
+        query = queries.set_query_conditions(template)
+    elif specifier == "cvterms":
+        query = queries.set_query_conditions(template, database=arguments.database, vocabulary=arguments.vocabulary)
+    elif specifier == "genedb_products":
+        query = queries.set_query_conditions(template, organism=arguments.organism)
+    elif specifier == "stats":
+        query = queries.set_query_conditions(template, organism=arguments.organism, start_date=arguments.start_date,
+                                             end_date=(arguments.end_date or utils.current_date()))
+    else:
+        print("Functionality 'extract " + specifier + "' is not yet implemented.")
+        query = queries.set_query_conditions("")
+    dbutils.query_to_file(uri, query, arguments.output_file, arguments.delimiter, arguments.include_header)
+
+
+def run_insert_command(specifier: str, arguments, uri: str) -> None:
+    # Insert a new entity of a specified type into a database
+    client = direct.DirectIOClient(uri)
+    if specifier == "organism":
+        client.insert_organism(arguments.genus, arguments.species, arguments.abbreviation, arguments.common_name,
+                               arguments.infraspecific_name, arguments.comment)
+    else:
+        print("Functionality 'insert " + specifier + "' is not yet implemented.")
+
+
+def run_delete_command(specifier: str, arguments, uri: str) -> None:
+    # Delete an entity of a specified type from a database
+    client = direct.DirectIOClient(uri)
+    if specifier == "organism":
+        client.delete_organism(arguments.organism)
+    else:
+        print("Functionality 'delete " + specifier + "' is not yet implemented.")
 
 
 def run_import_command(specifier: str, arguments, uri: str) -> None:
@@ -129,7 +150,7 @@ def run_import_command(specifier: str, arguments, uri: str) -> None:
         file = utils.download_file(arguments.input_url)
 
     if specifier == "ontology":
-        loader = load_ontology.OntologyClient(uri, arguments.verbose)
+        loader = ontology.OntologyClient(uri, arguments.verbose)
         loader.load(file, arguments.format, arguments.database_authority)
     else:
         print("Functionality 'import " + specifier + "' is not yet implemented.")

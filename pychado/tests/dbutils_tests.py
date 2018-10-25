@@ -17,7 +17,6 @@ class TestConnection(unittest.TestCase):
         # Checks if the default connection file is available and reads in the parameters
         self.assertTrue(os.path.exists(os.path.abspath(dbutils.default_configuration_file())))
         self.connectionParameters = utils.parse_yaml(dbutils.default_configuration_file())
-        self.dsn = dbutils.generate_dsn(self.connectionParameters)
         self.uri = dbutils.generate_uri(self.connectionParameters)
 
     def tearDown(self):
@@ -65,15 +64,6 @@ class TestConnection(unittest.TestCase):
               + self.connectionParameters["database"]
         self.assertEqual(self.uri, uri)
 
-    def test_connection_dsn(self):
-        # Tests the correct creation of a database connection string in keyword/value format
-        dsn = "dbname=" + self.connectionParameters["database"] \
-              + " user=" + self.connectionParameters["user"] \
-              + " password=" + self.connectionParameters["password"] \
-              + " host=" + self.connectionParameters["host"] \
-              + " port=" + self.connectionParameters["port"]
-        self.assertEqual(self.dsn, dsn)
-
     def test_random_database_uri(self):
         # Tests that a function creates a URI of a database that does not exist
         uri = dbutils.random_database_uri(self.connectionParameters)
@@ -86,7 +76,7 @@ class TestConnection(unittest.TestCase):
         # Tests that a connection to the default database can be established and that queries can be executed
         conn = dbutils.open_connection(self.uri)
         self.assertFalse(conn.closed)
-        result = dbutils.execute_query(conn, "SELECT 1 + 2").scalar()
+        result = conn.execute("SELECT 1 + 2").scalar()
         self.assertEqual(result, 3)
         dbutils.close_connection(conn)
         self.assertTrue(conn.closed)
@@ -128,7 +118,7 @@ class TestConnection(unittest.TestCase):
 
         # Check if the database is correctly set up
         conn = dbutils.open_connection(uri)
-        result_proxy = dbutils.execute_query(conn, "SELECT * FROM species ORDER BY legs ASC")
+        result_proxy = conn.execute("SELECT * FROM species ORDER BY legs ASC")
         result = result_proxy.fetchall()
         self.assertEqual(len(result), 4)
         self.assertEqual(result[0]["name"], "leech")
@@ -146,7 +136,7 @@ class TestConnection(unittest.TestCase):
 
         # Check if the database is still correctly set up
         conn = dbutils.open_connection(uri)
-        result_proxy = dbutils.execute_query(conn, "SELECT name FROM species WHERE extinct = TRUE")
+        result_proxy = conn.execute("SELECT name FROM species WHERE extinct = TRUE")
         result = result_proxy.fetchall()
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0]["name"], "diplodocus")
@@ -155,7 +145,7 @@ class TestConnection(unittest.TestCase):
 
         # Export the entire table to a file and check that the result is as expected
         temp_file = os.path.join(os.getcwd(), "tmp.csv")
-        dbutils.query_to_file(uri, "SELECT name, clade, legs, extinct FROM species ORDER BY legs ASC", {}, temp_file,
+        dbutils.query_to_file(uri, "SELECT name, clade, legs, extinct FROM species ORDER BY legs ASC", temp_file,
                               ";", True)
         self.assertTrue(os.path.exists(temp_file))
         output_file = os.path.join(self.data_dir, "dbutils_species_table.csv")

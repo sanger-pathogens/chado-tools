@@ -30,7 +30,7 @@ setuptools.setup(
     },
     entry_points={
         "console_scripts": [
-            "chado = terminal.chado_tools:main",
+            "chado = pychado_scripts.chado_tools:main",
         ]
     },
     test_suite="nose.collector",

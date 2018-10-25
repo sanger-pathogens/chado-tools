@@ -47,15 +47,14 @@ def general_commands() -> dict:
     """Lists the available general sub-commands of the 'chado' command with corresponding descriptions"""
     return {
         "connect": "connect to a CHADO database for an interactive session",
-        "query": "query a CHADO database and export the result to a text file",
-        "stats": "obtain statistics to updates in a CHADO database"
+        "query": "query a CHADO database and export the result to a text file"
     }
 
 
 def wrapper_commands() -> dict:
     """Lists the available 'wrapper' sub-commands of the 'chado' command with corresponding descriptions"""
     return {
-        "list": "list all entities of a specified type in the CHADO database",
+        "extract": "run a pre-compiled query against the CHADO database",
         "insert": "insert a new entity of a specified type into the CHADO database",
         "delete": "delete an entity of a specified type from the CHADO database",
         "import": "import entities of a specified type into the CHADO database",
@@ -74,12 +73,13 @@ def admin_commands() -> dict:
     }
 
 
-def list_commands() -> dict:
-    """Lists the available sub-commands of the 'chado list' command with corresponding descriptions"""
+def extract_commands() -> dict:
+    """Lists the available sub-commands of the 'chado extract' command with corresponding descriptions"""
     return {
         "organisms": "list all organisms in the CHADO database",
         "cvterms": "list all CV terms in the CHADO database",
-        "genedb_products": "list all products of transcripts in the CHADO database"
+        "genedb_products": "list all products of transcripts in the CHADO database",
+        "stats": "obtain statistics to updates in a CHADO database"
     }
 
 
@@ -160,10 +160,8 @@ def add_arguments_by_command(command: str, parser: argparse.ArgumentParser):
         add_admin_arguments(parser)
     elif command == "query":
         add_query_arguments(parser)
-    elif command == "stats":
-        add_stats_arguments(parser)
-    elif command == "list":
-        add_list_arguments(parser)
+    elif command == "extract":
+        add_extract_arguments(parser)
     elif command == "insert":
         add_insert_arguments(parser)
     elif command == "delete":
@@ -227,50 +225,51 @@ def add_query_arguments(parser: argparse.ArgumentParser):
     group.add_argument("-q", "--query", default="", help="SQL query")
 
 
-def add_stats_arguments(parser: argparse.ArgumentParser):
-    """Defines formal arguments for the 'chado stats' sub-command"""
-    add_general_export_arguments(parser)
-    parser.add_argument("-a", "--abbreviation", default="all", dest="organism",
-                        help="restrict to a certain organism, defined by its abbreviation/short name (default: all)")
-    parser.add_argument("--start_date", required=True, help="date for maximum age of updates, format 'YYYYMMDD'")
-    parser.add_argument("--end_date", default="", help="date for minimum age of updates, format 'YYYYMMDD' "
-                                                       "(default: today)")
-
-
-def add_list_arguments(parser: argparse.ArgumentParser):
-    """Defines formal arguments for the 'chado list' sub-command"""
+def add_extract_arguments(parser: argparse.ArgumentParser):
+    """Defines formal arguments for the 'chado extract' sub-command"""
     parser.epilog = "For detailed usage information type '" + parser.prog + " <command> -h'"
     subparsers = parser.add_subparsers()
-    for command, description in list_commands().items():
+    for command, description in extract_commands().items():
         # Create subparser and add general and specific formal arguments
         sub = subparsers.add_parser(command, description=description, help=description)
         add_general_arguments(sub)
         add_general_export_arguments(sub)
-        add_list_arguments_by_command(command, sub)
+        add_extract_arguments_by_command(command, sub)
 
 
-def add_list_arguments_by_command(command: str, parser: argparse.ArgumentParser):
-    """Defines formal arguments for a specified sub-command of 'chado list'"""
+def add_extract_arguments_by_command(command: str, parser: argparse.ArgumentParser):
+    """Defines formal arguments for a specified sub-command of 'chado extract'"""
     if command == "organisms":
         pass
     elif command == "cvterms":
-        add_list_cvterms_arguments(parser)
+        add_extract_cvterms_arguments(parser)
     elif command == "genedb_products":
-        add_list_genedb_product_arguments(parser)
+        add_extract_genedb_product_arguments(parser)
+    elif command == "stats":
+        add_extract_stats_arguments(parser)
     else:
         print("Command '" + parser.prog + "' is not available.")
 
 
-def add_list_cvterms_arguments(parser: argparse.ArgumentParser):
-    """Defines formal arguments for the 'chado list cvterms' sub-command"""
-    parser.add_argument("--vocabulary", default="all", help="restrict to a vocabulary, e.g. 'relationship'")
-    parser.add_argument("--database", default="all", help="restrict to a database, e.g. 'GO'")
+def add_extract_cvterms_arguments(parser: argparse.ArgumentParser):
+    """Defines formal arguments for the 'chado extract cvterms' sub-command"""
+    parser.add_argument("--vocabulary", help="restrict to a vocabulary, e.g. 'relationship'")
+    parser.add_argument("--database", help="restrict to a database, e.g. 'GO'")
 
 
-def add_list_genedb_product_arguments(parser: argparse.ArgumentParser):
-    """Defines formal arguments for the 'chado list genedb_products' sub-command"""
-    parser.add_argument("-a", "--abbreviation", dest="organism", default="all",
+def add_extract_genedb_product_arguments(parser: argparse.ArgumentParser):
+    """Defines formal arguments for the 'chado extract genedb_products' sub-command"""
+    parser.add_argument("-a", "--abbreviation", dest="organism",
                         help="restrict to a certain organism, defined by its abbreviation/short name (default: all)")
+
+
+def add_extract_stats_arguments(parser: argparse.ArgumentParser):
+    """Defines formal arguments for the 'chado stats' sub-command"""
+    parser.add_argument("-a", "--abbreviation", dest="organism",
+                        help="restrict to a certain organism, defined by its abbreviation/short name (default: all)")
+    parser.add_argument("--start_date", required=True, help="date for maximum age of updates, format 'YYYYMMDD'")
+    parser.add_argument("--end_date", default="", help="date for minimum age of updates, format 'YYYYMMDD' "
+                                                       "(default: today)")
 
 
 def add_insert_arguments(parser: argparse.ArgumentParser):
@@ -298,6 +297,7 @@ def add_insert_organism_arguments(parser: argparse.ArgumentParser):
     parser.add_argument("-s", "--species", required=True, help="species of the organism")
     parser.add_argument("-a", "--abbreviation", required=True, help="abbreviation/short name of the organism")
     parser.add_argument("--common_name", help="common name of the organism (default: use abbreviation, if provided)")
+    parser.add_argument("--infraspecific_name", help="infraspecific name of the organism")
     parser.add_argument("--comment", help="comment")
 
 

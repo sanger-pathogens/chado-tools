@@ -1,7 +1,7 @@
 import unittest
 import sqlalchemy.ext.declarative
 from .. import dbutils, utils
-from ..io import io
+from ..io import iobase
 
 test_base = sqlalchemy.ext.declarative.declarative_base()
 
@@ -21,7 +21,7 @@ class Species(test_base):
                 setattr(self, key, value)
 
 
-class TestIO(unittest.TestCase):
+class TestBasicIO(unittest.TestCase):
     """Tests basic functions for accessing databases via SQL"""
 
     connection_parameters = utils.parse_yaml(dbutils.default_configuration_file())
@@ -31,7 +31,7 @@ class TestIO(unittest.TestCase):
     def setUpClass(cls):
         # Creates a database, establishes a connection and creates tables
         dbutils.create_database(cls.connection_uri)
-        cls.client = io.IOClient(cls.connection_uri)
+        cls.client = iobase.IOClient(cls.connection_uri)
         cls.base = test_base
         cls.base.metadata.create_all(cls.client.engine)
         # self.client = io.IOClient("sqlite:///:memory:")

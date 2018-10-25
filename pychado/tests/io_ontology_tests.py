@@ -2,15 +2,14 @@ import os
 import unittest
 import pronto
 from .. import dbutils, utils
-from ..io import io, load_ontology
+from ..io import iobase, ontology
 from ..orm import general, cv
 
 
+class TestOntology(unittest.TestCase):
+    """Tests various functions used to load an ontology from a file into a database"""
 
-class TestLoadCvterms(unittest.TestCase):
-    """Tests various functions used to load CV terms from a file into a database"""
-
-    modules_dir = os.path.dirname(os.path.abspath(load_ontology.__file__))
+    modules_dir = os.path.dirname(os.path.abspath(ontology.__file__))
     data_dir = os.path.join(modules_dir, '..', 'tests', 'data')
     connection_parameters = utils.parse_yaml(dbutils.default_configuration_file())
     connection_uri = dbutils.random_database_uri(connection_parameters)
@@ -19,7 +18,7 @@ class TestLoadCvterms(unittest.TestCase):
     def setUpClass(cls):
         # Creates a database, establishes a connection and creates tables
         dbutils.create_database(cls.connection_uri)
-        cls.client = load_ontology.OntologySetupClient(cls.connection_uri)
+        cls.client = ontology.OntologySetupClient(cls.connection_uri)
         cls.client.create()
 
     @classmethod
@@ -84,38 +83,38 @@ class TestLoadCvterms(unittest.TestCase):
 
     def test_split_dbxref(self):
         # Checks the splitting of a given database cross reference into its constituents
-        result = load_ontology.split_dbxref("testdb:testaccession:testversion")
+        result = ontology.split_dbxref("testdb:testaccession:testversion")
         self.assertEqual(result[0], "testdb")
         self.assertEqual(result[1], "testaccession")
         self.assertEqual(result[2], "testversion")
 
-        result = load_ontology.split_dbxref("testdb:testaccession")
+        result = ontology.split_dbxref("testdb:testaccession")
         self.assertEqual(result[0], "testdb")
         self.assertEqual(result[1], "testaccession")
         self.assertEqual(result[2], "")
 
         with self.assertRaises(AttributeError):
-            load_ontology.split_dbxref("testdb_testaccession")
+            ontology.split_dbxref("testdb_testaccession")
 
     def test_create_dbxref(self):
         # Checks the creation of a database cross reference from its constituents
-        result = load_ontology.create_dbxref("testdb", "testaccession", "testversion")
+        result = ontology.create_dbxref("testdb", "testaccession", "testversion")
         self.assertEqual(result, "testdb:testaccession:testversion")
 
-        result = load_ontology.create_dbxref("testdb", "testaccession")
+        result = ontology.create_dbxref("testdb", "testaccession")
         self.assertEqual(result, "testdb:testaccession")
 
         with self.assertRaises(AttributeError):
-            load_ontology.create_dbxref("testdb", "")
+            ontology.create_dbxref("testdb", "")
 
     def test_create_cvterm_entry(self):
         # Checks if an ontology term is correctly converted into a CV term entry
         term = pronto.Term(id="testid", name="testname", desc="testdescription", other={"is_obsolete": ["True"]})
-        cvterm_entry = load_ontology.create_cvterm_entry(term, 100, 200)
+        cvterm_entry = ontology.create_cvterm_entry(term, 100, 200)
         self.assertEqual(cvterm_entry, cv.CvTerm(cv_id=100, dbxref_id=200, name="testname",
                                                  definition="testdescription", is_obsolete=1))
         term = pronto.Term(id="otherid", name="othername", other={"is_obsolete": ["False"]})
-        cvterm_entry = load_ontology.create_cvterm_entry(term, 10, 20)
+        cvterm_entry = ontology.create_cvterm_entry(term, 10, 20)
         self.assertEqual(cvterm_entry, cv.CvTerm(cv_id=10, dbxref_id=20, name="othername", is_obsolete=0))
 
     def test_update_cvterm_properties(self):
@@ -123,14 +122,14 @@ class TestLoadCvterms(unittest.TestCase):
         input_term = cv.CvTerm(cv_id=100, dbxref_id=200, name="testname", definition="testdescription", is_obsolete=1)
         output_term = cv.CvTerm(cv_id=1, dbxref_id=200, name="newname")
         self.assertNotEqual(input_term, output_term)
-        self.assertTrue(load_ontology.update_cvterm_properties(output_term, input_term))
+        self.assertTrue(ontology.update_cvterm_properties(output_term, input_term))
         self.assertEqual(input_term, output_term)
-        self.assertFalse(load_ontology.update_cvterm_properties(output_term, input_term))
+        self.assertFalse(ontology.update_cvterm_properties(output_term, input_term))
 
     def test_ontology_parser(self):
         # checks if an ontology file is parsed correctly
         filename = os.path.join(self.data_dir, "io_obo_example.obo")
-        content = load_ontology.parse_ontology(filename)
+        content = ontology.parse_ontology(filename)
         self.assertEqual(len(content), 2)
         self.assertIn("test:0000001", content)
         term = content["test:0000001"]
@@ -141,20 +140,20 @@ class TestLoadCvterms(unittest.TestCase):
 
     def test_get_default_namespace(self):
         # Checks if the default namespace is correctly extracted from an ontology
-        ontology = pronto.Ontology()
-        namespace = load_ontology.get_default_namespace(ontology)
+        ont = pronto.Ontology()
+        namespace = ontology.get_default_namespace(ont)
         self.assertEqual(namespace, "")
-        ontology.meta["default-namespace"] = ["mynamespace"]
-        namespace = load_ontology.get_default_namespace(ontology)
+        ont.meta["default-namespace"] = ["mynamespace"]
+        namespace = ontology.get_default_namespace(ont)
         self.assertEqual(namespace, "mynamespace")
 
     def test_filter_ontology(self):
         # Checks the filtering of ontology terms by a database authority
-        ontology = pronto.Ontology()
-        ontology.include(pronto.Term("test:001:abc"))
-        ontology.include(pronto.Term("test:002"))
-        ontology.include(pronto.Term("other:001"))
-        filtered_ontology = load_ontology.filter_ontology_by_db(ontology, "test")
+        ont = pronto.Ontology()
+        ont.include(pronto.Term("test:001:abc"))
+        ont.include(pronto.Term("test:002"))
+        ont.include(pronto.Term("other:001"))
+        filtered_ontology = ontology.filter_ontology_by_db(ont, "test")
         self.assertEqual(len(filtered_ontology), 2)
         self.assertIn("test:001:abc", filtered_ontology)
         self.assertEqual(filtered_ontology["test:002"].id, "test:002")
@@ -162,29 +161,29 @@ class TestLoadCvterms(unittest.TestCase):
     def test_extract_comments(self):
         # Tests the extraction of comments from an ontology term
         term = pronto.Term("testid")
-        comment = load_ontology.extract_comment(term)
+        comment = ontology.extract_comment(term)
         self.assertEqual(comment, "")
         term.other = {"comment": ["testcomment"]}
-        comment = load_ontology.extract_comment(term)
+        comment = ontology.extract_comment(term)
         self.assertEqual(comment, "testcomment")
 
     def test_extract_synonyms(self):
         # Tests the extraction of synonyms from an ontology term
         term = pronto.Term("testid")
-        synonyms = load_ontology.extract_synonyms(term)
+        synonyms = ontology.extract_synonyms(term)
         self.assertEqual(len(synonyms), 0)
         term.synonyms = {pronto.Synonym("first_synonym"), pronto.Synonym("second_synonym")}
-        synonyms = load_ontology.extract_synonyms(term)
+        synonyms = ontology.extract_synonyms(term)
         self.assertEqual(len(synonyms), 2)
         self.assertIn("second_synonym", synonyms)
 
     def test_extract_cross_references(self):
         # Tests the extraction of cross references from an ontology term
         term = pronto.Term("testid")
-        crossrefs = load_ontology.extract_cross_references(term)
+        crossrefs = ontology.extract_cross_references(term)
         self.assertEqual(len(crossrefs), 0)
         term.other = {"alt_id": ["alternative_id"], "xref": ["first_ref", "second_ref"]}
-        crossrefs = load_ontology.extract_cross_references(term)
+        crossrefs = ontology.extract_cross_references(term)
         self.assertEqual(len(crossrefs), 3)
         self.assertIn("alternative_id", crossrefs)
         self.assertIn("second_ref", crossrefs)
@@ -206,7 +205,7 @@ class TestLoadCvterms(unittest.TestCase):
         self.assertIsNotNone(first_cv.cv_id)
 
         # Try to insert an entry without namespace, and fail
-        with self.assertRaises(io.InputFileError):
+        with self.assertRaises(iobase.InputFileError):
             self.client._handle_cv(term, "")
 
         # Insert a further entry with another namespace
@@ -446,8 +445,8 @@ class TestLoadCvterms(unittest.TestCase):
         self.client.add_and_flush(other_dbxref)
         other_cvterm = cv.CvTerm(cv_id=self.default_cv.cv_id, dbxref_id=other_dbxref.dbxref_id, name="otherterm")
         self.client.add_and_flush(other_cvterm)
-        default_id = load_ontology.create_dbxref(self.default_db.name, self.default_dbxref.accession)
-        other_id = load_ontology.create_dbxref(self.default_db.name, other_dbxref.accession)
+        default_id = ontology.create_dbxref(self.default_db.name, self.default_dbxref.accession)
+        other_id = ontology.create_dbxref(self.default_db.name, other_dbxref.accession)
         all_cvterms = {default_id: self.default_cvterm, other_id: other_cvterm}
         relationship_terms = self.client._load_and_check_dependencies()[2]
 

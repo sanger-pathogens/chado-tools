@@ -2,11 +2,11 @@ import copy
 from typing import List, Dict
 import pronto
 from .. import utils
-from ..io import io
+from ..io import iobase
 from ..orm import general, cv
 
 
-class OntologyClient(io.IOClient):
+class OntologyClient(iobase.IOClient):
 
     def __init__(self, uri: str, verbose=False):
         """Constructor"""
@@ -93,33 +93,33 @@ class OntologyClient(io.IOClient):
         # CV term for comments
         property_type_cv = self.query_table(cv.Cv, name="cvterm_property_type").first()         # type: cv.Cv
         if not property_type_cv:
-            raise io.DatabaseError("CV 'cvterm_property_type' not present in database")
+            raise iobase.DatabaseError("CV 'cvterm_property_type' not present in database")
         comment_term = self.query_table(cv.CvTerm, name="comment",
                                         cv_id=property_type_cv.cv_id).first()                   # type: cv.CvTerm
         if not comment_term:
-            raise io.DatabaseError("CV term for comments not present in database")
+            raise iobase.DatabaseError("CV term for comments not present in database")
 
         # CV terms for synonym types
         synonym_type_cv = self.query_table(cv.Cv, name="synonym_type").first()                  # type: cv.Cv
         if not synonym_type_cv:
-            raise io.DatabaseError("CV 'synonym_type' not present in database")
+            raise iobase.DatabaseError("CV 'synonym_type' not present in database")
         synonym_type_cvterms = self.query_table(cv.CvTerm, cv_id=synonym_type_cv.cv_id).all()   # type: List[cv.CvTerm]
         synonym_type_terms = utils.list_to_dict(synonym_type_cvterms, "name")              # type: Dict[str, cv.CvTerm]
         required_terms = ["exact", "narrow", "broad", "related"]
         for term in required_terms:
             if term not in synonym_type_terms:
-                raise io.DatabaseError("CV term for synonym type '" + term + "' not present in database")
+                raise iobase.DatabaseError("CV term for synonym type '" + term + "' not present in database")
 
         # CV terms for relationships
         relationship_cv = self.query_table(cv.Cv, name="relationship").first()                  # type: cv.Cv
         if not relationship_cv:
-            raise io.DatabaseError("CV 'relationship' not present in database")
+            raise iobase.DatabaseError("CV 'relationship' not present in database")
         relationship_cvterms = self.query_table(cv.CvTerm, is_relationshiptype=1).all()         # type: List[cv.CvTerm]
         relationship_terms = utils.list_to_dict(relationship_cvterms, "name")              # type: Dict[str, cv.CvTerm]
         required_terms = ["is_a", "part_of"]
         for term in required_terms:
             if term not in relationship_terms:
-                raise io.DatabaseError("CV term for relationship '" + term + "' not present in database")
+                raise iobase.DatabaseError("CV term for relationship '" + term + "' not present in database")
 
         return comment_term, synonym_type_terms, relationship_terms
 
@@ -142,7 +142,7 @@ class OntologyClient(io.IOClient):
         if "namespace" in term.other:
             namespace = term.other["namespace"][0]
         if not namespace:
-            raise io.InputFileError("Namespace missing in input file")
+            raise iobase.InputFileError("Namespace missing in input file")
 
         # Get the corresponding CV in the database - create it, if not yet available
         cv_entry = self.query_table(cv.Cv, name=namespace).first()                 # type: cv.Cv
@@ -571,7 +571,7 @@ class OntologyClient(io.IOClient):
         return all_cvs, all_dbxrefs, all_cvterms, all_comments, all_synonyms, all_crossrefs, all_relationships
 
 
-class OntologySetupClient(io.IOSetupClient, OntologyClient):
+class OntologySetupClient(iobase.IOSetupClient, OntologyClient):
     """Helper class for setting up a CHADO database schema AND loading an ontology"""
     pass
 

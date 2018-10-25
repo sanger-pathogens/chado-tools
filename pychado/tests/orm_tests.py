@@ -1,7 +1,7 @@
 import unittest
 import sqlalchemy.exc
 from .. import dbutils, utils
-from ..io import io
+from ..io import iobase
 from ..orm import base, general, cv, organism, pub, sequence, audit
 
 
@@ -15,7 +15,7 @@ class TestPublic(unittest.TestCase):
     def setUpClass(cls):
         # Creates a database, establishes a connection and creates tables
         dbutils.create_database(cls.connection_uri)
-        cls.client = io.IOSetupClient(cls.connection_uri)
+        cls.client = iobase.IOSetupClient(cls.connection_uri)
         cls.client.create()
 
     @classmethod
@@ -1456,7 +1456,7 @@ class TestAudit(unittest.TestCase):
     def setUpClass(cls):
         # Creates a database, establishes a connection and creates tables
         dbutils.create_database(cls.connection_uri)
-        cls.client = io.IOSetupClient(cls.connection_uri)
+        cls.client = iobase.IOSetupClient(cls.connection_uri)
         cls.client.base = base.AuditBase
         cls.client.metadata = cls.client.base.metadata
         cls.client.schema = cls.client.metadata.schema

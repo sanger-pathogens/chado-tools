@@ -44,14 +44,7 @@ class SchemaSetupClient(ChadoClient):
 
     def create_schema(self) -> None:
         """Creates a schema in the target database, if it doesn't exist yet"""
-
-        # Create a query to check for schema existence
-        schemata_table = sqlalchemy.text("information_schema.schemata")
-        schemata_condition = sqlalchemy.text("schema_name=:schema")
-        query = sqlalchemy.exists().select_from(schemata_table).where(schemata_condition.bindparams(schema=self.schema))
-
-        # Check if schema exists
-        if not self.session.query(query).scalar():
+        if not self.schema_exists(self.schema):
 
             # Assure schema is created before the tables
             sqlalchemy.event.listen(self.metadata, "before_create", sqlalchemy.schema.CreateSchema(self.schema))
@@ -59,42 +52,63 @@ class SchemaSetupClient(ChadoClient):
     def setup_inheritance(self, parent_table: str, child_tables: list) -> None:
         """Sets ups inheritance between parent table and child tables in a schema"""
 
-        # Initiate query components
-        table_exists_table = sqlalchemy.text("information_schema.tables")
-        table_exists_condition = sqlalchemy.text("table_schema=:schema AND table_name=:child")
-        inherits_table = sqlalchemy.text("pg_catalog.pg_inherits")
-        inherits_condition = sqlalchemy.text(r"inhparent=:parent\:\:regclass AND inhrelid=:child\:\:regclass")
-
         # Loop over all child tables
         full_parent_table = self.schema + '.' + parent_table
         for child_table in child_tables:
             full_child_table = self.schema + '.' + child_table
 
-            # Generate queries and bind parameters
-            exists_query = sqlalchemy.exists().select_from(table_exists_table).where(
-                table_exists_condition.bindparams(schema=self.schema, child=child_table))
-            inherits_query = sqlalchemy.exists().select_from(inherits_table).where(
-                inherits_condition.bindparams(parent=full_parent_table, child=full_child_table))
+            # Check if the child table exists and if yes, if it already inherits from the parent table
+            if not self.table_exists(child_table, self.schema) or \
+                    not self.table_inherits(full_child_table, full_parent_table):
 
-            # Check if the child table exists and if it already inherits from the parent table
-            if not self.session.query(exists_query).scalar() or not self.session.query(inherits_query).scalar():
-
-                # Table doesn't exist or doesn't inherit yet. Set up inheritance
+                # Set up inheritance
                 inherit_command = " ".join(["ALTER TABLE", full_child_table, "INHERIT", full_parent_table])
-                sqlalchemy.event.listen(self.metadata, "after_create", sqlalchemy.DDL(inherit_command))
+                sqlalchemy.event.listen(self.metadata, "after_create", sqlalchemy.schema.DDL(inherit_command))
+
+    def schema_exists(self, schema: str) -> bool:
+        """Checks if a given schema exists in a database"""
+        schemata_table = sqlalchemy.text("information_schema.schemata")
+        schemata_condition = sqlalchemy.text("schema_name=:schema")
+        exists_query = sqlalchemy.exists().select_from(schemata_table).where(
+            schemata_condition.bindparams(schema=schema))
+        return self.session.query(exists_query).scalar()
+
+    def table_exists(self, table: str, schema: str) -> bool:
+        """Checks if a given table exists in a given database schema"""
+        tables_table = sqlalchemy.text("information_schema.tables")
+        tables_condition = sqlalchemy.text("table_schema=:schema AND table_name=:table")
+        exists_query = sqlalchemy.exists().select_from(tables_table).where(
+            tables_condition.bindparams(schema=schema, table=table))
+        return self.session.query(exists_query).scalar()
+
+    def table_inherits(self, child_table: str, parent_table: str) -> bool:
+        """Checks if a given table inherits from a given parent table"""
+        inheritance_table = sqlalchemy.text("pg_catalog.pg_inherits")
+        inheritance_condition = sqlalchemy.text(r"inhparent=:parent\:\:regclass AND inhrelid=:child\:\:regclass")
+        inherits_query = sqlalchemy.exists().select_from(inheritance_table).where(
+            inheritance_condition.bindparams(parent=parent_table, child=child_table))
+        return self.session.query(inherits_query).scalar()
+
+    def trigger_exists(self, trigger_name: str) -> bool:
+        """Checks if a trigger with a given name exists in a database"""
+        triggers_table = sqlalchemy.text("information_schema.triggers")
+        triggers_condition = sqlalchemy.text("trigger_name=:trigger_name")
+        exists_query = sqlalchemy.exists().select_from(triggers_table).where(
+            triggers_condition.bindparams(trigger_name=trigger_name))
+        return self.session.query(exists_query).scalar()
 
     @staticmethod
     def create_trigger_function(name: str, definition: str) -> str:
         return "CREATE OR REPLACE FUNCTION " + name + "()\n" \
                + "RETURNS trigger\nLANGUAGE plpgsql\nAS $function$\nBEGIN\n" \
-               + definition \
+               + definition + ";" \
                + "\nEND;\n$function$"
 
     @staticmethod
     def create_generic_trigger(trigger_name: str, function_name: str, table: str) -> str:
         return "CREATE TRIGGER " + trigger_name \
                + " AFTER INSERT OR UPDATE OR DELETE ON " + table \
-               + " FOR EACH ROW EXECUTE PROCEDURE " + function_name + "();"
+               + " FOR EACH ROW EXECUTE PROCEDURE " + function_name + "()"
 
 
 class PublicSchemaSetupClient(SchemaSetupClient):
@@ -122,9 +136,9 @@ class AuditSchemaSetupClient(SchemaSetupClient):
         """Main function for filling the schema with life"""
 
         # Make sure all required tables in the public schema exist
-        public_engine = PublicSchemaSetupClient(self.uri)
-        public_engine.create()
-        data_tables = public_engine.metadata.sorted_tables
+        public_client = PublicSchemaSetupClient(self.uri)
+        public_client.create()
+        data_tables = public_client.metadata.sorted_tables
 
         # Create the schema
         self.create_schema()
@@ -140,8 +154,7 @@ class AuditSchemaSetupClient(SchemaSetupClient):
         self.create_audit_triggers(audit_tables)
 
         # Transfer all created objects to the actual database
-        audit_tables.insert(0, self.master_table)
-        self.metadata.create_all(self.engine, tables=audit_tables)
+        self.metadata.create_all(self.engine, tables=([self.master_table] + audit_tables))
 
     def create_audit_tables(self, data_tables: list) -> list:
         """Creates an audit table for each given data table"""
@@ -179,10 +192,6 @@ class AuditSchemaSetupClient(SchemaSetupClient):
         """Creates the functions that trigger insertions of new lines in the audit table
         after each operation on the corresponding data table, and the triggers on the data tables"""
 
-        # Initiate query components
-        triggers_table = sqlalchemy.text("information_schema.triggers")
-        triggers_condition = sqlalchemy.text("trigger_name=:trigger_name")
-
         # Retrieve columns of parent table as reference
         parent_column_names = [col.name for col in self.master_table.columns]
 
@@ -202,19 +211,17 @@ class AuditSchemaSetupClient(SchemaSetupClient):
             function_creator = self.create_trigger_function(function_name, function_definition)
 
             # Assert function is created after table
-            sqlalchemy.event.listen(self.metadata, "after_create", sqlalchemy.DDL(function_creator))
+            sqlalchemy.event.listen(self.metadata, "after_create", sqlalchemy.schema.DDL(function_creator))
 
             # Define trigger
             trigger_name = table.name + "_audit_tr"
             trigger_creator = self.create_generic_trigger(trigger_name, function_name, table.name)
 
             # Check if trigger already exists
-            trigger_exists_query = sqlalchemy.exists().select_from(triggers_table).where(
-                triggers_condition.bindparams(trigger_name=trigger_name))
-            if not self.session.query(trigger_exists_query).scalar():
+            if not self.trigger_exists(trigger_name):
 
                 # Assert trigger is created after table
-                sqlalchemy.event.listen(self.metadata, "after_create", sqlalchemy.DDL(trigger_creator))
+                sqlalchemy.event.listen(self.metadata, "after_create", sqlalchemy.schema.DDL(trigger_creator))
 
     @staticmethod
     def generic_audit_function(table: str, columns: list) -> str:
@@ -228,4 +235,4 @@ class AuditSchemaSetupClient(SchemaSetupClient):
                + " VALUES (CAST(TG_OP AS " + base.operation_type.name + "), " \
                + utils.list_to_string(columns, ", ", "OLD") + ");\n" \
                + "\tRETURN OLD;\n" \
-               + "END IF;"
+               + "END IF"

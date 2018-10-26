@@ -162,7 +162,7 @@ class TestTasks(unittest.TestCase):
         mock_create_public_schema.assert_not_called()
         mock_create_audit_schema.assert_called()
 
-    @unittest.mock.patch('pychado.tasks.run_grant_command')
+    @unittest.mock.patch('pychado.tasks.run_grant_revoke_command')
     def test_run_grant(self, mock_run):
         # Checks that database access granting is correctly run
         self.assertIs(mock_run, tasks.run_grant_revoke_command)

@@ -2,8 +2,8 @@ import sys
 import os
 import pkg_resources
 import argparse
-import pychado.tasks
 import time
+from . import tasks
 
 
 def main():
@@ -19,16 +19,16 @@ def main():
     if command in init_commands():
 
         # Set database connection parameters
-        pychado.tasks.init(command)
+        tasks.init(command)
     else:
 
         # Check database access
         start_time = time.time()
-        connection_string = pychado.tasks.create_connection_string(arguments.config, arguments.dbname)
-        if pychado.tasks.check_access(connection_string, sub_command):
+        connection_string = tasks.create_connection_string(arguments.config, arguments.dbname)
+        if tasks.check_access(connection_string, sub_command):
 
             # Run the command
-            pychado.tasks.run_command_with_arguments(command, sub_command, arguments, connection_string)
+            tasks.run_command_with_arguments(command, sub_command, arguments, connection_string)
 
         # Print run time
         if arguments.verbose:

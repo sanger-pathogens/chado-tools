@@ -47,8 +47,14 @@ class RoleTests(unittest.TestCase):
     def test_execute_ddl(self, mock_ddl):
         # Tests the function that executes DDL statements
         self.assertIs(mock_ddl, sqlalchemy.schema.DDL)
-        self.client.execute_ddl(["testcommand"])
-        mock_ddl.assert_called_with("testcommand")
+        self.client.execute_ddl(["command1", "command2"])
+        self.assertIn(unittest.mock.call("command1"), mock_ddl.mock_calls)
+        self.assertIn(unittest.mock.call("command2"), mock_ddl.mock_calls)
+        self.assertIn(unittest.mock.call().execute(self.client.engine), mock_ddl.mock_calls)
+
+        mock_ddl.reset_mock()
+        self.client.execute_ddl("singlecommand")
+        mock_ddl.assert_called_with("singlecommand")
         self.assertIn(unittest.mock.call().execute(self.client.engine), mock_ddl.mock_calls)
 
     @unittest.mock.patch("pychado.ddl.RolesClient.execute_ddl")
@@ -110,10 +116,10 @@ class SetupTests(unittest.TestCase):
 
     def setUp(self):
         # Cleans the database
-        self.client.session.execute("DROP SCHEMA public CASCADE")
-        self.client.session.execute("CREATE SCHEMA public")
+        sqlalchemy.schema.DDL("DROP SCHEMA public CASCADE").execute(self.client.engine)
+        sqlalchemy.schema.DDL("CREATE SCHEMA public").execute(self.client.engine)
         if self.client.schema_exists("audit"):
-            self.client.session.execute("DROP SCHEMA audit CASCADE")
+            sqlalchemy.schema.DDL("DROP SCHEMA audit CASCADE").execute(self.client.engine)
 
     def test_create_trigger_function(self):
         # Tests the syntax of trigger function creation
@@ -150,7 +156,7 @@ class SetupTests(unittest.TestCase):
         # Tests the function that checks if a schema exists
         res = self.client.schema_exists("testschema")
         self.assertFalse(res)
-        self.client.session.execute("CREATE SCHEMA testschema")
+        sqlalchemy.schema.DDL("CREATE SCHEMA testschema").execute(self.client.engine)
         res = self.client.schema_exists("testschema")
         self.assertTrue(res)
 
@@ -158,75 +164,100 @@ class SetupTests(unittest.TestCase):
         # Tests the function that checks if a table exists
         res = self.client.table_exists("testtable", "public")
         self.assertFalse(res)
-        self.client.session.execute("CREATE TABLE testtable(id INTEGER, data VARCHAR(255))")
+        sqlalchemy.schema.DDL("CREATE TABLE testtable(id INTEGER, data VARCHAR(255))").execute(self.client.engine)
         res = self.client.table_exists("testtable", "public")
         self.assertTrue(res)
 
     def test_table_inherits(self):
         # Tests the function that checks if a table inherits from a parent table
-        self.client.session.execute("CREATE TABLE capitals(state CHAR(2))")
-        self.client.session.execute("CREATE TABLE cities(name TEXT, population INT)")
+        sqlalchemy.schema.DDL("CREATE TABLE capitals(state CHAR(2))").execute(self.client.engine)
+        sqlalchemy.schema.DDL("CREATE TABLE cities(name TEXT, population INT)").execute(self.client.engine)
         res = self.client.table_inherits("capitals", "cities")
         self.assertFalse(res)
-        self.client.session.execute("DROP TABLE capitals")
-        self.client.session.execute("CREATE TABLE capitals(state CHAR(2)) INHERITS (cities)")
+        sqlalchemy.schema.DDL("DROP TABLE capitals").execute(self.client.engine)
+        sqlalchemy.schema.DDL("CREATE TABLE capitals(state CHAR(2)) INHERITS (cities)").execute(self.client.engine)
         res = self.client.table_inherits("capitals", "cities")
         self.assertTrue(res)
 
     def test_trigger_exists(self):
         # Tests the function that checks if a trigger exists
-        self.client.session.execute("CREATE TABLE testtable(id INTEGER, data VARCHAR(255))")
+        sqlalchemy.schema.DDL("CREATE TABLE testtable(id INTEGER, data VARCHAR(255))").execute(self.client.engine)
         res = self.client.trigger_exists("testtrigger")
         self.assertFalse(res)
         fct = self.client.create_trigger_function("testfct", "SELECT 1+1")
-        self.client.session.execute(fct)
-        self.client.session.execute("CREATE TRIGGER testtrigger AFTER INSERT ON testtable EXECUTE PROCEDURE testfct()")
+        sqlalchemy.schema.DDL(fct).execute(self.client.engine)
+        sqlalchemy.schema.DDL("CREATE TRIGGER testtrigger AFTER INSERT ON testtable EXECUTE PROCEDURE testfct()")\
+            .execute(self.client.engine)
         res = self.client.trigger_exists("testtrigger")
         self.assertTrue(res)
 
     def test_role_exists(self):
         # Tests the function that checks if a role exists
-        res = self.client.role_exists("testuser")
-        self.assertFalse(res)
-        self.client.session.execute("CREATE USER testuser")
+        sqlalchemy.schema.DDL("CREATE USER testuser").execute(self.client.engine)
         res = self.client.role_exists("testuser")
         self.assertTrue(res)
+        sqlalchemy.schema.DDL("DROP USER testuser").execute(self.client.engine)
+        res = self.client.role_exists("testuser")
+        self.assertFalse(res)
 
-    @unittest.mock.patch("sqlalchemy.event.listen")
-    @unittest.mock.patch("sqlalchemy.schema.CreateSchema")
-    def test_create_schema(self, mock_ddl, mock_listen):
+    @unittest.mock.patch("pychado.ddl.AuditSchemaSetupClient.execute_ddl")
+    @unittest.mock.patch("pychado.ddl.AuditSchemaSetupClient.schema_exists")
+    def test_create_schema(self, mock_exists, mock_execute):
         # Tests the function that creates a schema
-        self.assertIs(mock_ddl, sqlalchemy.schema.CreateSchema)
-        self.assertIs(mock_listen, sqlalchemy.event.listen)
-        self.assertEqual(self.client.schema, "audit")
-        mock_ddl.return_value = "create_schema_DDL"
+        self.assertIs(mock_exists, self.client.schema_exists)
+        self.assertIs(mock_execute, self.client.execute_ddl)
+
+        mock_exists.return_value = True
         self.client.create_schema()
-        mock_ddl.assert_called_with("audit")
-        mock_listen.assert_called_with(self.client.metadata, "before_create", "create_schema_DDL")
+        mock_exists.assert_called_with("audit")
+        mock_execute.assert_not_called()
 
-    @unittest.mock.patch("sqlalchemy.event.listen")
-    @unittest.mock.patch("sqlalchemy.schema.DDL")
-    def test_setup_inheritance(self, mock_ddl, mock_listen):
+        mock_exists.return_value = False
+        self.client.create_schema()
+        mock_execute.assert_called_with("CREATE SCHEMA audit")
+
+    @unittest.mock.patch("pychado.ddl.AuditSchemaSetupClient.execute_ddl")
+    @unittest.mock.patch("pychado.ddl.AuditSchemaSetupClient.table_inherits")
+    @unittest.mock.patch("pychado.ddl.AuditSchemaSetupClient.table_exists")
+    def test_setup_inheritance(self, mock_exists, mock_inherits, mock_execute):
         # Tests the function that sets up table inheritance
-        self.assertIs(mock_ddl, sqlalchemy.schema.DDL)
-        self.assertIs(mock_listen, sqlalchemy.event.listen)
-        mock_ddl.return_value = "setup_inheritance_DDL"
-        self.client.setup_inheritance("cities", ["capitals"])
-        mock_ddl.assert_called_with("ALTER TABLE audit.capitals INHERIT audit.cities")
-        mock_listen.assert_called_with(self.client.metadata, "after_create", "setup_inheritance_DDL")
+        self.assertIs(mock_exists, self.client.table_exists)
+        self.assertIs(mock_inherits, self.client.table_inherits)
+        self.assertIs(mock_execute, self.client.execute_ddl)
 
-    @unittest.mock.patch("sqlalchemy.event.listen")
-    @unittest.mock.patch("sqlalchemy.schema.DDL")
+        mock_exists.return_value = False
+        mock_inherits.return_value = True
+        self.client.setup_inheritance("cities", ["capitals"])
+        mock_exists.assert_called_with("capitals", "audit")
+        mock_inherits.assert_not_called()
+        mock_execute.assert_not_called()
+
+        mock_exists.return_value = True
+        mock_inherits.return_value = True
+        self.client.setup_inheritance("cities", ["capitals"])
+        mock_exists.assert_called_with("capitals", "audit")
+        mock_inherits.assert_called_with("audit.capitals", "audit.cities")
+        mock_execute.assert_not_called()
+
+        mock_exists.return_value = True
+        mock_inherits.return_value = False
+        self.client.setup_inheritance("cities", ["capitals"])
+        mock_exists.assert_called_with("capitals", "audit")
+        mock_inherits.assert_called_with("audit.capitals", "audit.cities")
+        mock_execute.assert_called_with("ALTER TABLE audit.capitals INHERIT audit.cities")
+
+    @unittest.mock.patch("pychado.ddl.AuditSchemaSetupClient.execute_ddl")
+    @unittest.mock.patch("pychado.ddl.AuditSchemaSetupClient.trigger_exists")
     @unittest.mock.patch("pychado.ddl.AuditSchemaSetupClient.create_generic_trigger")
     @unittest.mock.patch("pychado.ddl.AuditSchemaSetupClient.create_trigger_function")
     @unittest.mock.patch("pychado.ddl.AuditSchemaSetupClient.generic_audit_function")
-    def test_create_audit_triggers(self, mock_function, mock_wrapper, mock_trigger, mock_ddl, mock_listen):
+    def test_create_audit_triggers(self, mock_function, mock_wrapper, mock_trigger, mock_exists, mock_execute):
         # Tests the creation of audit trigger functions
         self.assertIs(mock_function, self.client.generic_audit_function)
         self.assertIs(mock_wrapper, self.client.create_trigger_function)
         self.assertIs(mock_trigger, self.client.create_generic_trigger)
-        self.assertIs(mock_ddl, sqlalchemy.schema.DDL)
-        self.assertIs(mock_listen, sqlalchemy.event.listen)
+        self.assertIs(mock_exists, self.client.trigger_exists)
+        self.assertIs(mock_execute, self.client.execute_ddl)
 
         testtable = sqlalchemy.Table("testtable", self.client.metadata,
                                      sqlalchemy.Column("idcolumn", sqlalchemy.INTEGER, primary_key=True),
@@ -235,14 +266,18 @@ class SetupTests(unittest.TestCase):
         mock_function.return_value = "function_definition"
         mock_wrapper.return_value = "function_wrapper"
         mock_trigger.return_value = "trigger_wrapper"
-        mock_ddl.side_effect = ["create_function_DDL", "create_trigger_DDL"]
+        mock_exists.return_value = True
         self.client.create_audit_triggers([testtable])
         mock_function.assert_called_with("audit.testtable", ["idcolumn", "datacolumn"])
         mock_wrapper.assert_called_with("audit.public_testtable_proc", "function_definition")
         mock_trigger.assert_called_with("testtable_audit_tr", "audit.public_testtable_proc", "testtable")
-        mock_ddl.assert_has_calls([unittest.mock.call("function_wrapper"), unittest.mock.call("trigger_wrapper")])
-        mock_listen.assert_has_calls([unittest.mock.call(self.client.metadata, "after_create", "create_function_DDL"),
-                                      unittest.mock.call(self.client.metadata, "after_create", "create_trigger_DDL")])
+        mock_execute.assert_called_with("function_wrapper")
+
+        mock_execute.reset_mock()
+        mock_exists.return_value = False
+        self.client.create_audit_triggers([testtable])
+        mock_execute.assert_has_calls([unittest.mock.call("function_wrapper"),
+                                       unittest.mock.call("trigger_wrapper")])
 
     def test_create_audit_tables(self):
         # Tests the creation of the audit tables

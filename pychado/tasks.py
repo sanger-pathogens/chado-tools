@@ -108,7 +108,7 @@ def run_setup_command(arguments, uri: str) -> None:
         elif arguments.schema == "audit":
             client = ddl.AuditSchemaSetupClient(uri)
         else:
-            client = ddl.ChadoClient(uri)
+            client = ddl.DDLClient(uri)
         client.create()
 
 

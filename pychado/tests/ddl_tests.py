@@ -1,10 +1,96 @@
 import unittest.mock
 import sqlalchemy.event
 import sqlalchemy.schema
-from pychado import dbutils, utils, ddl
+from .. import dbutils, utils, ddl
 
 
-class DdlTests(unittest.TestCase):
+class RoleTests(unittest.TestCase):
+    """Tests the handling of roles for a CHADO database"""
+
+    connection_parameters = utils.parse_yaml(dbutils.default_configuration_file())
+    connection_uri = dbutils.random_database_uri(connection_parameters)
+
+    @classmethod
+    def setUpClass(cls):
+        # Creates a database and establishes a connection
+        dbutils.create_database(cls.connection_uri)
+        cls.client = ddl.RolesClient(cls.connection_uri)
+
+    @classmethod
+    def tearDownClass(cls):
+        # Drops the database
+        dbutils.drop_database(cls.connection_uri, True)
+
+    def test_revoke_privileges_commands(self):
+        # Tests the creation of commands for revoking privileges for database access
+        commands = self.client.revoke_privileges_commands("testrole", "testschema")
+        self.assertEqual(len(commands), 4)
+        self.assertIn("REVOKE USAGE ON SCHEMA \"testschema\" FROM \"testrole\"", commands)
+        self.assertIn("REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA \"testschema\" FROM \"testrole\"", commands)
+
+    def test_grant_privileges_commands(self):
+        # Tests the creation of commands for granting privileges for database access
+        commands = self.client.grant_privileges_commands("testrole", "testschema", False)
+        self.assertEqual(len(commands), 3)
+        self.assertIn("GRANT USAGE ON SCHEMA \"testschema\" TO \"testrole\"", commands)
+        self.assertNotIn("GRANT INSERT ON ALL TABLES IN SCHEMA \"testschema\" TO \"testrole\"", commands)
+
+        commands = self.client.grant_privileges_commands("testrole", "testschema", True)
+        self.assertEqual(len(commands), 8)
+        self.assertIn("GRANT USAGE ON SCHEMA \"testschema\" TO \"testrole\"", commands)
+        self.assertIn("GRANT INSERT ON ALL TABLES IN SCHEMA \"testschema\" TO \"testrole\"", commands)
+
+        commands = self.client.grant_privileges_commands("testrole", "audit", True)
+        self.assertEqual(len(commands), 6)
+
+    @unittest.mock.patch("sqlalchemy.schema.DDL")
+    def test_execute_ddl(self, mock_ddl):
+        # Tests the function that executes DDL statements
+        self.assertIs(mock_ddl, sqlalchemy.schema.DDL)
+        self.client.execute_ddl(["testcommand"])
+        mock_ddl.assert_called_with("testcommand")
+        self.assertIn(unittest.mock.call().execute(self.client.engine), mock_ddl.mock_calls)
+
+    @unittest.mock.patch("pychado.ddl.RolesClient.execute_ddl")
+    @unittest.mock.patch("pychado.ddl.RolesClient.revoke_privileges_commands")
+    @unittest.mock.patch("pychado.ddl.RolesClient.grant_privileges_commands")
+    @unittest.mock.patch("pychado.ddl.RolesClient.schema_exists")
+    @unittest.mock.patch("pychado.ddl.RolesClient.role_exists")
+    def test_grant_or_revoke(self, mock_exists_role, mock_exists_schema, mock_grant, mock_revoke, mock_execute):
+        # Tests the main function granting/revoking privileges
+        self.assertIs(mock_exists_role, self.client.role_exists)
+        self.assertIs(mock_exists_schema, self.client.schema_exists)
+        self.assertIs(mock_grant, self.client.grant_privileges_commands)
+        self.assertIs(mock_revoke, self.client.revoke_privileges_commands)
+        self.assertIs(mock_execute, self.client.execute_ddl)
+
+        mock_exists_role.return_value = False
+        self.client.grant_or_revoke("testrole", "testschema", False, False)
+        mock_exists_schema.assert_not_called()
+        mock_execute.assert_not_called()
+
+        mock_exists_role.return_value = True
+        mock_exists_schema.return_value = False
+        self.client.grant_or_revoke("testrole", "testschema", False, False)
+        mock_exists_schema.assert_called()
+        mock_execute.assert_not_called()
+
+        mock_exists_role.return_value = True
+        mock_exists_schema.return_value = True
+        mock_grant.return_value = ["grant_command"]
+        mock_revoke.return_value = ["revoke_command"]
+        self.client.grant_or_revoke("testrole", "testschema", False, False)
+        mock_revoke.assert_called_with("testrole", "testschema")
+        mock_grant.assert_not_called()
+        mock_execute.assert_called_with(["revoke_command"])
+
+        self.client.grant_or_revoke("testrole", "testschema", False, True)
+        mock_revoke.assert_called_with("testrole", "testschema")
+        mock_grant.assert_called_with("testrole", "testschema", False)
+        mock_execute.assert_called_with(["revoke_command", "grant_command"])
+
+
+class SetupTests(unittest.TestCase):
     """Tests the setup of CHADO database schemas"""
 
     connection_parameters = utils.parse_yaml(dbutils.default_configuration_file())
@@ -98,6 +184,14 @@ class DdlTests(unittest.TestCase):
         res = self.client.trigger_exists("testtrigger")
         self.assertTrue(res)
 
+    def test_role_exists(self):
+        # Tests the function that checks if a role exists
+        res = self.client.role_exists("testuser")
+        self.assertFalse(res)
+        self.client.session.execute("CREATE USER testuser")
+        res = self.client.role_exists("testuser")
+        self.assertTrue(res)
+
     @unittest.mock.patch("sqlalchemy.event.listen")
     @unittest.mock.patch("sqlalchemy.schema.CreateSchema")
     def test_create_schema(self, mock_ddl, mock_listen):
@@ -149,7 +243,6 @@ class DdlTests(unittest.TestCase):
         mock_ddl.assert_has_calls([unittest.mock.call("function_wrapper"), unittest.mock.call("trigger_wrapper")])
         mock_listen.assert_has_calls([unittest.mock.call(self.client.metadata, "after_create", "create_function_DDL"),
                                       unittest.mock.call(self.client.metadata, "after_create", "create_trigger_DDL")])
-
 
     def test_create_audit_tables(self):
         # Tests the creation of the audit tables

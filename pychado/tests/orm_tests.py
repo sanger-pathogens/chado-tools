@@ -1325,7 +1325,7 @@ class TestPublic(unittest.TestCase):
         # Test check constraint on 'featureloc.fmin', 'featureloc.fmax'
         existing_obj = self.add_featureloc_object()
         fmax = utils.random_integer(100)
-        fmin = fmax + utils.random_integer(100)
+        fmin = fmax + 1 + utils.random_integer(100)
         obj = sequence.FeatureLoc(feature_id=existing_obj.feature_id, srcfeature_id=existing_obj.srcfeature_id,
                                   fmin=fmin, fmax=fmax, locgroup=utils.random_integer(100),
                                   rank=utils.random_integer(100))

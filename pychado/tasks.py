@@ -68,6 +68,12 @@ def run_command_with_arguments(command: str, sub_command: str, arguments, connec
     elif command == "admin" and sub_command == "setup":
         # Setup a PostgreSQL database according to a schema
         run_setup_command(arguments, connection_uri)
+    elif command == "admin" and sub_command == "grant":
+        # Grant access to objects in a PostgreSQL database
+        run_grant_revoke_command(arguments, connection_uri, True)
+    elif command == "admin" and sub_command == "revoke":
+        # Revoke access to objects in a PostgreSQL database
+        run_grant_revoke_command(arguments, connection_uri, False)
     elif command == "query":
         # Query a PostgreSQL database and export the result to a text file
         query = (arguments.query or utils.read_text(arguments.input_file))
@@ -104,6 +110,15 @@ def run_setup_command(arguments, uri: str) -> None:
         else:
             client = ddl.ChadoClient(uri)
         client.create()
+
+
+def run_grant_revoke_command(arguments, uri: str, grant_access: bool) -> None:
+    # Grant/revoke access to objects in a PostgreSQL database
+    client = ddl.RolesClient(uri)
+    if grant_access:
+        client.grant_or_revoke(arguments.role, arguments.schema, arguments.write, True)
+    else:
+        client.grant_or_revoke(arguments.role, arguments.schema, False, False)
 
 
 def run_select_command(specifier: str, arguments, uri: str) -> None:

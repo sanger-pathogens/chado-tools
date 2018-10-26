@@ -1,6 +1,5 @@
 import unittest.mock
-from pychado_scripts import chado_tools
-from .. import tasks, queries, dbutils, utils, ddl
+from .. import chado_tools, tasks, queries, dbutils, utils, ddl
 from ..io import direct, ontology
 
 
@@ -122,16 +121,16 @@ class TestTasks(unittest.TestCase):
         tasks.run_command_with_arguments(args[1], args[2], parsed_args, self.uri)
         mock_run.assert_called_with(parsed_args, self.uri)
 
-    @unittest.mock.patch('pychado.ddl.AuditSchemaSetupClient')
-    @unittest.mock.patch('pychado.ddl.PublicSchemaSetupClient')
+    @unittest.mock.patch('pychado.ddl.AuditSchemaSetupClient.create')
+    @unittest.mock.patch('pychado.ddl.PublicSchemaSetupClient.create')
     @unittest.mock.patch('pychado.utils.download_file')
     @unittest.mock.patch('pychado.dbutils.setup_database')
-    def test_setup(self, mock_setup, mock_download, mock_public_schema, mock_audit_schema):
+    def test_setup(self, mock_setup, mock_download, mock_create_public_schema, mock_create_audit_schema):
         # Checks that the function setting up a database schema is correctly called
         self.assertIs(mock_setup, dbutils.setup_database)
         self.assertIs(mock_download, utils.download_file)
-        self.assertIs(mock_public_schema, ddl.PublicSchemaSetupClient)
-        self.assertIs(mock_audit_schema, ddl.AuditSchemaSetupClient)
+        self.assertIs(mock_create_public_schema, ddl.PublicSchemaSetupClient.create)
+        self.assertIs(mock_create_audit_schema, ddl.AuditSchemaSetupClient.create)
 
         args = ["chado", "admin", "setup", "-f", "testschema", "testdb"]
         parsed_args = chado_tools.parse_arguments(args)
@@ -139,7 +138,6 @@ class TestTasks(unittest.TestCase):
         mock_download.assert_not_called()
         mock_setup.assert_called_with(self.uri, "testschema")
 
-        mock_setup.reset_mock()
         mock_download.reset_mock()
         mock_download.return_value = "downloaded_schema"
         args = ["chado", "admin", "setup", "testdb"]
@@ -148,21 +146,53 @@ class TestTasks(unittest.TestCase):
         mock_download.assert_called()
         mock_setup.assert_called_with(self.uri, "downloaded_schema")
 
-        mock_public_schema.reset_mock()
-        mock_audit_schema.reset_mock()
+        mock_create_public_schema.reset_mock()
+        mock_create_audit_schema.reset_mock()
         args = ["chado", "admin", "setup", "-s", "basic", "testdb"]
         parsed_args = chado_tools.parse_arguments(args)
         tasks.run_setup_command(parsed_args, self.uri)
-        mock_public_schema.assert_called()
-        mock_audit_schema.assert_not_called()
+        mock_create_public_schema.assert_called()
+        mock_create_audit_schema.assert_not_called()
 
-        mock_public_schema.reset_mock()
-        mock_audit_schema.reset_mock()
+        mock_create_public_schema.reset_mock()
+        mock_create_audit_schema.reset_mock()
         args = ["chado", "admin", "setup", "-s", "audit", "testdb"]
         parsed_args = chado_tools.parse_arguments(args)
         tasks.run_setup_command(parsed_args, self.uri)
-        mock_public_schema.assert_not_called()
-        mock_audit_schema.assert_called()
+        mock_create_public_schema.assert_not_called()
+        mock_create_audit_schema.assert_called()
+
+    @unittest.mock.patch('pychado.tasks.run_grant_command')
+    def test_run_grant(self, mock_run):
+        # Checks that database access granting is correctly run
+        self.assertIs(mock_run, tasks.run_grant_revoke_command)
+        args = ["chado", "admin", "grant", "-r", "testrole", "-s", "testschema", "-w", "testdb"]
+        parsed_args = chado_tools.parse_arguments(args)
+        tasks.run_command_with_arguments(args[1], args[2], parsed_args, self.uri)
+        mock_run.assert_called_with(parsed_args, self.uri, True)
+
+        args = ["chado", "admin", "revoke", "-r", "testrole", "-s", "testschema", "testdb"]
+        parsed_args = vars(chado_tools.parse_arguments(args))
+        tasks.run_command_with_arguments(args[1], args[2], parsed_args, self.uri)
+        mock_run.assert_called_with(parsed_args, self.uri, False)
+
+    @unittest.mock.patch('pychado.ddl.RolesClient.grant_or_revoke')
+    def test_grant(self, mock_grant):
+        # Checks that the function granting database access is correctly called
+        self.assertIs(mock_grant, ddl.RolesClient.grant_or_revoke)
+        args = ["chado", "admin", "grant", "-r", "testrole", "-s", "testschema", "-w", "testdb"]
+        parsed_args = chado_tools.parse_arguments(args)
+        tasks.run_grant_revoke_command(parsed_args, self.uri, True)
+        mock_grant.assert_called_with("testrole", "testschema", True, True)
+
+    @unittest.mock.patch('pychado.ddl.RolesClient.grant_or_revoke')
+    def test_revoke(self, mock_grant):
+        # Checks that the function revoking database access is correctly called
+        self.assertIs(mock_grant, ddl.RolesClient.grant_or_revoke)
+        args = ["chado", "admin", "revoke", "-r", "testrole", "-s", "testschema", "testdb"]
+        parsed_args = chado_tools.parse_arguments(args)
+        tasks.run_grant_revoke_command(parsed_args, self.uri, False)
+        mock_grant.assert_called_with("testrole", "testschema", False, False)
 
     @unittest.mock.patch('pychado.utils.read_text')
     @unittest.mock.patch('pychado.dbutils.query_to_file')
@@ -211,8 +241,6 @@ class TestTasks(unittest.TestCase):
                                     end_date="testenddate")
         mock_query.assert_called_with(self.uri, "testquery_with_params", "", "\t", False)
 
-        mock_set.reset_mock()
-        mock_query.reset_mock()
         args = ["chado", "extract", "stats", "-H", "-d", ";", "-o", "testfile", "--start_date", "teststartdate",
                 "testdb"]
         parsed_args = chado_tools.parse_arguments(args)
@@ -242,7 +270,6 @@ class TestTasks(unittest.TestCase):
         mock_set.assert_called_with("testquery")
         mock_query.assert_called_with(self.uri, "testquery_with_params", "", "\t", False)
 
-        mock_set.reset_mock()
         tasks.run_select_command("inexistent_specifier", parsed_args, self.uri)
         mock_set.assert_called_with("")
 

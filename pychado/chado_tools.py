@@ -69,7 +69,9 @@ def admin_commands() -> dict:
         "drop": "drop a CHADO database",
         "dump": "dump a CHADO database into an archive file",
         "restore": "restore a CHADO database from an archive file",
-        "setup": "set up a blank CHADO database according to a given schema"
+        "setup": "set up a blank CHADO database according to a given schema",
+        "grant": "grant privileges for a CHADO database to a user/role",
+        "revoke": "revoke privileges for a CHADO database from a user/role"
     }
 
 
@@ -195,6 +197,10 @@ def add_admin_arguments_by_command(command: str, parser: argparse.ArgumentParser
         add_restore_arguments(parser)
     elif command == "setup":
         add_setup_arguments(parser)
+    elif command == "grant":
+        add_grant_arguments(parser)
+    elif command == "revoke":
+        add_revoke_arguments(parser)
     else:
         print("Command '" + parser.prog + "' is not available.")
 
@@ -215,6 +221,19 @@ def add_setup_arguments(parser: argparse.ArgumentParser):
     group.add_argument("-s", "--schema", choices={"gmod", "basic", "audit"}, default="gmod",
                        help="Database schema (default: GMOD schema 1.31)")
     group.add_argument("-f", "--schema_file", default="", help="File with database schema")
+
+
+def add_grant_arguments(parser: argparse.ArgumentParser):
+    """Defines formal arguments for the 'chado admin grant' sub-command"""
+    parser.add_argument("-r", "--role", required=True, help="Name of the role/user")
+    parser.add_argument("-s", "--schema", help="Database schema (default: all)")
+    parser.add_argument("-w", "--write", action="store_true", help="Grant read-write access (default: read-only)")
+
+
+def add_revoke_arguments(parser: argparse.ArgumentParser):
+    """Defines formal arguments for the 'chado admin revoke' sub-command"""
+    parser.add_argument("-r", "--role", required=True, help="Name of the role/user")
+    parser.add_argument("-s", "--schema", help="Database schema (default: all)")
 
 
 def add_query_arguments(parser: argparse.ArgumentParser):

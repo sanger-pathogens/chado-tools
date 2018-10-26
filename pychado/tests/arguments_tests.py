@@ -1,5 +1,5 @@
 import unittest
-from pychado_scripts import chado_tools
+from .. import chado_tools
 
 
 class TestCommands(unittest.TestCase):
@@ -33,6 +33,8 @@ class TestCommands(unittest.TestCase):
         self.assertIn("dump", commands)
         self.assertIn("restore", commands)
         self.assertIn("setup", commands)
+        self.assertIn("grant", commands)
+        self.assertIn("revoke", commands)
 
     def test_extract_commands(self):
         commands = chado_tools.extract_commands()
@@ -116,6 +118,29 @@ class TestArguments(unittest.TestCase):
         parsed_args = vars(chado_tools.parse_arguments(args))
         self.assertEqual(parsed_args["schema"], "gmod")
         self.assertEqual(parsed_args["schema_file"], "testschema")
+
+    def test_grant_args(self):
+        # Tests if the command line arguments for the subcommand 'chado admin grant' are parsed correctly
+        args = ["chado", "admin", "grant", "-r", "testrole", "-s", "testschema", "-w", "testdb"]
+        parsed_args = vars(chado_tools.parse_arguments(args))
+        self.assertEqual(parsed_args["role"], "testrole")
+        self.assertEqual(parsed_args["schema"], "testschema")
+        self.assertEqual(parsed_args["write"], True)
+        self.assertEqual(parsed_args["dbname"], "testdb")
+
+        # Test the default values / alternatives
+        args = ["chado", "admin", "grant", "-r", "testrole", "testdb"]
+        parsed_args = vars(chado_tools.parse_arguments(args))
+        self.assertEqual(parsed_args["schema"], None)
+        self.assertEqual(parsed_args["write"], False)
+
+    def test_revoke_args(self):
+        # Tests if the command line arguments for the subcommand 'chado admin revoke' are parsed correctly
+        args = ["chado", "admin", "revoke", "-r", "testrole", "-s", "testschema", "testdb"]
+        parsed_args = vars(chado_tools.parse_arguments(args))
+        self.assertEqual(parsed_args["role"], "testrole")
+        self.assertEqual(parsed_args["schema"], "testschema")
+        self.assertEqual(parsed_args["dbname"], "testdb")
 
     def test_query_args(self):
         # Tests if the command line arguments for the subcommand 'chado query' are parsed correctly

@@ -22,12 +22,129 @@ class ChadoClient(object):
         self.session.close()
         # self.engine.dispose()
 
+    def schema_exists(self, schema: str) -> bool:
+        """Checks if a given schema exists in a database"""
+        schemata_table = sqlalchemy.text("information_schema.schemata")
+        schemata_condition = sqlalchemy.text("schema_name=:schema")
+        exists_query = sqlalchemy.exists().select_from(schemata_table).where(
+            schemata_condition.bindparams(schema=schema))
+        return self.session.query(exists_query).scalar()
+
+    def table_exists(self, table: str, schema: str) -> bool:
+        """Checks if a given table exists in a given database schema"""
+        tables_table = sqlalchemy.text("information_schema.tables")
+        tables_condition = sqlalchemy.text("table_schema=:schema AND table_name=:table")
+        exists_query = sqlalchemy.exists().select_from(tables_table).where(
+            tables_condition.bindparams(schema=schema, table=table))
+        return self.session.query(exists_query).scalar()
+
+    def table_inherits(self, child_table: str, parent_table: str) -> bool:
+        """Checks if a given table inherits from a given parent table"""
+        inheritance_table = sqlalchemy.text("pg_catalog.pg_inherits")
+        inheritance_condition = sqlalchemy.text(r"inhparent=:parent\:\:regclass AND inhrelid=:child\:\:regclass")
+        inherits_query = sqlalchemy.exists().select_from(inheritance_table).where(
+            inheritance_condition.bindparams(parent=parent_table, child=child_table))
+        return self.session.query(inherits_query).scalar()
+
+    def trigger_exists(self, trigger_name: str) -> bool:
+        """Checks if a trigger with a given name exists in a database"""
+        triggers_table = sqlalchemy.text("information_schema.triggers")
+        triggers_condition = sqlalchemy.text("trigger_name=:trigger_name")
+        exists_query = sqlalchemy.exists().select_from(triggers_table).where(
+            triggers_condition.bindparams(trigger_name=trigger_name))
+        return self.session.query(exists_query).scalar()
+
+    def role_exists(self, role_name: str) -> bool:
+        """Checks if a given role/user exists in a database"""
+        roles_table = sqlalchemy.text("pg_catalog.pg_user")
+        roles_condition = sqlalchemy.text("usename=:role_name")
+        exists_query = sqlalchemy.exists().select_from(roles_table).where(
+            roles_condition.bindparams(role_name=role_name))
+        return self.session.query(exists_query).scalar()
+
     def create(self):
         """Basis function defined for completeness of the API"""
         pass
 
 
-class SchemaSetupClient(ChadoClient):
+class DDLClient(ChadoClient):
+    """Base class for all classes using DDL"""
+
+    def execute_ddl(self, statements: list) -> None:
+        """Executes DDL statements"""
+        for statement in statements:
+            ddl = sqlalchemy.schema.DDL(statement)
+            ddl.execute(self.engine)
+
+
+class RolesClient(DDLClient):
+    """Class for handling users/roles in a CHADO database"""
+
+    def grant_or_revoke(self, rolename: str, specific_schema: str, read_write: bool, grant_access: bool):
+        """Checks for role and schema existence and grants privileges"""
+        # Check if the user exists
+        if not self.role_exists(rolename):
+            print("Role '" + rolename + "' does not exist. Create it before granting privileges.")
+            return
+
+        # Obtain a list of schemata
+        if specific_schema:
+            schemata = [specific_schema]
+        else:
+            schemata = ["public", "audit"]
+
+        # Loop over all schemata
+        for schema in schemata:
+
+            # Check if the schema exists
+            if not self.schema_exists(schema) and schema != "public":
+                print("Schema '" + schema + "' does not exist.")
+                continue
+
+            # Revoke/grant privileges
+            commands = self.revoke_privileges_commands(rolename, schema)
+            if grant_access:
+                commands.extend(self.grant_privileges_commands(rolename, schema, read_write))
+            self.execute_ddl(commands)
+
+            # Print feedback
+            if grant_access:
+                print("Privileges on schema '" + schema + "' granted to role '" + rolename + "'")
+            else:
+                print("Privileges on schema '" + schema + "' revoked from role '" + rolename + "'")
+
+    @staticmethod
+    def grant_privileges_commands(rolename: str, schema: str, read_write: bool) -> list:
+        """Creates commands for granting privileges for accessing database objects to a role/user"""
+        x_role = "\"" + rolename + "\""
+        x_schema = "\"" + schema + "\""
+        statements = list()
+        statements.append(" ".join(["GRANT USAGE ON SCHEMA", x_schema, "TO", x_role]))
+        statements.append(" ".join(["GRANT SELECT ON ALL SEQUENCES IN SCHEMA", x_schema, "TO", x_role]))
+        statements.append(" ".join(["GRANT SELECT ON ALL TABLES IN SCHEMA", x_schema, "TO", x_role]))
+        if read_write:
+            statements.append(" ".join(["GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA", x_schema, "TO", x_role]))
+            statements.append(" ".join(["GRANT USAGE ON ALL SEQUENCES IN SCHEMA", x_schema, "TO", x_role]))
+            statements.append(" ".join(["GRANT INSERT ON ALL TABLES IN SCHEMA", x_schema, "TO", x_role]))
+            if schema != "audit":
+                statements.append(" ".join(["GRANT UPDATE ON ALL TABLES IN SCHEMA", x_schema, "TO", x_role]))
+                statements.append(" ".join(["GRANT DELETE ON ALL TABLES IN SCHEMA", x_schema, "TO", x_role]))
+        return statements
+
+    @staticmethod
+    def revoke_privileges_commands(rolename: str, schema: str) -> list:
+        # Create the 'revoke' commands
+        x_role = "\"" + rolename + "\""
+        x_schema = "\"" + schema + "\""
+        statements = list()
+        statements.append(" ".join(["REVOKE USAGE ON SCHEMA", x_schema, "FROM", x_role]))
+        statements.append(" ".join(["REVOKE ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA", x_schema, "FROM", x_role]))
+        statements.append(" ".join(["REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA", x_schema, "FROM", x_role]))
+        statements.append(" ".join(["REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA", x_schema, "FROM", x_role]))
+        return statements
+
+
+class SchemaSetupClient(DDLClient):
     """Base Class for setting up a CHADO database schema"""
 
     def __init__(self, uri: str):
@@ -64,38 +181,6 @@ class SchemaSetupClient(ChadoClient):
                 # Set up inheritance
                 inherit_command = " ".join(["ALTER TABLE", full_child_table, "INHERIT", full_parent_table])
                 sqlalchemy.event.listen(self.metadata, "after_create", sqlalchemy.schema.DDL(inherit_command))
-
-    def schema_exists(self, schema: str) -> bool:
-        """Checks if a given schema exists in a database"""
-        schemata_table = sqlalchemy.text("information_schema.schemata")
-        schemata_condition = sqlalchemy.text("schema_name=:schema")
-        exists_query = sqlalchemy.exists().select_from(schemata_table).where(
-            schemata_condition.bindparams(schema=schema))
-        return self.session.query(exists_query).scalar()
-
-    def table_exists(self, table: str, schema: str) -> bool:
-        """Checks if a given table exists in a given database schema"""
-        tables_table = sqlalchemy.text("information_schema.tables")
-        tables_condition = sqlalchemy.text("table_schema=:schema AND table_name=:table")
-        exists_query = sqlalchemy.exists().select_from(tables_table).where(
-            tables_condition.bindparams(schema=schema, table=table))
-        return self.session.query(exists_query).scalar()
-
-    def table_inherits(self, child_table: str, parent_table: str) -> bool:
-        """Checks if a given table inherits from a given parent table"""
-        inheritance_table = sqlalchemy.text("pg_catalog.pg_inherits")
-        inheritance_condition = sqlalchemy.text(r"inhparent=:parent\:\:regclass AND inhrelid=:child\:\:regclass")
-        inherits_query = sqlalchemy.exists().select_from(inheritance_table).where(
-            inheritance_condition.bindparams(parent=parent_table, child=child_table))
-        return self.session.query(inherits_query).scalar()
-
-    def trigger_exists(self, trigger_name: str) -> bool:
-        """Checks if a trigger with a given name exists in a database"""
-        triggers_table = sqlalchemy.text("information_schema.triggers")
-        triggers_condition = sqlalchemy.text("trigger_name=:trigger_name")
-        exists_query = sqlalchemy.exists().select_from(triggers_table).where(
-            triggers_condition.bindparams(trigger_name=trigger_name))
-        return self.session.query(exists_query).scalar()
 
     @staticmethod
     def create_trigger_function(name: str, definition: str) -> str:

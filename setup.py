@@ -11,7 +11,7 @@ except FileNotFoundError or FileExistsError:
 
 setuptools.setup(
     name="chado-tools",
-    version="0.1.1",
+    version="0.1.2",
     author="Christoph Puethe",
     author_email="path-help@sanger.ac.uk",
     description="Tools to access CHADO databases",
@@ -30,7 +30,7 @@ setuptools.setup(
     },
     entry_points={
         "console_scripts": [
-            "chado = terminal.chado_tools:main",
+            "chado = pychado.chado_tools:main",
         ]
     },
     test_suite="nose.collector",

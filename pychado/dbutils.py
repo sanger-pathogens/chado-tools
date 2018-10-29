@@ -5,7 +5,7 @@ import urllib.parse
 import getpass
 import sqlalchemy
 import sqlalchemy_utils
-from pychado import utils
+from . import utils
 
 
 def set_default_parameters() -> None:
@@ -44,22 +44,6 @@ def generate_uri(connection_details: dict) -> str:
     return "".join(uri_as_list)
 
 
-def generate_dsn(connection_details: dict) -> str:
-    """Creates a connection DSN"""
-    dsn_as_list = []
-    if "database" in connection_details and connection_details["database"] is not None:
-        dsn_as_list.append("dbname=" + connection_details["database"])
-    if "user" in connection_details and connection_details["user"] is not None:
-        dsn_as_list.append("user=" + connection_details["user"])
-    if "password" in connection_details and connection_details["password"] is not None:
-        dsn_as_list.append("password=" + connection_details["password"])
-    if "host" in connection_details and connection_details["host"] is not None:
-        dsn_as_list.append("host=" + connection_details["host"])
-    if "port" in connection_details and connection_details["port"] is not None:
-        dsn_as_list.append("port=" + connection_details["port"])
-    return " ".join(dsn_as_list)
-
-
 def default_schema_url() -> str:
     """Returns the URL of the default schema"""
     yaml_file = pkg_resources.resource_filename("pychado", "data/gmodSchema.yml")
@@ -90,26 +74,20 @@ def close_connection(connection: sqlalchemy.engine.base.Connection) -> None:
     connection.engine.dispose()
 
 
-def execute_query(connection: sqlalchemy.engine.base.Connection, query: str, params=None) \
-        -> sqlalchemy.engine.ResultProxy:
-    """Executes an SQL query in an opened database and returns the query result"""
-    if params:
-        return connection.execute(sqlalchemy.text(query), params)
-    else:
-        return connection.execute(query)
-
-
-def execute_statement(connection: sqlalchemy.engine.base.Connection, statement: str, params=None) -> None:
-    """Executes an SQL statement in an opened database"""
-    if params:
-        connection.execute(sqlalchemy.text(statement), params)
-    else:
-        connection.execute(statement)
-
-
 def exists(uri: str) -> bool:
     """Checks if a database exists"""
     return sqlalchemy_utils.database_exists(uri)
+
+
+def random_database_uri(connection_parameters: dict) -> str:
+    """Generates a random database name and makes sure the name is not yet in use"""
+    parameters = connection_parameters.copy()
+    while True:
+        parameters["database"] = utils.random_string(10)
+        uri = generate_uri(parameters)
+        if not exists(uri):
+            break
+    return uri
 
 
 def create_database(uri: str) -> None:
@@ -159,18 +137,14 @@ def connect_to_database(uri: str) -> None:
     print("Connection to database closed.")
 
 
-def connect_and_execute(uri: str, statement: str, params=None) -> None:
-    """Connects to a database and executes a single statement"""
-    connection = open_connection(uri)
-    execute_statement(connection, statement, params)
-    close_connection(connection)
-
-
-def query_to_file(uri: str, query: str, params: dict, filename: str, delimiter: str, header: bool) -> None:
+def query_to_file(uri: str, query, filename: str, delimiter: str, header: bool) -> None:
     """Connects to a database, runs a single query, and writes the result into a CSV file"""
     # Query database and convert result to rows
     conn = open_connection(uri)
-    result = execute_query(conn, query, params)
+    if isinstance(query, sqlalchemy.sql.expression.TextClause):
+        result = conn.execute(query)
+    else:
+        result = conn.execute(sqlalchemy.text(query))
     rows = []
     if header:
         rows = [result.keys()]

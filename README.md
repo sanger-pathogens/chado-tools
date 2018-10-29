@@ -8,7 +8,6 @@ Python3 command line script providing various tools for accessing CHADO database
 
 * Python 3.6 or higher
 * PostgreSQL 9.6 or higher
-* SQLite (for testing only)
 
 ## Installation from source
 
@@ -56,8 +55,7 @@ The usage is:
 | reset                 | reset the default connection parameters to factory settings          |
 | connect               | connect to a CHADO database for an interactive session               |
 | query                 | query a CHADO database and export the result into a text file        |
-| stats                 | obtain statistics to updates in a CHADO database                     |
-| list                  | list all entities of a specified type in the CHADO database          |
+| extract               | run a pre-compiled query against the CHADO database                  |
 | insert                | insert a new entity of a specified type into the CHADO database      |
 | delete                | delete an entity of a specified type from the CHADO database         |
 | import                | import entities of a specified type into the CHADO database          |
@@ -69,6 +67,7 @@ The usage is:
 Create a new CHADO database called `eukaryotes` according to the current GMOD schema:
 
     chado admin create eukaryotes
+    chado admin setup -s gmod eukaryotes
     
 Dump this database into an archive called `eukaryotes.dump`:
 
@@ -76,7 +75,7 @@ Dump this database into an archive called `eukaryotes.dump`:
 
 List all organisms in the `eukaryotes` database:
 
-    chado list organisms eukaryotes
+    chado extract organisms eukaryotes
 
 Query the database to check the meaning of a certain `cvterm_id`:
 

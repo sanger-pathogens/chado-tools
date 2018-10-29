@@ -3,8 +3,9 @@ import os
 import datetime
 import subprocess
 import urllib.request
+import string
+import random
 import yaml
-import pronto.parser
 
 
 class EmptyObject:
@@ -108,7 +109,7 @@ def dump_yaml(filename: str, data: dict) -> None:
     close(stream)
 
 
-def list_to_string(the_list: list, delimiter: str) -> str:
+def list_to_string(the_list: list, delimiter: str, prefix=None) -> str:
     """Function concatenating all elements of a list"""
     the_string = []
     for element in the_list:
@@ -122,7 +123,10 @@ def list_to_string(the_list: list, delimiter: str) -> str:
             the_string.append("")
         else:
             the_string.append(str(element))
-    return delimiter.join(the_string)
+    if not prefix:
+        return delimiter.join(the_string)
+    else:
+        return delimiter.join([prefix + "." + item for item in the_string])
 
 
 def filter_objects(entries: list, **kwargs) -> list:
@@ -144,6 +148,16 @@ def list_to_dict(entries: list, key: str) -> dict:
         current_key = getattr(entry, key)
         dictionary[current_key] = entry
     return dictionary
+
+
+def random_string(n: int) -> str:
+    """Generates a random string of n lowercase letters"""
+    return "".join(random.choices(string.ascii_lowercase, k=n))
+
+
+def random_integer(n: int) -> int:
+    """Generates a random integer in the range [0, n]"""
+    return random.randint(0, n)
 
 
 def current_date() -> str:

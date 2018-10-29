@@ -571,11 +571,6 @@ class OntologyClient(iobase.IOClient):
         return all_cvs, all_dbxrefs, all_cvterms, all_comments, all_synonyms, all_crossrefs, all_relationships
 
 
-class OntologySetupClient(iobase.IOSetupClient, OntologyClient):
-    """Helper class for setting up a CHADO database schema AND loading an ontology"""
-    pass
-
-
 def parse_ontology(filename: str, file_format="obo") -> pronto.Ontology:
     """Function parsing an OBO/OWL file"""
     if file_format == "owl":

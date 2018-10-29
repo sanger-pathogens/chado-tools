@@ -32,8 +32,8 @@ class TestBasicIO(unittest.TestCase):
         # Creates a database, establishes a connection and creates tables
         dbutils.create_database(cls.connection_uri)
         cls.client = iobase.IOClient(cls.connection_uri)
-        cls.base = test_base
-        cls.base.metadata.create_all(cls.client.engine)
+        schema_base = test_base
+        schema_base.metadata.create_all(cls.client.engine)
         # self.client = io.IOClient("sqlite:///:memory:")
         # self.client.engine.execute("ATTACH DATABASE ':memory:' AS " + self.client.schema)
         # self.client.session.execute("PRAGMA foreign_keys=ON")

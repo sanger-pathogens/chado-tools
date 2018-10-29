@@ -193,11 +193,9 @@ class SetupTests(unittest.TestCase):
 
     def test_role_exists(self):
         # Tests the function that checks if a role exists
-        sqlalchemy.schema.DDL("CREATE USER testuser").execute(self.client.engine)
-        res = self.client.role_exists("testuser")
+        res = self.client.role_exists("postgres")
         self.assertTrue(res)
-        sqlalchemy.schema.DDL("DROP USER testuser").execute(self.client.engine)
-        res = self.client.role_exists("testuser")
+        res = self.client.role_exists(utils.random_string(30))
         self.assertFalse(res)
 
     @unittest.mock.patch("pychado.ddl.AuditSchemaSetupClient.execute_ddl")

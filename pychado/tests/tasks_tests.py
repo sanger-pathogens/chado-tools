@@ -121,16 +121,16 @@ class TestTasks(unittest.TestCase):
         tasks.run_command_with_arguments(args[1], args[2], parsed_args, self.uri)
         mock_run.assert_called_with(parsed_args, self.uri)
 
-    @unittest.mock.patch('pychado.ddl.AuditSchemaSetupClient.create')
-    @unittest.mock.patch('pychado.ddl.PublicSchemaSetupClient.create')
+    @unittest.mock.patch('pychado.ddl.AuditSchemaSetupClient')
+    @unittest.mock.patch('pychado.ddl.PublicSchemaSetupClient')
     @unittest.mock.patch('pychado.utils.download_file')
     @unittest.mock.patch('pychado.dbutils.setup_database')
     def test_setup(self, mock_setup, mock_download, mock_create_public_schema, mock_create_audit_schema):
         # Checks that the function setting up a database schema is correctly called
         self.assertIs(mock_setup, dbutils.setup_database)
         self.assertIs(mock_download, utils.download_file)
-        self.assertIs(mock_create_public_schema, ddl.PublicSchemaSetupClient.create)
-        self.assertIs(mock_create_audit_schema, ddl.AuditSchemaSetupClient.create)
+        self.assertIs(mock_create_public_schema, ddl.PublicSchemaSetupClient)
+        self.assertIs(mock_create_audit_schema, ddl.AuditSchemaSetupClient)
 
         args = ["chado", "admin", "setup", "-f", "testschema", "testdb"]
         parsed_args = chado_tools.parse_arguments(args)
@@ -151,7 +151,8 @@ class TestTasks(unittest.TestCase):
         args = ["chado", "admin", "setup", "-s", "basic", "testdb"]
         parsed_args = chado_tools.parse_arguments(args)
         tasks.run_setup_command(parsed_args, self.uri)
-        mock_create_public_schema.assert_called()
+        mock_create_public_schema.assert_called_with(self.uri)
+        self.assertIn(unittest.mock.call().create(), mock_create_public_schema.mock_calls)
         mock_create_audit_schema.assert_not_called()
 
         mock_create_public_schema.reset_mock()
@@ -160,7 +161,8 @@ class TestTasks(unittest.TestCase):
         parsed_args = chado_tools.parse_arguments(args)
         tasks.run_setup_command(parsed_args, self.uri)
         mock_create_public_schema.assert_not_called()
-        mock_create_audit_schema.assert_called()
+        mock_create_audit_schema.assert_called_with(self.uri)
+        self.assertIn(unittest.mock.call().create(), mock_create_audit_schema.mock_calls)
 
     @unittest.mock.patch('pychado.tasks.run_grant_revoke_command')
     def test_run_grant(self, mock_run):
@@ -176,23 +178,27 @@ class TestTasks(unittest.TestCase):
         tasks.run_command_with_arguments(args[1], args[2], parsed_args, self.uri)
         mock_run.assert_called_with(parsed_args, self.uri, False)
 
-    @unittest.mock.patch('pychado.ddl.RolesClient.grant_or_revoke')
+    @unittest.mock.patch('pychado.ddl.RolesClient')
     def test_grant(self, mock_grant):
         # Checks that the function granting database access is correctly called
-        self.assertIs(mock_grant, ddl.RolesClient.grant_or_revoke)
+        self.assertIs(mock_grant, ddl.RolesClient)
         args = ["chado", "admin", "grant", "-r", "testrole", "-s", "testschema", "-w", "testdb"]
         parsed_args = chado_tools.parse_arguments(args)
         tasks.run_grant_revoke_command(parsed_args, self.uri, True)
-        mock_grant.assert_called_with("testrole", "testschema", True, True)
+        mock_grant.assert_called_with(self.uri)
+        self.assertIn(unittest.mock.call().grant_or_revoke("testrole", "testschema", True, True),
+                      mock_grant.mock_calls)
 
-    @unittest.mock.patch('pychado.ddl.RolesClient.grant_or_revoke')
+    @unittest.mock.patch('pychado.ddl.RolesClient')
     def test_revoke(self, mock_grant):
         # Checks that the function revoking database access is correctly called
-        self.assertIs(mock_grant, ddl.RolesClient.grant_or_revoke)
+        self.assertIs(mock_grant, ddl.RolesClient)
         args = ["chado", "admin", "revoke", "-r", "testrole", "-s", "testschema", "testdb"]
         parsed_args = chado_tools.parse_arguments(args)
         tasks.run_grant_revoke_command(parsed_args, self.uri, False)
-        mock_grant.assert_called_with("testrole", "testschema", False, False)
+        mock_grant.assert_called_with(self.uri)
+        self.assertIn(unittest.mock.call().grant_or_revoke("testrole", "testschema", False, False),
+                      mock_grant.mock_calls)
 
     @unittest.mock.patch('pychado.utils.read_text')
     @unittest.mock.patch('pychado.dbutils.query_to_file')

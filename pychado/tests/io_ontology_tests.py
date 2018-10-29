@@ -3,7 +3,7 @@ import unittest
 import pronto
 from .. import dbutils, utils
 from ..io import iobase, ontology
-from ..orm import general, cv
+from ..orm import base, general, cv
 
 
 class TestOntology(unittest.TestCase):
@@ -18,8 +18,10 @@ class TestOntology(unittest.TestCase):
     def setUpClass(cls):
         # Creates a database, establishes a connection and creates tables
         dbutils.create_database(cls.connection_uri)
-        cls.client = ontology.OntologySetupClient(cls.connection_uri)
-        cls.client.create()
+        cls.client = ontology.OntologyClient(cls.connection_uri)
+        schema_base = base.PublicBase
+        schema_metadata = schema_base.metadata
+        schema_metadata.create_all(cls.client.engine, tables=schema_metadata.sorted_tables)
 
     @classmethod
     def tearDownClass(cls):

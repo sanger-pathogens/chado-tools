@@ -13,6 +13,17 @@ class InputFileError(Exception):
 class IOClient(ddl.ChadoClient):
     """Base class for read-write access to a CHADO database"""
 
+    def __init__(self, uri: str):
+        """Constructor - connect to database"""
+        super().__init__(uri)
+        session_maker = sqlalchemy.orm.sessionmaker(bind=self.engine)
+        self.session = session_maker()                                              # type: sqlalchemy.orm.Session
+
+    def __del__(self):
+        """Destructor - disconnect from database"""
+        self.session.close()
+        super().__del__()
+
     def query_table(self, table, **kwargs) -> sqlalchemy.orm.Query:
         """Creates a query on a database table from given keyword arguments"""
         query = self.session.query(table)
@@ -37,8 +48,3 @@ class IOClient(ddl.ChadoClient):
         if not entry:
             entry = self.insert_into_table(table, **kwargs)
         return entry
-
-
-class IOSetupClient(ddl.SchemaSetupClient, IOClient):
-    """Base class for setting up a CHADO database schema AND read-write access"""
-    pass

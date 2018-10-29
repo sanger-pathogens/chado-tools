@@ -1,5 +1,4 @@
 from . import iobase
-from .. import ddl
 from ..orm import organism
 
 
@@ -30,8 +29,3 @@ class DirectIOClient(iobase.IOClient):
             self.session.delete(obj)
             self.session.commit()
             print("An organism with abbreviation '" + abbreviation + "' has been deleted from the database.")
-
-
-class DirectIOSetupClient(ddl.SchemaSetupClient, DirectIOClient):
-    """Base class for setting up a CHADO database schema AND read-write access"""
-    pass

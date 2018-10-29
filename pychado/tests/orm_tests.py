@@ -1,5 +1,6 @@
 import unittest
 import sqlalchemy.exc
+import sqlalchemy.schema
 from .. import dbutils, utils
 from ..io import iobase
 from ..orm import base, general, cv, organism, pub, sequence, audit
@@ -15,8 +16,10 @@ class TestPublic(unittest.TestCase):
     def setUpClass(cls):
         # Creates a database, establishes a connection and creates tables
         dbutils.create_database(cls.connection_uri)
-        cls.client = iobase.IOSetupClient(cls.connection_uri)
-        cls.client.create()
+        cls.client = iobase.IOClient(cls.connection_uri)
+        schema_base = base.PublicBase
+        schema_metadata = schema_base.metadata
+        schema_base.metadata.create_all(cls.client.engine, tables=schema_metadata.sorted_tables)
 
     @classmethod
     def tearDownClass(cls):
@@ -1454,14 +1457,13 @@ class TestAudit(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        # Creates a database, establishes a connection and creates tables
+        # Creates a database, establishes a connection and creates schema and tables
         dbutils.create_database(cls.connection_uri)
-        cls.client = iobase.IOSetupClient(cls.connection_uri)
-        cls.client.base = base.AuditBase
-        cls.client.metadata = cls.client.base.metadata
-        cls.client.schema = cls.client.metadata.schema
-        cls.client.create_schema()
-        cls.client.create()
+        cls.client = iobase.IOClient(cls.connection_uri)
+        schema_base = base.AuditBase
+        schema_metadata = schema_base.metadata
+        sqlalchemy.schema.CreateSchema('audit').execute(cls.client.engine)
+        schema_base.metadata.create_all(cls.client.engine, tables=schema_metadata.sorted_tables)
 
     @classmethod
     def tearDownClass(cls):

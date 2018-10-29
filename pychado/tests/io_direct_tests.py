@@ -1,7 +1,7 @@
 import unittest
 from .. import dbutils, utils
 from ..io import direct
-from ..orm import organism
+from ..orm import base, organism
 
 
 class TestDirectIO(unittest.TestCase):
@@ -14,8 +14,10 @@ class TestDirectIO(unittest.TestCase):
     def setUpClass(cls):
         # Creates a database, establishes a connection and creates tables
         dbutils.create_database(cls.connection_uri)
-        cls.client = direct.DirectIOSetupClient(cls.connection_uri)
-        cls.client.create()
+        cls.client = direct.DirectIOClient(cls.connection_uri)
+        schema_base = base.PublicBase
+        schema_metadata = schema_base.metadata
+        schema_base.metadata.create_all(cls.client.engine, tables=schema_metadata.sorted_tables)
 
     @classmethod
     def tearDownClass(cls):

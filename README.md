@@ -8,14 +8,12 @@ Python3 command line script providing various tools for accessing CHADO database
 
 * Python 3.6 or higher
 * PostgreSQL 9.6 or higher
-* SQLite (for testing only)
 
 ## Installation from source
 
 Download the latest release from this github repository, or clone the repository to obtain the most recent updates.
 
-Modify the file with [default connection settings](pychado/data/defaultDatabase.yml) such that it contains an existing PostgreSQL database to which you can connect.
-Note: This database is only used for housekeeping purposes, it will never be changed or removed by `chado-tools`. You can thus simply use one of the built-in PostgreSQL databases, such as `postgres`.
+Modify the file with [default connection settings](pychado/data/defaultDatabase.yml) such that it contains the settings for an existing PostgreSQL database server to which you can connect.
 
 Then run the tests:
 
@@ -56,30 +54,28 @@ The usage is:
 | init                  | set the default connection parameters                                |
 | reset                 | reset the default connection parameters to factory settings          |
 | connect               | connect to a CHADO database for an interactive session               |
-| create                | create a new instance of the CHADO schema                            |
-| dump                  | dump a CHADO database into an archive file                           |
-| restore               | restore a CHADO database from an archive file                        |
 | query                 | query a CHADO database and export the result into a text file        |
-| stats                 | obtain statistics to updates in a CHADO database                     |
-| list                  | list all entities of a specified type in the CHADO database          |
+| extract               | run a pre-compiled query against the CHADO database                  |
 | insert                | insert a new entity of a specified type into the CHADO database      |
 | delete                | delete an entity of a specified type from the CHADO database         |
 | import                | import entities of a specified type into the CHADO database          |
+| admin                 | perform admin tasks, such as creating or dumping a CHADO database    |
 ------------------------------------------------------------------------------------------------
 
 ## Examples
 
 Create a new CHADO database called `eukaryotes` according to the current GMOD schema:
 
-    chado create eukaryotes
+    chado admin create eukaryotes
+    chado admin setup -s gmod eukaryotes
     
 Dump this database into an archive called `eukaryotes.dump`:
 
-    chado dump eukaryotes eukaryotes.dump
+    chado admin dump eukaryotes eukaryotes.dump
 
 List all organisms in the `eukaryotes` database:
 
-    chado list organisms eukaryotes
+    chado extract organisms eukaryotes
 
 Query the database to check the meaning of a certain `cvterm_id`:
 

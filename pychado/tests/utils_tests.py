@@ -3,17 +3,16 @@ import os
 import unittest
 import subprocess
 import string
-import random
 import io
 from contextlib import redirect_stdout
-from pychado import utils
-
-modules_dir = os.path.dirname(os.path.abspath(utils.__file__))
-data_dir = os.path.join(modules_dir, 'tests', 'data')
+from .. import utils
 
 
 class TestUtils(unittest.TestCase):
     """Class for testing utilities"""
+
+    modules_dir = os.path.dirname(os.path.abspath(utils.__file__))
+    data_dir = os.path.join(modules_dir, 'tests', 'data')
 
     def test_write_and_read(self):
         # open_file_write() and open_file_read() should do the right thing whether gzipped or not
@@ -40,7 +39,7 @@ class TestUtils(unittest.TestCase):
 
     def test_write_read_text(self):
         # tests reading and writing text from/to file
-        text = ''.join(random.choices(string.ascii_lowercase, k=100)).strip()
+        text = utils.random_string(100)
         filename = "tmp.txt"
         utils.write_text(filename, text)
         self.assertTrue(os.path.exists(os.path.abspath(filename)))
@@ -56,7 +55,7 @@ class TestUtils(unittest.TestCase):
         with self.assertRaises(FileNotFoundError):
             utils.open_file_read('this_file_is_not_here_so_throw_error.gz')
         with self.assertRaises(subprocess.CalledProcessError):
-            utils.open_file_read(os.path.join(data_dir, 'utils_test_not_really_zipped.gz'))
+            utils.open_file_read(os.path.join(self.data_dir, 'utils_test_not_really_zipped.gz'))
         with self.assertRaises(FileNotFoundError):
             utils.open_file_write(os.path.join('not_a_directory', 'this_file_is_not_here_so_throw_error'))
         with self.assertRaises(FileNotFoundError):
@@ -64,7 +63,7 @@ class TestUtils(unittest.TestCase):
 
     def test_yaml_parser(self):
         # checks if a yaml file is parsed correctly
-        filename = os.path.join(data_dir, "utils_yaml_example.yml")
+        filename = os.path.join(self.data_dir, "utils_yaml_example.yml")
         content = utils.parse_yaml(filename)
         self.assertIn("institute", content)
         self.assertEqual(content["institute"], "Sanger")
@@ -79,6 +78,8 @@ class TestUtils(unittest.TestCase):
         test_list = [1.123, None, 'hello', True, 'A', 8, False]
         test_string = utils.list_to_string(test_list, "_")
         self.assertEqual(test_string, "1.123__hello_t_A_8_f")
+        test_string_with_prefix = utils.list_to_string(test_list, "\t", "A")
+        self.assertEqual(test_string_with_prefix, "A.1.123\tA.\tA.hello\tA.t\tA.A\tA.8\tA.f")
 
     def test_filter_objects(self):
         # checks if a function correctly filters objects in a list according to keyword arguments
@@ -102,6 +103,23 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(persons_dict["John"], john)
         with self.assertRaises(AttributeError):
             utils.list_to_dict(persons, "age")
+
+    def test_random_string(self):
+        # tests if a function generates a random string of lowercase letters
+        string1 = utils.random_string(8)
+        self.assertEqual(len(string1), 8)
+        for letter in string1:
+            self.assertIn(letter, string.ascii_lowercase)
+        string2 = utils.random_string(8)
+        self.assertNotEqual(string1, string2)
+
+    def test_random_integer(self):
+        # tests if a function generates a random integer
+        int1 = utils.random_integer(10000)
+        self.assertLessEqual(int1, 10000)
+        self.assertGreaterEqual(int1, 0)
+        int2 = utils.random_integer(10000)
+        self.assertNotEqual(int1, int2)
 
     def test_current_date(self):
         # checks if a function returns the current date in the correct format

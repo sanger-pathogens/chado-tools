@@ -1,18 +1,18 @@
 import copy
 from typing import List, Dict
 import pronto
-from pychado import utils
-from pychado.io import io
-from pychado.orm import general, cv
+from .. import utils
+from ..io import iobase
+from ..orm import general, cv
 
 
-class OntologyLoader(io.DatabaseLoader):
+class OntologyClient(iobase.IOClient):
 
     def __init__(self, uri: str, verbose=False):
         """Constructor"""
 
         # Connect to database
-        io.DatabaseLoader.__init__(self, uri)
+        super().__init__(uri)
 
         # Set up printer
         self.printer = utils.VerbosePrinter(verbose)
@@ -88,7 +88,7 @@ class OntologyLoader(io.DatabaseLoader):
         self._mark_obsolete_terms(ontology_terms, default_db_entry)
 
         # Commit changes
-        self.commit()
+        self.session.commit()
         self._print_statistics()
 
     def _load_and_check_dependencies(self) -> (cv.CvTerm, Dict[str, cv.CvTerm], Dict[str, cv.CvTerm]):
@@ -97,33 +97,33 @@ class OntologyLoader(io.DatabaseLoader):
         # CV term for comments
         property_type_cv = self.query_table(cv.Cv, name="cvterm_property_type").first()         # type: cv.Cv
         if not property_type_cv:
-            raise io.DatabaseError("CV 'cvterm_property_type' not present in database")
+            raise iobase.DatabaseError("CV 'cvterm_property_type' not present in database")
         comment_term = self.query_table(cv.CvTerm, name="comment",
                                         cv_id=property_type_cv.cv_id).first()                   # type: cv.CvTerm
         if not comment_term:
-            raise io.DatabaseError("CV term for comments not present in database")
+            raise iobase.DatabaseError("CV term for comments not present in database")
 
         # CV terms for synonym types
         synonym_type_cv = self.query_table(cv.Cv, name="synonym_type").first()                  # type: cv.Cv
         if not synonym_type_cv:
-            raise io.DatabaseError("CV 'synonym_type' not present in database")
+            raise iobase.DatabaseError("CV 'synonym_type' not present in database")
         synonym_type_cvterms = self.query_table(cv.CvTerm, cv_id=synonym_type_cv.cv_id).all()   # type: List[cv.CvTerm]
         synonym_type_terms = utils.list_to_dict(synonym_type_cvterms, "name")              # type: Dict[str, cv.CvTerm]
         required_terms = ["exact", "narrow", "broad", "related"]
         for term in required_terms:
             if term not in synonym_type_terms:
-                raise io.DatabaseError("CV term for synonym type '" + term + "' not present in database")
+                raise iobase.DatabaseError("CV term for synonym type '" + term + "' not present in database")
 
         # CV terms for relationships
         relationship_cv = self.query_table(cv.Cv, name="relationship").first()                  # type: cv.Cv
         if not relationship_cv:
-            raise io.DatabaseError("CV 'relationship' not present in database")
+            raise iobase.DatabaseError("CV 'relationship' not present in database")
         relationship_cvterms = self.query_table(cv.CvTerm, is_relationshiptype=1).all()         # type: List[cv.CvTerm]
         relationship_terms = utils.list_to_dict(relationship_cvterms, "name")              # type: Dict[str, cv.CvTerm]
         required_terms = ["is_a", "part_of"]
         for term in required_terms:
             if term not in relationship_terms:
-                raise io.DatabaseError("CV term for relationship '" + term + "' not present in database")
+                raise iobase.DatabaseError("CV term for relationship '" + term + "' not present in database")
 
         return comment_term, synonym_type_terms, relationship_terms
 
@@ -151,7 +151,9 @@ class OntologyLoader(io.DatabaseLoader):
         """Returns an entry from the db table"""
         db_entry = self.query_table(general.Db, name=db_authority).first()         # type: general.Db
         if not db_entry:
-            db_entry = self.insert_into_table(general.Db, name=db_authority)       # type: general.Db
+            db_entry = general.Db(name=db_authority)
+            self.session.add(db_entry)
+            self.session.flush()
             self.printer.print("Inserted DB '" + db_authority + "'")
             self._db_inserts += 1
         return db_entry
@@ -164,12 +166,14 @@ class OntologyLoader(io.DatabaseLoader):
         if "namespace" in term.other:
             namespace = term.other["namespace"][0]
         if not namespace:
-            raise io.InputFileError("Namespace missing in input file")
+            raise iobase.InputFileError("Namespace missing in input file")
 
         # Get the corresponding CV in the database - create it, if not yet available
         cv_entry = self.query_table(cv.Cv, name=namespace).first()                 # type: cv.Cv
         if not cv_entry:
-            cv_entry = self.insert_into_table(cv.Cv, name=namespace)               # type: cv.Cv
+            cv_entry = cv.Cv(name=namespace)
+            self.session.add(cv_entry)
+            self.session.flush()
             self.printer.print("Inserted CV '" + namespace + "'")
             self._cv_inserts += 1
         return cv_entry

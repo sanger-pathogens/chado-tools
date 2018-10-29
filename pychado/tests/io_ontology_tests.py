@@ -197,6 +197,22 @@ class TestOntology(unittest.TestCase):
         self.assertIn("exact", synonym_type_terms)
         self.assertIn("is_a", relationship_terms)
 
+    def test_handle_db(self):
+        # Tests the insertion of DB entries
+
+        # Insert a new entry
+        first_db = self.client._handle_db("testdb")
+        self.assertEqual(first_db.name, "testdb")
+        self.assertIsNotNone(first_db.db_id)
+
+        # Insert a further entry with a different authority
+        second_db = self.client._handle_db("anotherdb")
+        self.assertNotEqual(first_db.db_id, second_db.db_id)
+
+        # Try to insert a further entry with the same authority, and check that the function returns the existing entry
+        third_db = self.client._handle_db("testdb")
+        self.assertEqual(third_db.db_id, first_db.db_id)
+
     def test_handle_cv(self):
         # Tests the insertion of CV entries
 
@@ -360,6 +376,26 @@ class TestOntology(unittest.TestCase):
         self.assertEqual(self.client._cvterm_inserts, 3)
         self.assertEqual(self.client._cvterm_updates, 2)
         self.assertEqual(self.client._cvterm_deletes, 1)
+
+    def test_handle_typedef(self):
+        # Tests the insertion of relationship-type CV terms
+
+        # Insert a new entry
+        relationship = pronto.Relationship("new_relationship")
+        first_typedef = self.client._handle_typedef(relationship, self.default_db, self.default_cv)
+        self.assertEqual(first_typedef.name, "new_relationship")
+        self.assertEqual(first_typedef.cv_id, self.default_cv.cv_id)
+        self.assertTrue(first_typedef.is_relationshiptype)
+        self.assertIsNotNone(first_typedef.cvterm_id)
+
+        # Insert a further entry with a different name
+        relationship = pronto.Relationship("another_relationship")
+        second_typedef = self.client._handle_typedef(relationship, self.default_db, self.default_cv)
+        self.assertNotEqual(first_typedef.cvterm_id, second_typedef.cvterm_id)
+
+        # Try to insert a further entry with the same authority, and check that the function returns the existing entry
+        third_typedef = self.client._handle_typedef(relationship, self.default_db, self.default_cv)
+        self.assertEqual(third_typedef.cvterm_id, second_typedef.cvterm_id)
 
     def test_handle_comments(self):
         # Tests the insertion, update and deletion of comments (cvtermprop entries)

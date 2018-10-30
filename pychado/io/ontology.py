@@ -52,12 +52,16 @@ class OntologyClient(iobase.IOClient):
 
         # Find/create parent vocabulary and db of ontology terms in file; load dependencies
         default_db_entry = self._handle_db(db_authority)
-        self._handle_cv(pronto.Term(""), default_namespace)
+        default_cv_entry = self._handle_cv(pronto.Term(""), default_namespace)
         comment_term, synonym_type_terms, relationship_terms = self._load_and_check_dependencies()
 
         # Create global containers to reduce the number of database requests
         all_dbxref_entries = {}                                                     # type: Dict[str, general.DbxRef]
         all_cvterm_entries = {}                                                     # type: Dict[str, cv.CvTerm]
+
+        # Handle typedefs
+        for typedef in ontology.typedefs:                                           # type: pronto.Relationship
+            self._handle_typedef(typedef, default_db_entry, default_cv_entry)
 
         # First loop over all terms retrieved from the file: handle vocabulary, dbxref, CV terms, synonyms, comments
         for term in ontology_terms.values():                                        # type: pronto.Term
@@ -128,8 +132,7 @@ class OntologyClient(iobase.IOClient):
         db_entry = self.query_table(general.Db, name=db_authority).first()         # type: general.Db
         if not db_entry:
             db_entry = general.Db(name=db_authority)
-            self.session.add(db_entry)
-            self.session.flush()
+            self.add_and_flush(db_entry)
             self.printer.print("Inserted DB '" + db_authority + "'")
             self._db_inserts += 1
         return db_entry
@@ -148,8 +151,7 @@ class OntologyClient(iobase.IOClient):
         cv_entry = self.query_table(cv.Cv, name=namespace).first()                 # type: cv.Cv
         if not cv_entry:
             cv_entry = cv.Cv(name=namespace)
-            self.session.add(cv_entry)
-            self.session.flush()
+            self.add_and_flush(cv_entry)
             self.printer.print("Inserted CV '" + namespace + "'")
             self._cv_inserts += 1
         return cv_entry
@@ -180,8 +182,7 @@ class OntologyClient(iobase.IOClient):
 
             # Insert dbxref
             dbxref_entry = general.DbxRef(db_id=default_db.db_id, accession=accession, version=version)
-            self.session.add(dbxref_entry)
-            self.session.flush()
+            self.add_and_flush(dbxref_entry)
             self.printer.print("Inserted dbxref '" + term.id + "'")
             self._dbxref_inserts += 1
 
@@ -231,8 +232,7 @@ class OntologyClient(iobase.IOClient):
                 else:
 
                     # Insert a new CV term
-                    self.session.add(cvterm_entry)
-                    self.session.flush()
+                    self.add_and_flush(cvterm_entry)
                     self.printer.print("Inserted CV term '" + cvterm_entry.name + "' for dbxref " + term.id)
                     self._cvterm_inserts += 1
                     return cvterm_entry
@@ -291,6 +291,26 @@ class OntologyClient(iobase.IOClient):
             cvterm_entry.is_obsolete = test_cvterm_entry.is_obsolete
         return marked
 
+    def _handle_typedef(self, typedef: pronto.Relationship, default_db: general.Db, default_cv: cv.Cv):
+        """Inserts CV terms for relationship ontology terms (so-called "typedefs")"""
+
+        # Check if a relationship CV term with this name already exists
+        cvterm_entry = self.query_table(cv.CvTerm, name=typedef.obo_name, is_relationshiptype=1).first()
+        if not cvterm_entry:
+
+            # Create dbxref
+            dbxref = create_dbxref(default_db.name, typedef.obo_name)
+            term = pronto.Term(dbxref, typedef.obo_name)
+            dbxref_entry = self._handle_dbxref(term, default_db)
+
+            # Create CV term
+            cvterm_entry = cv.CvTerm(cv_id=default_cv.cv_id, dbxref_id=dbxref_entry.dbxref_id,
+                                     name=typedef.obo_name, is_relationshiptype=1)
+            self.add_and_flush(cvterm_entry)
+            self._cvterm_inserts += 1
+            self.printer.print("Inserted CV term '" + cvterm_entry.name + "' for dbxref " + dbxref)
+        return cvterm_entry
+
     def _handle_comments(self, term: pronto.Term, cvterm_entry: cv.CvTerm, comment_id: int) -> cv.CvTermProp:
         """Inserts, updates or deletes comments to a CV term in the cvtermprop table"""
 
@@ -322,8 +342,7 @@ class OntologyClient(iobase.IOClient):
 
                 # Insert comment
                 cvtermprop_entry = cv.CvTermProp(cvterm_id=cvterm_entry.cvterm_id, type_id=comment_id, value=comment)
-                self.session.add(cvtermprop_entry)
-                self.session.flush()
+                self.add_and_flush(cvtermprop_entry)
                 self.printer.print("Inserted comment '" + cvtermprop_entry.value + "' for CV term '"
                                    + cvterm_entry.name + "'")
                 self._comment_inserts += 1
@@ -379,8 +398,7 @@ class OntologyClient(iobase.IOClient):
                 # Insert synonym
                 cvtermsynonym_entry = cv.CvTermSynonym(cvterm_id=cvterm_entry.cvterm_id, synonym=synonym.desc,
                                                        type_id=synonym_type_term.cvterm_id)
-                self.session.add(cvtermsynonym_entry)
-                self.session.flush()
+                self.add_and_flush(cvtermsynonym_entry)
                 self.printer.print("Inserted synonym '" + cvtermsynonym_entry.synonym + "' for CV term '"
                                    + cvterm_entry.name + "'")
                 self._synonym_inserts += 1
@@ -428,8 +446,7 @@ class OntologyClient(iobase.IOClient):
                 cvterm_dbxref_entry = cv.CvTermDbxRef(cvterm_id=cvterm_entry.cvterm_id,
                                                       dbxref_id=corresponding_dbxref_entry.dbxref_id,
                                                       is_for_definition=0)
-                self.session.add(cvterm_dbxref_entry)
-                self.session.flush()
+                self.add_and_flush(cvterm_dbxref_entry)
                 self.printer.print("Inserted cross reference '" + crossref + "' for CV term '"
                                    + cvterm_entry.name + "'")
                 self._crossref_inserts += 1
@@ -465,7 +482,8 @@ class OntologyClient(iobase.IOClient):
             # Get relationship type and corresponding term from database
             relationship_name = relationship.obo_name
             if relationship_name not in relationship_terms:
-                self.printer.print("WARNING: Relationship term '" + relationship_name + "' not present in database")
+                if relationship_name != "can_be":
+                    self.printer.print("WARNING: Relationship term '" + relationship_name + "' not present in database")
                 continue
             type_cvterm = relationship_terms[relationship_name]                     # type: cv.CvTerm
 
@@ -493,8 +511,7 @@ class OntologyClient(iobase.IOClient):
                     cvterm_relationship_entry = cv.CvTermRelationship(subject_id=subject_cvterm_entry.cvterm_id,
                                                                       object_id=object_cvterm_entry.cvterm_id,
                                                                       type_id=type_cvterm.cvterm_id)
-                    self.session.add(cvterm_relationship_entry)
-                    self.session.flush()
+                    self.add_and_flush(cvterm_relationship_entry)
                     self.printer.print("Inserted relationship: '" + subject_cvterm_entry.name + "', '"
                                        + relationship_name + "', '" + object_cvterm_entry.name + "'")
                     self._relationship_inserts += 1
@@ -526,7 +543,8 @@ class OntologyClient(iobase.IOClient):
             if dbxref not in ontology_terms:
 
                 # Find the corresponding CV term in the database
-                cvterm_entry = self.query_table(cv.CvTerm, dbxref_id=dbxref_entry.dbxref_id).first()  # type: cv.CvTerm
+                cvterm_entry = self.query_table(cv.CvTerm, dbxref_id=dbxref_entry.dbxref_id,
+                                                is_relationshiptype=0).first()      # type: cv.CvTerm
                 if not cvterm_entry:
                     continue
 

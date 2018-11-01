@@ -69,8 +69,8 @@ class DDLClient(ChadoClient):
 
     def role_exists(self, role_name: str) -> bool:
         """Checks if a given role/user exists in a database"""
-        roles_table = sqlalchemy.text("pg_catalog.pg_user")
-        roles_condition = sqlalchemy.text("usename=:role_name")
+        roles_table = sqlalchemy.text("pg_catalog.pg_roles")
+        roles_condition = sqlalchemy.text("rolname=:role_name")
         exists_query = sqlalchemy.exists().select_from(roles_table).where(
             roles_condition.bindparams(role_name=role_name)).select()
         return self.connection.execute(exists_query).scalar()
@@ -171,12 +171,16 @@ class SchemaSetupClient(DDLClient):
 
         # Create the tables
         self.metadata.create_all(self.engine, tables=self.metadata.sorted_tables)
+        print("Created missing tables in schema '" + self.schema + "'.")
 
     def create_schema(self) -> None:
         """Creates a schema in the target database, if it doesn't exist yet"""
         if not self.schema_exists(self.schema):
             command = " ".join(["CREATE SCHEMA", self.schema])
             self.execute_ddl(command)
+            print("Created schema '" + self.schema + "'.")
+        else:
+            print("Schema '" + self.schema + "' already exists.")
 
     def setup_inheritance(self, parent_table: str, child_tables: list) -> None:
         """Sets ups inheritance between parent table and child tables in a schema"""
@@ -244,12 +248,15 @@ class AuditSchemaSetupClient(SchemaSetupClient):
         audit_tables = self.create_audit_tables(data_tables)
         audit_tablenames = [table.name for table in audit_tables]
         self.metadata.create_all(self.engine, tables=([self.master_table] + audit_tables))
+        print("Created missing tables in schema '" + self.schema + "'.")
 
         # Set up inheritance
         self.setup_inheritance(self.master_table.name, audit_tablenames)
+        print("Set up table inheritance in schema '" + self.schema + "'.")
 
         # Create triggers
         self.create_audit_triggers(audit_tables)
+        print("Created audit triggers.")
 
     def create_audit_tables(self, data_tables: list) -> list:
         """Creates an audit table for each given data table"""

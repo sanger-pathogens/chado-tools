@@ -42,7 +42,7 @@ class Feature(base.PublicBase):
     type = sqlalchemy.orm.relationship(cv.CvTerm, foreign_keys=type_id, backref="feature_type")
 
     # Initialisation
-    def __init__(self, dbxref_id, organism_id, type_id, uniquename, name=None, residues=None, seqlen=None,
+    def __init__(self, organism_id, type_id, uniquename, dbxref_id=None, name=None, residues=None, seqlen=None,
                  md5checksum=None, is_analysis=False, is_obsolete=False, timeaccessioned=sqlalchemy.sql.functions.now(),
                  timelastmodified=sqlalchemy.sql.functions.now(), feature_id=None):
         for key, value in locals().items():

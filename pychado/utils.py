@@ -160,6 +160,16 @@ def random_integer(n: int) -> int:
     return random.randint(0, n)
 
 
+def random_float() -> float:
+    """Generates a random positive float number between 0 and 1"""
+    n1 = random_integer(1000) + 1
+    n2 = random_integer(1000) + 1
+    if n2 > n1:
+        return float(n1)/float(n2)
+    else:
+        return float(n2)/float(n1)
+
+
 def current_date() -> str:
     """Function returning the current date in format 'YYYYMMDD"""
     return datetime.date.today().strftime('%Y%m%d')

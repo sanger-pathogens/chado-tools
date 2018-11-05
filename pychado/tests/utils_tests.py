@@ -121,6 +121,14 @@ class TestUtils(unittest.TestCase):
         int2 = utils.random_integer(10000)
         self.assertNotEqual(int1, int2)
 
+    def test_random_float(self):
+        # tests if a function generates a random float number between 0 and 1
+        float1 = utils.random_float()
+        self.assertGreaterEqual(float1, 0.0)
+        self.assertLessEqual(float1, 1.0)
+        float2 = utils.random_float()
+        self.assertFalse(abs(float1 - float2) < 0.00001)
+
     def test_current_date(self):
         # checks if a function returns the current date in the correct format
         date = utils.current_date()

@@ -92,6 +92,20 @@ class TestUtils(unittest.TestCase):
         with self.assertRaises(AttributeError):
             utils.filter_objects(persons, heads=2)
 
+    def test_copy_attributes(self):
+        # checks if a function correctly copies attributes from one object to another
+        john = utils.EmptyObject(name="John", age=42, sex="m")
+        mike = utils.EmptyObject(name="Mike", age=23, sex="m")
+        updated = utils.copy_attribute(john, mike, "age")
+        self.assertTrue(updated)
+        self.assertEqual(getattr(john, "age"), 23)
+        updated = utils.copy_attribute(john, mike, "sex")
+        self.assertFalse(updated)
+        updated = utils.copy_attribute("abc", "def", "xyz")
+        self.assertFalse(updated)
+        updated = utils.copy_attribute("abc", 567, "xyz")
+        self.assertFalse(updated)
+
     def test_list_to_dict(self):
         # checks if a function correctly converts a list into a dictionary
         john = utils.EmptyObject(name="John")

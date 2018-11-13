@@ -2,7 +2,7 @@ import os
 import unittest
 import pronto
 from .. import dbutils, utils
-from ..io import iobase, ontology
+from ..io import iobase, essentials, ontology
 from ..orm import base, general, cv
 
 
@@ -16,12 +16,15 @@ class TestOntology(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        # Creates a database, establishes a connection and creates tables
+        # Creates a database, establishes a connection, creates tables and populates them with essential entries
         dbutils.create_database(cls.connection_uri)
-        cls.client = ontology.OntologyClient(cls.connection_uri)
         schema_base = base.PublicBase
         schema_metadata = schema_base.metadata
-        schema_metadata.create_all(cls.client.engine, tables=schema_metadata.sorted_tables)
+        essentials_client = essentials.EssentialsClient(cls.connection_uri)
+        schema_metadata.create_all(essentials_client.engine, tables=schema_metadata.sorted_tables)
+        essentials_client.load()
+        essentials_client._load_further_relationship_entries()
+        cls.client = ontology.OntologyClient(cls.connection_uri)
 
     @classmethod
     def tearDownClass(cls):
@@ -30,48 +33,13 @@ class TestOntology(unittest.TestCase):
 
     def setUp(self):
         # Inserts default entries into database tables
-        (self.default_db, self.default_dbxref, self.default_cv, self.default_cvterm) = self.insert_essentials()
-        self.insert_dependencies()
+        (self.default_db, self.default_dbxref, self.default_cv, self.default_cvterm) = self.insert_default_entries()
 
     def tearDown(self):
         # Rolls back all changes to the database
         self.client.session.rollback()
 
-    def insert_dependencies(self):
-        # Inserts all the CV terms needed as basis for relationships and synonyms into the database
-        db = general.Db(name="general")
-        self.client.add_and_flush(db)
-
-        synonymtype_cv = cv.Cv(name="synonym_type")
-        self.client.add_and_flush(synonymtype_cv)
-
-        required_terms = ["exact", "narrow", "broad", "related"]
-        for term in required_terms:
-            dbxref = general.DbxRef(db_id=db.db_id, accession=term)
-            self.client.add_and_flush(dbxref)
-            cvterm = cv.CvTerm(cv_id=synonymtype_cv.cv_id, dbxref_id=dbxref.dbxref_id, name=term)
-            self.client.add_and_flush(cvterm)
-
-        relationship_cv = cv.Cv(name="relationship")
-        self.client.add_and_flush(relationship_cv)
-
-        required_terms = ["is_a", "part_of"]
-        for term in required_terms:
-            dbxref = general.DbxRef(db_id=db.db_id, accession=term)
-            self.client.add_and_flush(dbxref)
-            cvterm = cv.CvTerm(cv_id=relationship_cv.cv_id, dbxref_id=dbxref.dbxref_id, name=term,
-                               is_relationshiptype=1)
-            self.client.add_and_flush(cvterm)
-
-        propertytype_cv = cv.Cv(name="cvterm_property_type")
-        self.client.add_and_flush(propertytype_cv)
-
-        dbxref = general.DbxRef(db_id=db.db_id, accession="comment")
-        self.client.add_and_flush(dbxref)
-        cvterm = cv.CvTerm(cv_id=propertytype_cv.cv_id, dbxref_id=dbxref.dbxref_id, name="comment")
-        self.client.add_and_flush(cvterm)
-
-    def insert_essentials(self):
+    def insert_default_entries(self):
         # Inserts CV terms needed as basis for virtually all tests
         default_db = general.Db(name="defaultdb")
         self.client.add_and_flush(default_db)
@@ -190,12 +158,21 @@ class TestOntology(unittest.TestCase):
         self.assertIn("alternative_id", crossrefs)
         self.assertIn("second_ref", crossrefs)
 
-    def test_load_and_check_dependencies(self):
-        # Tests the loading of various entries from the database
-        (comment_term, synonym_type_terms, relationship_terms) = self.client._load_and_check_dependencies()
+    def test_load_comment_term(self):
+        # Tests the loading of the "comment" term from the database
+        comment_term = self.client._load_comment_term()
         self.assertEqual(comment_term.name, "comment")
-        self.assertIn("exact", synonym_type_terms)
+
+    def test_load_relationship_terms(self):
+        # Tests the loading of relationship terms from the database
+        relationship_terms = self.client._load_relationship_terms()
         self.assertIn("is_a", relationship_terms)
+        self.assertEqual(relationship_terms["is_a"].is_relationshiptype, 1)
+
+    def test_load_synonym_type_terms(self):
+        # Tests the loading of synonym type terms from the database
+        synonym_type_terms = self.client._load_synonym_type_terms()
+        self.assertIn("exact", synonym_type_terms)
 
     def test_handle_db(self):
         # Tests the insertion of DB entries
@@ -401,22 +378,21 @@ class TestOntology(unittest.TestCase):
         # Tests the insertion, update and deletion of comments (cvtermprop entries)
 
         # Check that an ontology term without comment will not create a cvtermprop entry
-        comment_cvterm = self.client._load_and_check_dependencies()[0]
         term = pronto.Term("defaultdb:defaultaccession")
-        first_cvtermprop = self.client._handle_comments(term, self.default_cvterm, comment_cvterm.cvterm_id)
+        first_cvtermprop = self.client._handle_comments(term, self.default_cvterm)
         self.assertIsNone(first_cvtermprop)
 
         # Insert a comment
         term.other = {"comment": ["testcomment"]}
-        second_cvtermprop = self.client._handle_comments(term, self.default_cvterm, comment_cvterm.cvterm_id)
+        second_cvtermprop = self.client._handle_comments(term, self.default_cvterm)
         self.assertIsNotNone(second_cvtermprop.cvtermprop_id)
         self.assertEqual(second_cvtermprop.cvterm_id, self.default_cvterm.cvterm_id)
-        self.assertEqual(second_cvtermprop.type_id, comment_cvterm.cvterm_id)
+        self.assertEqual(second_cvtermprop.type_id, self.client._comment_term.cvterm_id)
         self.assertEqual(second_cvtermprop.value, "testcomment")
 
         # Try to insert another comment and check that this updates the existing entry
         term.other = {"comment": ["othercomment"]}
-        third_cvtermprop = self.client._handle_comments(term, self.default_cvterm, comment_cvterm.cvterm_id)
+        third_cvtermprop = self.client._handle_comments(term, self.default_cvterm)
         self.assertEqual(third_cvtermprop.cvtermprop_id, second_cvtermprop.cvtermprop_id)
         self.assertEqual(third_cvtermprop.value, "othercomment")
 
@@ -424,29 +400,28 @@ class TestOntology(unittest.TestCase):
         # Tests the insertion, update and deletion of synonyms of CV terms
 
         # Check that an ontology term without synonym will not create a cvtermsynonym entry
-        synonymtype_terms = self.client._load_and_check_dependencies()[1]
         term = pronto.Term("defaultdb:defaultaccession")
-        first_synonyms = self.client._handle_synonyms(term, self.default_cvterm, synonymtype_terms)
+        first_synonyms = self.client._handle_synonyms(term, self.default_cvterm)
         self.assertEqual(len(first_synonyms), 0)
 
         # Insert a synonym
         term.synonyms = {pronto.Synonym("another_name", "EXACT")}
-        second_synonyms = self.client._handle_synonyms(term, self.default_cvterm, synonymtype_terms)
+        second_synonyms = self.client._handle_synonyms(term, self.default_cvterm)
         self.assertEqual(len(second_synonyms), 1)
         self.assertIsNotNone(second_synonyms[0].cvtermsynonym_id)
         self.assertEqual(second_synonyms[0].synonym, "another_name")
-        self.assertEqual(second_synonyms[0].type_id, synonymtype_terms["exact"].cvterm_id)
+        self.assertEqual(second_synonyms[0].type_id, self.client._synonym_type_terms["exact"].cvterm_id)
 
         # Try to insert an existing synonym with changed scope, and check that this updates the existing entry
         term.synonyms = {pronto.Synonym("another_name", "NARROW")}
-        third_synonyms = self.client._handle_synonyms(term, self.default_cvterm, synonymtype_terms)
+        third_synonyms = self.client._handle_synonyms(term, self.default_cvterm)
         self.assertEqual(len(third_synonyms), 1)
         self.assertEqual(third_synonyms[0].cvtermsynonym_id, second_synonyms[0].cvtermsynonym_id)
-        self.assertEqual(third_synonyms[0].type_id, synonymtype_terms["narrow"].cvterm_id)
+        self.assertEqual(third_synonyms[0].type_id, self.client._synonym_type_terms["narrow"].cvterm_id)
 
         # Insert another synonym
         term.synonyms.add(pronto.Synonym("yet_another_name", "BROAD"))
-        fourth_synonyms = self.client._handle_synonyms(term, self.default_cvterm, synonymtype_terms)
+        fourth_synonyms = self.client._handle_synonyms(term, self.default_cvterm)
         self.assertEqual(len(fourth_synonyms), 2)
 
     def test_handle_cross_references(self):
@@ -486,31 +461,27 @@ class TestOntology(unittest.TestCase):
         default_id = ontology.create_dbxref(self.default_db.name, self.default_dbxref.accession)
         other_id = ontology.create_dbxref(self.default_db.name, other_dbxref.accession)
         all_cvterms = {default_id: self.default_cvterm, other_id: other_cvterm}
-        relationship_terms = self.client._load_and_check_dependencies()[2]
 
         # Check that an ontology term without relationships will not create a cvterm_relationship entry
         term = pronto.Term("defaultdb:defaultaccession")
-        first_relationships = self.client._handle_relationships(term, self.default_cvterm, relationship_terms,
-                                                                all_cvterms)
+        first_relationships = self.client._handle_relationships(term, self.default_cvterm, all_cvterms)
         self.assertEqual(len(first_relationships), 0)
 
         # Insert a relationship
         term.relations = {pronto.Relationship("part_of"): [pronto.Term(other_id, other_cvterm.name)]}
-        second_relationships = self.client._handle_relationships(term, self.default_cvterm, relationship_terms,
-                                                                 all_cvterms)
+        second_relationships = self.client._handle_relationships(term, self.default_cvterm, all_cvterms)
         self.assertEqual(len(second_relationships), 1)
         self.assertIsNotNone(second_relationships[0].cvterm_relationship_id)
         self.assertEqual(second_relationships[0].subject_id, self.default_cvterm.cvterm_id)
         self.assertEqual(second_relationships[0].object_id, other_cvterm.cvterm_id)
-        self.assertEqual(second_relationships[0].type_id, relationship_terms["part_of"].cvterm_id)
+        self.assertEqual(second_relationships[0].type_id, self.client._relationship_terms["part_of"].cvterm_id)
 
         # Insert a new relationship between the same terms
         term.relations.clear()
         term.relations = {pronto.Relationship("is_a"): [pronto.Term(other_id, other_cvterm.name)]}
-        third_relationships = self.client._handle_relationships(term, self.default_cvterm, relationship_terms,
-                                                                all_cvterms)
+        third_relationships = self.client._handle_relationships(term, self.default_cvterm, all_cvterms)
         self.assertEqual(len(third_relationships), 1)
-        self.assertEqual(third_relationships[0].type_id, relationship_terms["is_a"].cvterm_id)
+        self.assertEqual(third_relationships[0].type_id, self.client._relationship_terms["is_a"].cvterm_id)
 
     def test_mark_obsolete_terms(self):
         # Populate the database with essentials

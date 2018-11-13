@@ -38,6 +38,11 @@ class OntologyClient(iobase.IOClient):
         self._relationship_updates = 0
         self._relationship_deletes = 0
 
+        # Load essentials
+        self._comment_term = self._load_comment_term()
+        self._relationship_terms = self._load_relationship_terms()
+        self._synonym_type_terms = self._load_synonym_type_terms()
+
     def load(self, filename: str, file_format: str, db_authority: str):
         """Loads CV terms from a file into a database"""
 
@@ -53,10 +58,8 @@ class OntologyClient(iobase.IOClient):
         # Find/create parent vocabulary and db of ontology terms in file; load dependencies
         default_db_entry = self._handle_db(db_authority)
         default_cv_entry = self._handle_cv(pronto.Term(""), default_namespace)
-        comment_term, synonym_type_terms, relationship_terms = self._load_and_check_dependencies()
 
         # Create global containers to reduce the number of database requests
-        all_dbxref_entries = {}                                                     # type: Dict[str, general.DbxRef]
         all_cvterm_entries = {}                                                     # type: Dict[str, cv.CvTerm]
 
         # Handle typedefs
@@ -70,11 +73,10 @@ class OntologyClient(iobase.IOClient):
             cv_entry = self._handle_cv(term, default_namespace)
             dbxref_entry = self._handle_dbxref(term, default_db_entry)
             cvterm_entry = self._handle_cvterms(ontology_terms, default_db_entry, dbxref_entry, cv_entry.cv_id)
-            self._handle_comments(term, cvterm_entry, comment_term.cvterm_id)
-            self._handle_synonyms(term, cvterm_entry, synonym_type_terms)
+            self._handle_comments(term, cvterm_entry)
+            self._handle_synonyms(term, cvterm_entry)
 
-            # Save dbxref and CV term in global containers
-            all_dbxref_entries[term.id] = dbxref_entry
+            # Save CV term in global container
             all_cvterm_entries[term.id] = cvterm_entry
 
         # Second loop over all terms retrieved from file: cross references and relationships
@@ -82,7 +84,7 @@ class OntologyClient(iobase.IOClient):
 
             # Insert, update and/or delete entries in various tables
             self._handle_cross_references(term, all_cvterm_entries[term.id])
-            self._handle_relationships(term, all_cvterm_entries[term.id], relationship_terms, all_cvterm_entries)
+            self._handle_relationships(term, all_cvterm_entries[term.id], all_cvterm_entries)
 
         # Mark obsolete CV terms
         self._mark_obsolete_terms(ontology_terms, default_db_entry)
@@ -91,41 +93,38 @@ class OntologyClient(iobase.IOClient):
         self.session.commit()
         self._print_statistics()
 
-    def _load_and_check_dependencies(self) -> (cv.CvTerm, Dict[str, cv.CvTerm], Dict[str, cv.CvTerm]):
-        """Loads basic vocabularies and CV terms that are required for the processing of the data in the input file"""
-
-        # CV term for comments
-        property_type_cv = self.query_table(cv.Cv, name="cvterm_property_type").first()         # type: cv.Cv
-        if not property_type_cv:
-            raise iobase.DatabaseError("CV 'cvterm_property_type' not present in database")
-        comment_term = self.query_table(cv.CvTerm, name="comment",
-                                        cv_id=property_type_cv.cv_id).first()                   # type: cv.CvTerm
-        if not comment_term:
-            raise iobase.DatabaseError("CV term for comments not present in database")
-
-        # CV terms for synonym types
-        synonym_type_cv = self.query_table(cv.Cv, name="synonym_type").first()                  # type: cv.Cv
+    def _load_synonym_type_terms(self) -> Dict[str, cv.CvTerm]:
+        """Loads CV terms describing tyoes of synonyms"""
+        synonym_type_cv = self.query_table(cv.Cv, name="synonym_type").first()
         if not synonym_type_cv:
             raise iobase.DatabaseError("CV 'synonym_type' not present in database")
-        synonym_type_cvterms = self.query_table(cv.CvTerm, cv_id=synonym_type_cv.cv_id).all()   # type: List[cv.CvTerm]
-        synonym_type_terms = utils.list_to_dict(synonym_type_cvterms, "name")              # type: Dict[str, cv.CvTerm]
+        synonym_type_cvterms = self.query_table(cv.CvTerm, cv_id=synonym_type_cv.cv_id).all()
+        synonym_type_cvterms_dict = utils.list_to_dict(synonym_type_cvterms, "name")
         required_terms = ["exact", "narrow", "broad", "related"]
         for term in required_terms:
-            if term not in synonym_type_terms:
+            if term not in synonym_type_cvterms_dict:
                 raise iobase.DatabaseError("CV term for synonym type '" + term + "' not present in database")
+        return synonym_type_cvterms_dict
 
-        # CV terms for relationships
-        relationship_cv = self.query_table(cv.Cv, name="relationship").first()                  # type: cv.Cv
+    def _load_comment_term(self) -> cv.CvTerm:
+        """Loads the CV term describing a comment"""
+        comment_cvterm = self.query_table(cv.CvTerm, name="comment").first()
+        if not comment_cvterm:
+            raise iobase.DatabaseError("CV term 'comment' not present in database")
+        return comment_cvterm
+
+    def _load_relationship_terms(self) -> Dict[str, cv.CvTerm]:
+        """Loads CV terms describing relationships between CV terms"""
+        relationship_cv = self.query_table(cv.Cv, name="relationship").first()
         if not relationship_cv:
             raise iobase.DatabaseError("CV 'relationship' not present in database")
-        relationship_cvterms = self.query_table(cv.CvTerm, is_relationshiptype=1).all()         # type: List[cv.CvTerm]
-        relationship_terms = utils.list_to_dict(relationship_cvterms, "name")              # type: Dict[str, cv.CvTerm]
+        relationship_cvterms = self.query_table(cv.CvTerm, is_relationshiptype=1).all()
+        relationship_cvterms_dict = utils.list_to_dict(relationship_cvterms, "name")
         required_terms = ["is_a", "part_of"]
         for term in required_terms:
-            if term not in relationship_terms:
+            if term not in relationship_cvterms_dict:
                 raise iobase.DatabaseError("CV term for relationship '" + term + "' not present in database")
-
-        return comment_term, synonym_type_terms, relationship_terms
+        return relationship_cvterms_dict
 
     def _handle_db(self, db_authority: str) -> general.Db:
         """Returns an entry from the db table"""
@@ -311,12 +310,12 @@ class OntologyClient(iobase.IOClient):
             self.printer.print("Inserted CV term '" + cvterm_entry.name + "' for dbxref " + dbxref)
         return cvterm_entry
 
-    def _handle_comments(self, term: pronto.Term, cvterm_entry: cv.CvTerm, comment_id: int) -> cv.CvTermProp:
+    def _handle_comments(self, term: pronto.Term, cvterm_entry: cv.CvTerm) -> cv.CvTermProp:
         """Inserts, updates or deletes comments to a CV term in the cvtermprop table"""
 
         # Get existing and new comments, i.e. comments present in database and in input file
         existing_comment_entries = self.query_table(cv.CvTermProp, cvterm_id=cvterm_entry.cvterm_id,
-                                                    type_id=comment_id).all()      # type: List[cv.CvTermProp]
+                                                    type_id=self._comment_term.cvterm_id).all()
         comment = extract_comment(term)
         edited_entry = None
 
@@ -341,7 +340,8 @@ class OntologyClient(iobase.IOClient):
             else:
 
                 # Insert comment
-                cvtermprop_entry = cv.CvTermProp(cvterm_id=cvterm_entry.cvterm_id, type_id=comment_id, value=comment)
+                cvtermprop_entry = cv.CvTermProp(cvterm_id=cvterm_entry.cvterm_id, type_id=self._comment_term.cvterm_id,
+                                                 value=comment)
                 self.add_and_flush(cvtermprop_entry)
                 self.printer.print("Inserted comment '" + cvtermprop_entry.value + "' for CV term '"
                                    + cvterm_entry.name + "'")
@@ -360,8 +360,7 @@ class OntologyClient(iobase.IOClient):
 
         return edited_entry
 
-    def _handle_synonyms(self, term: pronto.Term, cvterm_entry: cv.CvTerm,
-                         synonym_types: Dict[str, cv.CvTerm]) -> List[cv.CvTermSynonym]:
+    def _handle_synonyms(self, term: pronto.Term, cvterm_entry: cv.CvTerm) -> List[cv.CvTermSynonym]:
         """Inserts, updates or deletes synonyms to a CV term in the cvtermsynonym table"""
 
         # Get existing and new synonyms, i.e. synonyms present in database and in input file
@@ -373,11 +372,11 @@ class OntologyClient(iobase.IOClient):
         for synonym in term.synonyms:                                               # type: pronto.Synonym
 
             # Extract synonym type
-            if synonym.scope.lower() not in synonym_types:
+            if synonym.scope.lower() not in self._synonym_type_terms:
                 synonym_type_term = ""
                 self.printer.print("WARNING: synonym type '" + synonym.scope.lower() + "' not present in database!")
             else:
-                synonym_type_term = synonym_types[synonym.scope.lower()]
+                synonym_type_term = self._synonym_type_terms[synonym.scope.lower()]
 
             # Check if the synonym is already present in the database
             matching_synonyms = utils.filter_objects(existing_synonyms,
@@ -466,7 +465,6 @@ class OntologyClient(iobase.IOClient):
         return edited_entries
 
     def _handle_relationships(self, term: pronto.Term, subject_cvterm_entry: cv.CvTerm,
-                              relationship_terms: Dict[str, cv.CvTerm],
                               all_cvterm_entries: Dict[str, cv.CvTerm]) -> List[cv.CvTermRelationship]:
         """Inserts, updates or deletes relationships between CV terms"""
 
@@ -481,11 +479,11 @@ class OntologyClient(iobase.IOClient):
 
             # Get relationship type and corresponding term from database
             relationship_name = relationship.obo_name
-            if relationship_name not in relationship_terms:
+            if relationship_name not in self._relationship_terms:
                 if relationship_name != "can_be":
                     self.printer.print("WARNING: Relationship term '" + relationship_name + "' not present in database")
                 continue
-            type_cvterm = relationship_terms[relationship_name]                     # type: cv.CvTerm
+            type_cvterm = self._relationship_terms[relationship_name]                # type: cv.CvTerm
 
             # Loop over all objects
             for object_term in object_terms:                                        # type: pronto.Term

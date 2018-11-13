@@ -7,27 +7,28 @@ class TestCommands(unittest.TestCase):
 
     def test_init_commands(self):
         commands = chado_tools.init_commands()
+        self.assertEqual(len(commands), 2)
         self.assertIn("init", commands)
         self.assertIn("reset", commands)
-        self.assertNotIn("non_existent_command", commands)
 
     def test_general_commands(self):
         commands = chado_tools.general_commands()
+        self.assertEqual(len(commands), 2)
         self.assertIn("connect", commands)
         self.assertIn("query", commands)
-        self.assertNotIn("non_existent_command", commands)
 
     def test_wrapper_commands(self):
         commands = chado_tools.wrapper_commands()
+        self.assertEqual(len(commands), 5)
         self.assertIn("extract", commands)
         self.assertIn("insert", commands)
         self.assertIn("delete", commands)
         self.assertIn("import", commands)
         self.assertIn("admin", commands)
-        self.assertNotIn("non_existent_command", commands)
 
     def test_admin_commands(self):
         commands = chado_tools.admin_commands()
+        self.assertEqual(len(commands), 7)
         self.assertIn("create", commands)
         self.assertIn("drop", commands)
         self.assertIn("dump", commands)
@@ -38,6 +39,7 @@ class TestCommands(unittest.TestCase):
 
     def test_extract_commands(self):
         commands = chado_tools.extract_commands()
+        self.assertEqual(len(commands), 4)
         self.assertIn("organisms", commands)
         self.assertIn("cvterms", commands)
         self.assertIn("genedb_products", commands)
@@ -45,15 +47,20 @@ class TestCommands(unittest.TestCase):
 
     def test_insert_commands(self):
         commands = chado_tools.insert_commands()
+        self.assertEqual(len(commands), 1)
         self.assertIn("organism", commands)
 
     def test_delete_commands(self):
         commands = chado_tools.delete_commands()
+        self.assertEqual(len(commands), 1)
         self.assertIn("organism", commands)
 
     def test_import_commands(self):
         commands = chado_tools.import_commands()
+        self.assertEqual(len(commands), 3)
+        self.assertIn("essentials", commands)
         self.assertIn("ontology", commands)
+        self.assertIn("gff", commands)
 
 
 class TestArguments(unittest.TestCase):
@@ -218,13 +225,13 @@ class TestArguments(unittest.TestCase):
     def test_insert_organism_args(self):
         # Tests if the command line arguments for the subcommand 'chado insert organism' are parsed correctly
         args = ["chado", "insert", "organism", "-g", "testgenus", "-s", "testspecies", "-a", "testabbreviation",
-                "--common_name", "testname", "--infraspecific_name", "testinfra", "--comment", "testcomment", "testdb"]
+                "--common_name", "testname", "-i", "teststrain", "--comment", "testcomment", "testdb"]
         parsed_args = vars(chado_tools.parse_arguments(args))
         self.assertEqual(parsed_args["genus"], "testgenus")
         self.assertEqual(parsed_args["species"], "testspecies")
+        self.assertEqual(parsed_args["infraspecific_name"], "teststrain")
         self.assertEqual(parsed_args["abbreviation"], "testabbreviation")
         self.assertEqual(parsed_args["common_name"], "testname")
-        self.assertEqual(parsed_args["infraspecific_name"], "testinfra")
         self.assertEqual(parsed_args["comment"], "testcomment")
         self.assertEqual(parsed_args["dbname"], "testdb")
 
@@ -235,8 +242,14 @@ class TestArguments(unittest.TestCase):
         self.assertEqual(parsed_args["organism"], "testorganism")
         self.assertEqual(parsed_args["dbname"], "testdb")
 
+    def test_import_essentials_args(self):
+        # Tests if the command line arguments for the subcommand 'chado import essentials' are parsed correctly
+        args = ["chado", "import", "essentials", "testdb"]
+        parsed_args = vars(chado_tools.parse_arguments(args))
+        self.assertEqual(parsed_args["dbname"], "testdb")
+
     def test_import_ontology_args(self):
-        # Tests if the command line arguments for the subcommand 'chado import cv_terms' are parsed correctly
+        # Tests if the command line arguments for the subcommand 'chado import ontology' are parsed correctly
         args = ["chado", "import", "ontology", "-f", "testfile", "-A", "testauthority", "-F", "owl", "testdb"]
         parsed_args = vars(chado_tools.parse_arguments(args))
         self.assertEqual(parsed_args["input_file"], "testfile")
@@ -251,6 +264,14 @@ class TestArguments(unittest.TestCase):
         self.assertEqual(parsed_args["input_file"], "")
         self.assertEqual(parsed_args["input_url"], "testurl")
         self.assertEqual(parsed_args["format"], "obo")
+
+    def test_import_gff_args(self):
+        # Tests if the command line arguments for the subcommand 'chado import gff' are parsed correctly
+        args = ["chado", "import", "gff", "-f", "testfile", "-a", "testorganism", "testdb"]
+        parsed_args = vars(chado_tools.parse_arguments(args))
+        self.assertEqual(parsed_args["input_file"], "testfile")
+        self.assertEqual(parsed_args["organism"], "testorganism")
+        self.assertEqual(parsed_args["dbname"], "testdb")
 
 
 if __name__ == '__main__':

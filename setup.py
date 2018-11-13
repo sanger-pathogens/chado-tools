@@ -42,7 +42,7 @@ setuptools.setup(
         "sqlalchemy-utils",
         "psycopg2-binary",
         "pyyaml",
-        "pronto"
+        "pronto >= 0.11.0"
     ],
     license="GPLv3",
     classifiers=[

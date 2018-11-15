@@ -119,7 +119,7 @@ class EssentialsClient(iobase.ImportClient):
         new_sequence_cv = cv.Cv(name="sequence")
         sequence_cv = self._handle_cv(new_sequence_cv)
 
-        for term in ["gene", "intron", "exon", "CDS", "mRNA", "chromosome"]:
+        for term in ["gene", "intron", "exon", "CDS", "mRNA", "chromosome", "contig", "supercontig", "region"]:
 
             new_dbxref = general.DbxRef(db_id=sequence_db.db_id, accession=term)
             dbxref = self._handle_dbxref(new_dbxref, sequence_db.name)

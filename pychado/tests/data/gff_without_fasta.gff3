@@ -1,0 +1,22 @@
+##gff-version 3
+##sequence-region   CM000574 1 11697295
+CM000574	chado	gene	1517	2509	.	+	.	ID=FGSG_11579
+CM000574	chado	CDS	1517	2509	.	+	0	ID=FGSG_11579-t26_1:exon:1;Parent=FGSG_11579-t26_1
+CM000574	chado	mRNA	1517	2509	.	+	.	ID=FGSG_11579-t26_1;Parent=FGSG_11579;product=term%3Dhypothetical protein%3B;translation=mcwaqklraygkaikdtttsighiqwsdddetlwykdtqftmtqlrslvsteleiaqaqlsdlflihpddddrdlvvpslslrsladnpaesapgwsfichpknkalhghekwllnrilqtswlrndffrvpkraiwreqtvskyvtnvdrflerllllihitggqpargtellsirhrnsvdgqgrrniflksglvsfvtyyhkgyninsstkiihryfplevsklvvyylwlvvpfvdqlrilamgsalnklgssylwgestkppdkspgertikstqpgsatavetpwlstrlsrifvqefqrliptkvtipiwrhaaiaisrrhlr
+CM000574	chado	polypeptide	1517	2509	.	+	.	ID=FGSG_11579-t26_1:pep;Derives_from=FGSG_11579-t26_1
+CM000574	chado	CDS	3127	3192	.	-	0	ID=FGSG_11580-t26_1:exon:2;Parent=FGSG_11580-t26_1
+CM000574	chado	gene	3127	3716	.	-	.	ID=FGSG_11580
+CM000574	chado	mRNA	3127	3716	.	-	.	ID=FGSG_11580-t26_1;Parent=FGSG_11580;product=term%3Dhypothetical protein%3B;translation=msatqgdikatiellrlkqtgsardystkflellskttketylaarfflglkeeiqeaihkdgelpatfedmarkattidnylhdkrrkrglyysafaddadlkldasyhnalnv
+CM000574	chado	polypeptide	3127	3716	.	-	.	ID=FGSG_11580-t26_1:pep;Derives_from=FGSG_11580-t26_1
+CM000574	chado	CDS	3435	3716	.	-	0	ID=FGSG_11580-t26_1:exon:1;Parent=FGSG_11580-t26_1
+CM000574	chado	CDS	6045	6888	.	+	0	ID=FGSG_11581-t26_1:exon:1;Parent=FGSG_11581-t26_1
+CM000574	chado	gene	6045	8153	.	+	.	ID=FGSG_11581
+CM000574	chado	mRNA	6045	8153	.	+	.	ID=FGSG_11581-t26_1;Parent=FGSG_11581;product=term%3Dhypothetical protein%3B;translation=mttlvaawrsflvismgnehwrrlskrlaatgatdyehdagfafvreskriktdktdepkpeavpkpkaepvkkstkgrpaakrraaqapttngtiveeeppekethattkpttrkssrqkasvdasvereinvpkrpstrmstrrsgegqekealqpapasisepepeaaptshvnaapkkrgsrakpsrpppdwdkspqrkppvqsatialpmsdtpiinrnkemqkkggnknkrsslgnrgrrassliesgqtaiphrdvnptdfykhieaeglieprhfdlldlnegkirgfladetvsfdairsqtesrlrtiqsllefqvdqladnvhkleqqvlvaakeadkvlsasalrlrqrdkrekasartkdmpvievlrslgnilsegvitnkilrnlrngsedewgrhvrrhlprcsmpttrmsfganqppdtirqlirrwltdqeanytlsrfqkvcipnr
+CM000574	chado	polypeptide	6045	8153	.	+	.	ID=FGSG_11581-t26_1:pep;Derives_from=FGSG_11581-t26_1
+CM000574	chado	CDS	7249	7575	.	+	2	ID=FGSG_11581-t26_1:exon:2;Parent=FGSG_11581-t26_1
+CM000574	chado	CDS	7787	7871	.	+	2	ID=FGSG_11581-t26_1:exon:3;Parent=FGSG_11581-t26_1
+CM000574	chado	CDS	8012	8153	.	+	1	ID=FGSG_11581-t26_1:exon:4;Parent=FGSG_11581-t26_1
+CM000574	chado	gene	8754	9110	.	+	.	ID=FGSG_11582
+CM000574	chado	CDS	8754	9110	.	+	0	ID=FGSG_11582-t26_1:exon:1;Parent=FGSG_11582-t26_1
+CM000574	chado	mRNA	8754	9110	.	+	.	ID=FGSG_11582-t26_1;Parent=FGSG_11582;product=term%3Dhypothetical protein%3B;translation=mitanekkmtteaglqkatkkkrkkkkknkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkssavtmmkevttaeqslkraasvskqslvkttgsnvkqsltkskrkgtikkkgknkik
+CM000574	chado	polypeptide	8754	9110	.	+	.	ID=FGSG_11582-t26_1:pep;Derives_from=FGSG_11582-t26_1

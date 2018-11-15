@@ -1,18 +1,22 @@
 import os
+import tempfile
 from typing import List, Dict, Union
 import gffutils
-from . import iobase, ontology
+from . import iobase, ontology, fasta
+from .. import utils
 from ..orm import general, cv, organism, pub, sequence
 
 
 class GFFImportClient(iobase.ImportClient):
-    """Class for importing genomic data from GFF files into Chado and vice versa"""
+    """Class for importing genomic data from GFF files into Chado"""
 
     def __init__(self, uri: str, verbose=False):
         """Constructor"""
 
         # Connect to database
-        super().__init__(uri, verbose)
+        self.uri = uri
+        self.verbose = verbose
+        super().__init__(self.uri, self.verbose)
 
         # Create array for temporary SQLite databases
         self._sqlite_databases = []
@@ -36,8 +40,15 @@ class GFFImportClient(iobase.ImportClient):
             if os.path.exists(database):
                 os.remove(database)
 
-    def load(self, filename: str, organism_name: str):
+    def load(self, filename: str, organism_name: str, fasta_filename: str):
         """Import data from a GFF3 file into a Chado database"""
+
+        # Check for file existence
+        if not os.path.exists(filename):
+            raise iobase.InputFileError("Input file '" + filename + "' does not exist.")
+
+        # Import FASTA sequences, if present
+        self._import_fasta(filename, fasta_filename, organism_name)
 
         # Create temporary SQLite database
         gff_db = self._create_sqlite_db(filename)
@@ -73,9 +84,64 @@ class GFFImportClient(iobase.ImportClient):
         # Commit changes
         self.session.commit()
 
+    def _import_fasta(self, gff_file: str, fasta_file: str, organism_name: str):
+        """Imports sequences from a FASTA file into the Chado database"""
+
+        # Check if the GFF file contains FASTA sequences
+        fasta_is_temporary = False
+        if self._has_fasta(gff_file):
+            if fasta_file:
+
+                # Error message - only one file with FASTA is permitted
+                raise iobase.InputFileError("You cannot provide a GFF file with FASTA sequences "
+                                            "plus a separate FASTA file.")
+            else:
+
+                # Create a FASTA file containing the sequences in the GFF file
+                (fasta_handle, fasta_file) = tempfile.mkstemp(dir=os.getcwd())
+                os.close(fasta_handle)
+                fasta_is_temporary = True
+                self._split_off_fasta(gff_file, fasta_file)
+
+        # Import sequences from FASTA file, if present
+        if fasta_file:
+            fasta_client = fasta.FastaImportClient(self.uri, self.verbose)
+            fasta_client.load(fasta_file, organism_name, "region")
+
+        # Delete temporary file
+        if fasta_is_temporary and os.path.exists(fasta_file):
+            os.remove(fasta_file)
+
+    @staticmethod
+    def _has_fasta(gff_file: str) -> bool:
+        """Checks if a GFF file contains a FASTA section"""
+        infile = utils.open_file_read(gff_file)
+        fasta_started = False
+        for line in infile:
+            if "##FASTA" in line:
+                fasta_started = True
+                break
+        utils.close(infile)
+        return fasta_started
+
+    @staticmethod
+    def _split_off_fasta(gff_file: str, fasta_file: str) -> None:
+        """Copies the FASTA section from a GFF file into a separate FASTA file"""
+        infile = utils.open_file_read(gff_file)
+        outfile = utils.open_file_write(fasta_file)
+        fasta_started = False
+        for line in infile:
+            if fasta_started:
+                outfile.write(line)
+            else:
+                if "##FASTA" in line:
+                    fasta_started = True
+        utils.close(infile)
+        utils.close(outfile)
+
     def _create_sqlite_db(self, filename: str) -> gffutils.FeatureDB:
         """Creates a local SQLite database containing data from a GFF file"""
-        database_name = os.getcwd() + "/" + filename + ".sqlitedb"
+        database_name = os.path.abspath(filename) + ".sqlitedb"
         self._sqlite_databases.append(database_name)
         gffutils.create_db(filename, database_name, force=True, keep_order=True)
         database = gffutils.FeatureDB(database_name)
@@ -313,7 +379,7 @@ class GFFImportClient(iobase.ImportClient):
                                                               cvterm_id=cvterm_entry.cvterm_id,
                                                               pub_id=self._default_pub.pub_id)
             feature_cvterm_entry = self._handle_feature_cvterm(new_feature_cvterm_entry, existing_feature_cvterms,
-                                                               ontology_term, feature_entry.uniquename)
+                                                               cvterm_entry.name, feature_entry.uniquename)
             all_feature_cvterms.append(feature_cvterm_entry)
 
         return all_feature_cvterms

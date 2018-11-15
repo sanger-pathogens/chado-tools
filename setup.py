@@ -43,7 +43,8 @@ setuptools.setup(
         "psycopg2-binary",
         "pyyaml",
         "pronto >= 0.11.0",
-        "gffutils"
+        "gffutils",
+        "biopython"
     ],
     license="GPLv3",
     classifiers=[

@@ -318,7 +318,7 @@ class TestGFF(unittest.TestCase):
         feature_entry = sequence.Feature(organism_id=11, type_id=200, uniquename="testname", feature_id=12)
         mock_query_first.side_effect = [utils.EmptyObject(db_id=33),
                                         utils.EmptyObject(dbxref_id=44),
-                                        utils.EmptyObject(cvterm_id=55)]
+                                        utils.EmptyObject(cvterm_id=55, name="")]
 
         all_ontology_terms = self.client._handle_ontology_terms(self.default_gff_entry, feature_entry)
         mock_query_first.assert_any_call(general.Db, name="GO")

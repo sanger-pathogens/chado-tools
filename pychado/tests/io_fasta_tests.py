@@ -2,7 +2,7 @@ import unittest.mock
 from Bio import SeqIO
 from .. import dbutils, utils
 from ..io import essentials, fasta
-from ..orm import base, cv, organism
+from ..orm import base, cv, organism, sequence
 
 
 class TestFasta(unittest.TestCase):
@@ -61,6 +61,22 @@ class TestFasta(unittest.TestCase):
         mock_extract_type.assert_called_with(self.default_fasta_record)
         mock_create.assert_called_with(self.default_fasta_record, 33,
                                        self.client._sequence_terms["chromosome"].cvterm_id)
+        mock_insert.assert_called()
+
+    @unittest.mock.patch("pychado.io.fasta.FastaImportClient._handle_featureprop")
+    @unittest.mock.patch("pychado.orm.sequence.FeatureProp")
+    @unittest.mock.patch("pychado.io.fasta.FastaImportClient.query_all")
+    def test_mark_as_top_level_sequence(self, mock_query: unittest.mock.Mock, mock_featureprop: unittest.mock.Mock,
+                                        mock_insert: unittest.mock.Mock):
+        # Tests the function transferring data from a FASTA record to the 'feature' table
+        self.assertIs(mock_query, self.client.query_all)
+        self.assertIs(mock_featureprop, sequence.FeatureProp)
+        self.assertIs(mock_insert, self.client._handle_featureprop)
+        feature_entry = sequence.Feature(organism_id=1, type_id=2, uniquename="", feature_id=33)
+
+        self.client._mark_as_top_level_sequence(feature_entry)
+        mock_query.assert_called_with(sequence.FeatureProp, feature_id=33)
+        mock_featureprop.assert_called_with(feature_id=33, type_id=self.client._top_level_term.cvterm_id, value="true")
         mock_insert.assert_called()
 
     def test_create_feature(self):

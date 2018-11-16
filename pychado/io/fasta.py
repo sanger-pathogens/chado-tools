@@ -16,6 +16,7 @@ class FastaImportClient(iobase.ImportClient):
 
         # Load essentials
         self._sequence_terms = self._load_cvterms("sequence", ["contig", "supercontig", "chromosome", "region"])
+        self._top_level_term = self._load_cvterm("top_level_seq")
 
     def load(self, filename: str, organism_name: str, sequence_type: str):
         """Import data from a FASTA file into a Chado database"""
@@ -32,7 +33,8 @@ class FastaImportClient(iobase.ImportClient):
         for record in SeqIO.parse(filename, "fasta"):
 
             # Insert or update entries in the 'feature' table
-            self._handle_sequence(record, default_organism, default_type)
+            feature_entry = self._handle_sequence(record, default_organism, default_type)
+            self._mark_as_top_level_sequence(feature_entry)
 
         # Commit changes
         self.session.commit()
@@ -56,6 +58,16 @@ class FastaImportClient(iobase.ImportClient):
         new_feature_entry = self._create_feature(fasta_record, organism_entry.organism_id, type_entry.cvterm_id)
         feature_entry = self._handle_feature(new_feature_entry, organism_entry.abbreviation)
         return feature_entry
+
+    def _mark_as_top_level_sequence(self, feature_entry: sequence.Feature) -> sequence.FeatureProp:
+        """Inserts or updates an entry in the 'featureprop' table and returns it"""
+        existing_featureprops = self.query_all(sequence.FeatureProp, feature_id=feature_entry.feature_id)
+        new_featureprop_entry = sequence.FeatureProp(feature_id=feature_entry.feature_id,
+                                                     type_id=self._top_level_term.cvterm_id, value="true")
+        featureprop_entry = self._handle_featureprop(new_featureprop_entry, existing_featureprops,
+                                                     self._top_level_term.name, new_featureprop_entry.value,
+                                                     feature_entry.uniquename)
+        return featureprop_entry
 
     @staticmethod
     def _create_feature(fasta_record: SeqIO.SeqRecord, organism_id: int, type_id: int) -> sequence.Feature:

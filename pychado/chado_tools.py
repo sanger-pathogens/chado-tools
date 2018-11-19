@@ -218,7 +218,7 @@ def add_restore_arguments(parser: argparse.ArgumentParser):
 def add_setup_arguments(parser: argparse.ArgumentParser):
     """Defines formal arguments for the 'chado admin setup' sub-command"""
     group = parser.add_mutually_exclusive_group()
-    group.add_argument("-s", "--schema", choices={"gmod", "basic", "audit"}, default="gmod",
+    group.add_argument("-s", "--schema", choices={"gmod", "basic", "audit", "audit_backup"}, default="gmod",
                        help="Database schema (default: GMOD schema 1.31)")
     group.add_argument("-f", "--schema_file", default="", help="File with database schema")
 

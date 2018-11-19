@@ -107,6 +107,8 @@ def run_setup_command(arguments, uri: str) -> None:
             client = ddl.PublicSchemaSetupClient(uri)
         elif arguments.schema == "audit":
             client = ddl.AuditSchemaSetupClient(uri)
+        elif arguments.schema == "audit_backup":
+            client = ddl.AuditBackupSchemaSetupClient(uri)
         else:
             client = ddl.DDLClient(uri)
         client.create()

@@ -294,5 +294,37 @@ class SetupTests(unittest.TestCase):
                 self.assertTrue(column.primary_key)
 
 
+class BackupSetupTests(unittest.TestCase):
+
+    connection_parameters = utils.parse_yaml(dbutils.default_configuration_file())
+    connection_uri = dbutils.random_database_uri(connection_parameters)
+
+    @classmethod
+    def setUpClass(cls):
+        # Creates a database and establishes a connection
+        dbutils.create_database(cls.connection_uri)
+        cls.client = ddl.AuditBackupSchemaSetupClient(cls.connection_uri)
+        cls.public_metadata = sqlalchemy.schema.MetaData(schema='public')
+
+    @classmethod
+    def tearDownClass(cls):
+        # Drops the database
+        dbutils.drop_database(cls.connection_uri, True)
+
+    def test_backup_function_wrapper(self):
+        # Tests the syntax of the backup function
+        fct = self.client.backup_function_wrapper("testname", ["var integer"], "testdefinition")
+        self.assertEqual(fct, "CREATE OR REPLACE FUNCTION testname(text)\n"
+                              "RETURNS bigint\n"
+                              "LANGUAGE plpgsql\n"
+                              "AS $function$\n"
+                              "DECLARE\n"
+                              "var integer;\n"
+                              "BEGIN\n"
+                              "testdefinition;\n"
+                              "END;\n"
+                              "$function$")
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=2, buffer=True)

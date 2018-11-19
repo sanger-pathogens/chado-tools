@@ -121,16 +121,19 @@ class TestTasks(unittest.TestCase):
         tasks.run_command_with_arguments(args[1], args[2], parsed_args, self.uri)
         mock_run.assert_called_with(parsed_args, self.uri)
 
+    @unittest.mock.patch('pychado.ddl.AuditBackupSchemaSetupClient')
     @unittest.mock.patch('pychado.ddl.AuditSchemaSetupClient')
     @unittest.mock.patch('pychado.ddl.PublicSchemaSetupClient')
     @unittest.mock.patch('pychado.utils.download_file')
     @unittest.mock.patch('pychado.dbutils.setup_database')
-    def test_setup(self, mock_setup, mock_download, mock_create_public_schema, mock_create_audit_schema):
+    def test_setup(self, mock_setup, mock_download, mock_create_public_schema, mock_create_audit_schema,
+                   mock_create_backup_schema):
         # Checks that the function setting up a database schema is correctly called
         self.assertIs(mock_setup, dbutils.setup_database)
         self.assertIs(mock_download, utils.download_file)
         self.assertIs(mock_create_public_schema, ddl.PublicSchemaSetupClient)
         self.assertIs(mock_create_audit_schema, ddl.AuditSchemaSetupClient)
+        self.assertIs(mock_create_backup_schema, ddl.AuditBackupSchemaSetupClient)
 
         args = ["chado", "admin", "setup", "-f", "testschema", "testdb"]
         parsed_args = chado_tools.parse_arguments(args)
@@ -148,21 +151,36 @@ class TestTasks(unittest.TestCase):
 
         mock_create_public_schema.reset_mock()
         mock_create_audit_schema.reset_mock()
+        mock_create_backup_schema.reset_mock()
         args = ["chado", "admin", "setup", "-s", "basic", "testdb"]
         parsed_args = chado_tools.parse_arguments(args)
         tasks.run_setup_command(parsed_args, self.uri)
         mock_create_public_schema.assert_called_with(self.uri)
-        self.assertIn(unittest.mock.call().create(), mock_create_public_schema.mock_calls)
         mock_create_audit_schema.assert_not_called()
+        mock_create_backup_schema.assert_not_called()
+        self.assertIn(unittest.mock.call().create(), mock_create_public_schema.mock_calls)
 
         mock_create_public_schema.reset_mock()
         mock_create_audit_schema.reset_mock()
+        mock_create_backup_schema.reset_mock()
         args = ["chado", "admin", "setup", "-s", "audit", "testdb"]
         parsed_args = chado_tools.parse_arguments(args)
         tasks.run_setup_command(parsed_args, self.uri)
         mock_create_public_schema.assert_not_called()
         mock_create_audit_schema.assert_called_with(self.uri)
+        mock_create_backup_schema.assert_not_called()
         self.assertIn(unittest.mock.call().create(), mock_create_audit_schema.mock_calls)
+
+        mock_create_public_schema.reset_mock()
+        mock_create_audit_schema.reset_mock()
+        mock_create_backup_schema.reset_mock()
+        args = ["chado", "admin", "setup", "-s", "audit_backup", "testdb"]
+        parsed_args = chado_tools.parse_arguments(args)
+        tasks.run_setup_command(parsed_args, self.uri)
+        mock_create_public_schema.assert_not_called()
+        mock_create_audit_schema.assert_not_called()
+        mock_create_backup_schema.assert_called_with(self.uri)
+        self.assertIn(unittest.mock.call().create(), mock_create_backup_schema.mock_calls)
 
     @unittest.mock.patch('pychado.tasks.run_grant_revoke_command')
     def test_run_grant(self, mock_run):

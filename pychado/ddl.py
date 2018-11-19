@@ -1,3 +1,4 @@
+import copy
 from typing import Union, List
 import sqlalchemy.sql
 import sqlalchemy.orm.attributes
@@ -336,3 +337,79 @@ class AuditSchemaSetupClient(SchemaSetupClient):
                + utils.list_to_string(columns, ", ", "OLD") + ");\n" \
                + "\tRETURN OLD;\n" \
                + "END IF"
+
+
+class AuditBackupSchemaSetupClient(AuditSchemaSetupClient):
+
+    def __init__(self, uri: str):
+        """Constructor"""
+        super().__init__(uri)
+        self.schema = "audit_backup"
+        self.metadata = copy.deepcopy(self.base.metadata)
+        self.metadata.schema = self.schema
+        self.backup_master_table = self.master_table.tometadata(self.metadata, schema=self.schema)
+
+    def create(self):
+        """Main function for filling the schema with life"""
+
+        # Make sure all required tables in the public schema exist
+        public_client = PublicSchemaSetupClient(self.uri)
+        public_client.create()
+        data_tables = public_client.metadata.sorted_tables
+
+        # Create the schema
+        self.create_schema()
+
+        # Create the tables
+        audit_tables = self.create_audit_tables(data_tables)
+        audit_tablenames = [table.name for table in audit_tables]
+        self.metadata.create_all(self.engine, tables=([self.backup_master_table] + audit_tables))
+        print("Created missing tables in schema '" + self.schema + "'.")
+
+        # Set up inheritance
+        self.setup_inheritance(self.backup_master_table.name, audit_tablenames)
+        print("Set up table inheritance in schema '" + self.schema + "'.")
+
+        # Create back-up function
+        self.create_backup_function()
+        print("Created a back_up function in schema '" + self.schema + "'.")
+
+    def create_backup_function(self):
+        """Creates a function for moving audit tracks from the audit schema to the audit_backup schema"""
+        function_name = self.schema + ".backup_proc"
+        declarations = self.backup_declarations()
+        definition = self.backup_function()
+        backup_creator = self.backup_function_wrapper(function_name, declarations, definition)
+        self.execute_ddl(backup_creator)
+
+    @staticmethod
+    def backup_function_wrapper(name: str, declarations: List[str], definition: str) -> str:
+        return "CREATE OR REPLACE FUNCTION " + name + "(text)\n" \
+               + "RETURNS bigint\nLANGUAGE plpgsql\nAS $function$\nDECLARE\n" \
+               + ";\n".join(declarations) + ";\n" \
+               + "BEGIN\n" \
+               + definition + ";\n" \
+               + "END;\n$function$"
+
+    @staticmethod
+    def backup_declarations() -> List[str]:
+        return ["all_rows bigint", "table_rows bigint", "tabname RECORD"]
+
+    @staticmethod
+    def backup_function() -> str:
+        return "\ttable_rows:=0;\n" \
+               "\tall_rows:=0;\n" \
+               "\tFOR tabname IN (SELECT table_name FROM information_schema.tables " \
+               "WHERE table_schema = 'audit' AND table_name != 'audit') LOOP\n" \
+               "\tEXECUTE\n" \
+               "\t'INSERT INTO audit_backup.' || quote_ident(tabname.table_name) || " \
+               "' (SELECT * FROM audit.' || quote_ident(tabname.table_name) || " \
+               "' WHERE time < CAST($1 AS timestamp))'\n" \
+               "\tUSING $1;\n" \
+               "\tGET DIAGNOSTICS table_rows = ROW_COUNT;\n" \
+               "\tall_rows:=all_rows+table_rows;\n" \
+               "\tEXECUTE\n" \
+               "\t'DELETE FROM audit.' || quote_ident(tabname.table_name) || ' WHERE time < CAST($1 AS timestamp)'\n" \
+               "\tUSING $1;\n" \
+               "\tEND LOOP;\n" \
+               "\tRETURN all_rows"

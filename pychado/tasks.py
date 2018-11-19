@@ -1,5 +1,5 @@
 from . import utils, dbutils, queries, ddl
-from .io import direct, ontology
+from .io import direct, essentials, ontology, gff
 
 
 def create_connection_string(filename: str, dbname: str) -> str:
@@ -160,12 +160,20 @@ def run_delete_command(specifier: str, arguments, uri: str) -> None:
 
 def run_import_command(specifier: str, arguments, uri: str) -> None:
     """Imports data from a file into a database"""
-    file = arguments.input_file
-    if arguments.input_url:
+    file = None
+    if hasattr(arguments, "input_file") and arguments.input_file:
+        file = arguments.input_file
+    elif hasattr(arguments, "input_url") and arguments.input_url:
         file = utils.download_file(arguments.input_url)
 
-    if specifier == "ontology":
+    if specifier == "essentials":
+        loader = essentials.EssentialsClient(uri, arguments.verbose)
+        loader.load()
+    elif specifier == "ontology":
         loader = ontology.OntologyClient(uri, arguments.verbose)
         loader.load(file, arguments.format, arguments.database_authority)
+    elif specifier == "gff":
+        loader = gff.GFFImportClient(uri, arguments.verbose)
+        loader.load(file, arguments.organism)
     else:
         print("Functionality 'import " + specifier + "' is not yet implemented.")

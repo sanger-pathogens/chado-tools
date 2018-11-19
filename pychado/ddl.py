@@ -5,7 +5,7 @@ import sqlalchemy.engine
 import sqlalchemy.schema
 import sqlalchemy.event
 from . import utils
-from .orm import base, general, cv, organism, pub, sequence, audit
+from .orm import base, general, cv, organism, pub, sequence, companalysis, audit
 
 
 class ChadoClient(object):
@@ -218,7 +218,7 @@ class PublicSchemaSetupClient(SchemaSetupClient):
     def __init__(self, uri: str):
         """Constructor"""
         super().__init__(uri)
-        self.modules = [general, cv, organism, pub, sequence]
+        self.modules = [general, cv, organism, pub, sequence, companalysis]
 
 
 class AuditSchemaSetupClient(SchemaSetupClient):

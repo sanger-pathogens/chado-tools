@@ -92,6 +92,20 @@ class TestUtils(unittest.TestCase):
         with self.assertRaises(AttributeError):
             utils.filter_objects(persons, heads=2)
 
+    def test_copy_attributes(self):
+        # checks if a function correctly copies attributes from one object to another
+        john = utils.EmptyObject(name="John", age=42, sex="m")
+        mike = utils.EmptyObject(name="Mike", age=23, sex="m")
+        updated = utils.copy_attribute(john, mike, "age")
+        self.assertTrue(updated)
+        self.assertEqual(getattr(john, "age"), 23)
+        updated = utils.copy_attribute(john, mike, "sex")
+        self.assertFalse(updated)
+        updated = utils.copy_attribute("abc", "def", "xyz")
+        self.assertFalse(updated)
+        updated = utils.copy_attribute("abc", 567, "xyz")
+        self.assertFalse(updated)
+
     def test_list_to_dict(self):
         # checks if a function correctly converts a list into a dictionary
         john = utils.EmptyObject(name="John")
@@ -120,6 +134,14 @@ class TestUtils(unittest.TestCase):
         self.assertGreaterEqual(int1, 0)
         int2 = utils.random_integer(10000)
         self.assertNotEqual(int1, int2)
+
+    def test_random_float(self):
+        # tests if a function generates a random float number between 0 and 1
+        float1 = utils.random_float()
+        self.assertGreaterEqual(float1, 0.0)
+        self.assertLessEqual(float1, 1.0)
+        float2 = utils.random_float()
+        self.assertFalse(abs(float1 - float2) < 0.00001)
 
     def test_current_date(self):
         # checks if a function returns the current date in the correct format

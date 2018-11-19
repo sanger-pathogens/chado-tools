@@ -13,6 +13,7 @@ class EssentialsClient(iobase.ImportClient):
         self._load_cvterm_property_type_entries()
         self._load_feature_property_entries()
         self._load_genedb_synonymtype_entries()
+        self._load_genedb_misc_entries()
         self.session.commit()
 
     def _load_generic_entries(self):
@@ -112,6 +113,20 @@ class EssentialsClient(iobase.ImportClient):
             new_cvterm = cv.CvTerm(cv_id=synonymtype_cv.cv_id, dbxref_id=dbxref.dbxref_id, name=term)
             self._handle_cvterm(new_cvterm, synonymtype_cv.name)
 
+    def _load_genedb_misc_entries(self):
+        """Import specific CV terms for GeneDB"""
+        new_misc_db = general.Db(name="genedb_misc")
+        misc_db = self._handle_db(new_misc_db)
+        new_misc_cv = cv.Cv(name="genedb_misc")
+        misc_cv = self._handle_cv(new_misc_cv)
+
+        for term in ["top_level_seq"]:
+
+            new_dbxref = general.DbxRef(db_id=misc_db.db_id, accession=term)
+            dbxref = self._handle_dbxref(new_dbxref, misc_db.name)
+            new_cvterm = cv.CvTerm(cv_id=misc_cv.cv_id, dbxref_id=dbxref.dbxref_id, name=term)
+            self._handle_cvterm(new_cvterm, misc_cv.name)
+
     def _load_sequence_type_entries(self):
         """Import CV terms for sequence types; for testing only (all terms are part of the SO sequence ontology)"""
         new_sequence_db = general.Db(name="SO")
@@ -119,7 +134,7 @@ class EssentialsClient(iobase.ImportClient):
         new_sequence_cv = cv.Cv(name="sequence")
         sequence_cv = self._handle_cv(new_sequence_cv)
 
-        for term in ["gene", "intron", "exon", "CDS", "mRNA", "chromosome"]:
+        for term in ["gene", "intron", "exon", "CDS", "mRNA", "chromosome", "contig", "supercontig", "region"]:
 
             new_dbxref = general.DbxRef(db_id=sequence_db.db_id, accession=term)
             dbxref = self._handle_dbxref(new_dbxref, sequence_db.name)

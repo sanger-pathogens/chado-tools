@@ -104,6 +104,7 @@ def import_commands() -> dict:
     return {
         "essentials": "import basic terms into the CHADO database (for setup)",
         "ontology": "import an ontology into the CHADO database",
+        "fasta": "import sequences from a FASTA file into the CHADO database",
         "gff": "import genomic data from a GFF3 file into the CHADO database"
     }
 
@@ -366,6 +367,8 @@ def add_import_arguments_by_command(command: str, parser: argparse.ArgumentParse
         add_import_ontology_arguments(parser)
     elif command == "gff":
         add_import_gff_arguments(parser)
+    elif command == "fasta":
+        add_import_fasta_arguments(parser)
     else:
         print("Command '" + parser.prog + "' is not available.")
 
@@ -386,3 +389,13 @@ def add_import_gff_arguments(parser: argparse.ArgumentParser):
     parser.add_argument("-f", "--input_file", required=True, help="GFF3 input file")
     parser.add_argument("-a", "--abbreviation", required=True, dest="organism",
                         help="abbreviation/short name of the organism")
+    parser.add_argument("--fasta", help="FASTA input file with sequences")
+
+
+def add_import_fasta_arguments(parser: argparse.ArgumentParser):
+    """Defines formal arguments for the 'chado import gff' sub-command"""
+    parser.add_argument("-f", "--input_file", required=True, help="FASTA input file")
+    parser.add_argument("-a", "--abbreviation", required=True, dest="organism",
+                        help="abbreviation/short name of the organism")
+    parser.add_argument("-t", "--sequence_type", choices={"chromosome", "supercontig", "contig", "region"},
+                        default="region", help="type of the sequences (default: region)")

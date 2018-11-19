@@ -1,13 +1,18 @@
+import os
+import tempfile
+import filecmp
 import unittest.mock
 import gffutils
 from .. import dbutils, utils
-from ..io import essentials, gff
+from ..io import iobase, essentials, fasta, gff
 from ..orm import base, general, cv, organism, pub, sequence
 
 
 class TestGFF(unittest.TestCase):
     """Tests various functions used to load a GFF file into a database"""
 
+    modules_dir = os.path.dirname(os.path.abspath(gff.__file__))
+    data_dir = os.path.abspath(os.path.join(modules_dir, '..', 'tests', 'data'))
     connection_parameters = utils.parse_yaml(dbutils.default_configuration_file())
     connection_uri = dbutils.random_database_uri(connection_parameters)
 
@@ -53,6 +58,76 @@ class TestGFF(unittest.TestCase):
         default_cvterm = cv.CvTerm(cv_id=default_cv.cv_id, dbxref_id=default_dbxref.dbxref_id, name="testterm")
         self.client.add_and_flush(default_cvterm)
         return default_db, default_dbxref, default_cv, default_cvterm
+
+    def test_create_sqlite_db(self):
+        # Tests the function that creates a SQLite database from a GFF file
+        gff_file = os.path.join(self.data_dir, 'gff_without_fasta.gff3')
+        self.assertTrue(os.path.exists(gff_file))
+        gff_db = self.client._create_sqlite_db(gff_file)
+        self.assertEqual(len(self.client._sqlite_databases), 1)
+        gff_db_name = self.client._sqlite_databases[0]
+        self.assertTrue(os.path.exists(gff_db_name))
+        self.assertIn("gff-version 3", gff_db.directives)
+        os.remove(gff_db_name)
+        self.assertFalse(os.path.exists(gff_db_name))
+
+    def test_has_fasta(self):
+        # Tests the function that checks if a GFF file contains a FASTA section
+        gff_file = os.path.join(self.data_dir, 'gff_without_fasta.gff3')
+        self.assertFalse(self.client._has_fasta(gff_file))
+        gff_file = os.path.join(self.data_dir, 'gff_with_fasta.gff3')
+        self.assertTrue(self.client._has_fasta(gff_file))
+
+    def test_split_off_fasta(self):
+        # Tests the function copying the FASTA section from a GFF file into a separate file
+        gff_file = os.path.join(self.data_dir, 'gff_with_fasta.gff3')
+        fasta_file = tempfile.mkstemp()[1]
+        self.client._split_off_fasta(gff_file, fasta_file)
+        actual_fasta_file = os.path.join(self.data_dir, 'fasta_only.fa')
+        self.assertTrue(filecmp.cmp(fasta_file, actual_fasta_file))
+        os.remove(fasta_file)
+
+    @unittest.mock.patch("pychado.io.fasta.FastaImportClient")
+    @unittest.mock.patch("pychado.io.gff.GFFImportClient._split_off_fasta")
+    @unittest.mock.patch("pychado.io.gff.GFFImportClient._has_fasta")
+    def test_import_fasta(self, mock_includes: unittest.mock.Mock, mock_copy: unittest.mock.Mock,
+                          mock_fasta: unittest.mock.Mock):
+        self.assertIs(mock_includes, self.client._has_fasta)
+        self.assertIs(mock_copy, self.client._split_off_fasta)
+        self.assertIs(mock_fasta, fasta.FastaImportClient)
+
+        # FASTA in GFF and separate file
+        mock_includes.return_value = True
+        with self.assertRaises(iobase.InputFileError):
+            self.client._import_fasta("testgff", "testfasta", "testorganism")
+
+        # FASTA in separate file only
+        mock_includes.return_value = False
+        mock_copy.reset_mock()
+        mock_fasta.reset_mock()
+        self.client._import_fasta("testgff", "testfasta", "testorganism")
+        mock_includes.assert_called_with("testgff")
+        mock_copy.assert_not_called()
+        mock_fasta.assert_called_with(self.client.uri, self.client.verbose)
+        self.assertIn(unittest.mock.call().load("testfasta", "testorganism", "region"), mock_fasta.mock_calls)
+
+        # FASTA in GFF only
+        mock_includes.return_value = True
+        mock_copy.reset_mock()
+        mock_fasta.reset_mock()
+        self.client._import_fasta("testgff", "", "testorganism")
+        mock_includes.assert_called_with("testgff")
+        mock_copy.assert_called()
+        mock_fasta.assert_called()
+
+        # No FASTA
+        mock_includes.return_value = False
+        mock_copy.reset_mock()
+        mock_fasta.reset_mock()
+        self.client._import_fasta("testgff", "", "testorganism")
+        mock_includes.assert_called_with("testgff")
+        mock_copy.assert_not_called()
+        mock_fasta.assert_not_called()
 
     @unittest.mock.patch("pychado.io.gff.GFFImportClient._handle_feature")
     @unittest.mock.patch("pychado.io.gff.GFFImportClient._create_feature")
@@ -243,7 +318,7 @@ class TestGFF(unittest.TestCase):
         feature_entry = sequence.Feature(organism_id=11, type_id=200, uniquename="testname", feature_id=12)
         mock_query_first.side_effect = [utils.EmptyObject(db_id=33),
                                         utils.EmptyObject(dbxref_id=44),
-                                        utils.EmptyObject(cvterm_id=55)]
+                                        utils.EmptyObject(cvterm_id=55, name="")]
 
         all_ontology_terms = self.client._handle_ontology_terms(self.default_gff_entry, feature_entry)
         mock_query_first.assert_any_call(general.Db, name="GO")

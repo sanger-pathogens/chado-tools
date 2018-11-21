@@ -390,6 +390,12 @@ def add_import_gff_arguments(parser: argparse.ArgumentParser):
     parser.add_argument("-a", "--abbreviation", required=True, dest="organism",
                         help="abbreviation/short name of the organism")
     parser.add_argument("--fasta", help="FASTA input file with sequences")
+    parser.add_argument("--fresh_load", action="store_true",
+                        help="load a genome from scratch (default: load an update to an existing genome)")
+    parser.add_argument("--force", action="store_true",
+                        help="in case of a fresh load, purge all existing features of the organism")
+    parser.add_argument("--full_genome", action="store_true",
+                        help="in case of an update, assume that the GFF file contains all features of the organism")
 
 
 def add_import_fasta_arguments(parser: argparse.ArgumentParser):

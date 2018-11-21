@@ -413,11 +413,13 @@ class TestTasks(unittest.TestCase):
     def test_import_gff(self, mock_client):
         # Checks that the function importing a GFF file into the database is correctly called
         self.assertIs(mock_client, gff.GFFImportClient)
-        args = ["chado", "import", "gff", "-f", "testfile", "-a", "testorganism", "--fasta", "testfasta", "testdb"]
+        args = ["chado", "import", "gff", "-f", "testfile", "-a", "testorganism", "--fasta", "testfasta",
+                "--fresh_load", "--force", "--full_genome", "testdb"]
         parsed_args = chado_tools.parse_arguments(args)
         tasks.run_import_command(args[2], parsed_args, self.uri)
         mock_client.assert_called_with(self.uri, False)
-        self.assertIn(unittest.mock.call().load("testfile", "testorganism", "testfasta"), mock_client.mock_calls)
+        self.assertIn(unittest.mock.call().load("testfile", "testorganism", "testfasta", True, True, True),
+                      mock_client.mock_calls)
 
     @unittest.mock.patch('pychado.io.fasta.FastaImportClient')
     def test_import_fasta(self, mock_client):

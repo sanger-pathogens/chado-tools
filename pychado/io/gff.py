@@ -40,12 +40,17 @@ class GFFImportClient(iobase.ImportClient):
             if os.path.exists(database):
                 os.remove(database)
 
-    def load(self, filename: str, organism_name: str, fasta_filename: str):
+    def load(self, filename: str, organism_name: str, fasta_filename: str, fresh_load=False, force_purge=False,
+             full_genome=False):
         """Import data from a GFF3 file into a Chado database"""
 
         # Check for file existence
         if not os.path.exists(filename):
             raise iobase.InputFileError("Input file '" + filename + "' does not exist.")
+
+        # Remove existing database entries, if applicable
+        default_organism = self._load_organism(organism_name)
+        self._handle_existing_features(default_organism, fresh_load, force_purge)
 
         # Import FASTA sequences, if present
         self._import_fasta(filename, fasta_filename, organism_name)
@@ -53,16 +58,13 @@ class GFFImportClient(iobase.ImportClient):
         # Create temporary SQLite database
         gff_db = self._create_sqlite_db(filename)
 
-        # Load dependencies
-        default_organism = self._load_organism(organism_name)
-
         # Initiate global containers
         all_feature_entries = {}
 
         # Loop over all entries in the gff file
         for gff_feature in gff_db.all_features():
 
-            # Insert or update entries in various tables
+            # Insert, update or delete entries in various tables
             feature_entry = self._handle_child_feature(gff_feature, default_organism)
             if feature_entry:
                 self._handle_location(gff_feature, feature_entry)
@@ -78,13 +80,18 @@ class GFFImportClient(iobase.ImportClient):
         # Second loop over all entries in the gff file
         for gff_feature in gff_db.all_features():
 
-            # Insert or update entries in various tables
+            # Insert, update or delete entries in the 'feature_relationship' table
             self._handle_relationships(gff_feature, all_feature_entries)
+
+        # Mark obsolete features
+        if full_genome:
+            top_level_entries = self._extract_sequence_names(gff_db)
+            self._mark_obsolete_features(default_organism, all_feature_entries, top_level_entries)
 
         # Commit changes
         self.session.commit()
 
-    def _import_fasta(self, gff_file: str, fasta_file: str, organism_name: str):
+    def _import_fasta(self, gff_file: str, fasta_file: str, organism_name: str) -> None:
         """Imports sequences from a FASTA file into the Chado database"""
 
         # Check if the GFF file contains FASTA sequences
@@ -147,6 +154,44 @@ class GFFImportClient(iobase.ImportClient):
         database = gffutils.FeatureDB(database_name)
         return database
 
+    def _handle_existing_features(self, organism_entry: organism.Organism, fresh_load: bool, force_purge: bool) -> None:
+        """Checks if there are existing features for the organism, and deletes them if required"""
+
+        # Check if this is an import "from scratch". If not, there is no need to take any action
+        if not fresh_load:
+            return
+
+        # Check if the database already contains features for this organism. If not, there is no need to take any action
+        existing_features_query = self.query_table(sequence.Feature, organism_id=organism_entry.organism_id)
+        if existing_features_query.count() == 0:
+            return
+
+        # Check if the '--force' option was used
+        if not force_purge:
+
+            # Abort the operation
+            raise iobase.DatabaseError("The database already contains features for organism '"
+                                       + organism_entry.abbreviation + "'. Run without option '--fresh_load' to update"
+                                       + " the features or with option '--force' to overwrite everything.")
+        else:
+
+            # Delete all existing features for this organism
+            self.printer.print("Deleting all features for organism '" + organism_entry.abbreviation + "'")
+            existing_features_query.delete()
+
+    def _mark_obsolete_features(self, organism_entry: organism.Organism,
+                                all_features: Dict[str, sequence.Feature], top_level_features: List[str]) -> None:
+        """Marks features as obsolete"""
+
+        # Loop over all features for the given organism in the database
+        for feature_id in self._load_feature_ids(organism_entry):
+
+            # Check if the feature is also present in the input file
+            if feature_id not in all_features and feature_id not in top_level_features:
+
+                # Mark the feature as obsolete, if necessary
+                self._mark_feature_as_obsolete(organism_entry, feature_id)
+
     def _handle_child_feature(self, gff_feature: gffutils.Feature, organism_entry: organism.Organism
                               ) -> Union[None, sequence.Feature]:
         """Inserts or updates an entry in the 'feature' table and returns it"""
@@ -179,12 +224,13 @@ class GFFImportClient(iobase.ImportClient):
         featureloc_entry = self._handle_featureloc(new_featureloc_entry, feature_entry.uniquename)
         return featureloc_entry
 
-    def _handle_synonyms(self, gff_feature: gffutils.Feature,
-                         feature_entry: sequence.Feature) -> List[sequence.FeatureSynonym]:
-        """Inserts or updates entries in the 'synonym' and 'feature_synonym' tables and returns the latter"""
+    def _handle_synonyms(self, gff_feature: gffutils.Feature, feature_entry: sequence.Feature
+                         ) -> List[sequence.FeatureSynonym]:
+        """Inserts, updates and deletes entries in the 'synonym' and 'feature_synonym' tables and returns the latter"""
 
         # Extract existing synonyms for this feature from the database
-        existing_feature_synonyms = self.query_all(sequence.FeatureSynonym, feature_id=feature_entry.feature_id)
+        existing_feature_synonyms = self.query_feature_synonym_by_type(
+            feature_entry.feature_id, self._synonym_types()).all()
         all_feature_synonyms = []
 
         # Loop over all synonyms for this feature in the GFF file
@@ -206,16 +252,18 @@ class GFFImportClient(iobase.ImportClient):
                 # Insert/update entry in the 'feature_synonym' table
                 new_feature_synonym_entry = sequence.FeatureSynonym(
                     synonym_id=synonym_entry.synonym_id, feature_id=feature_entry.feature_id,
-                    pub_id=self._default_pub.pub_id, is_current=(synonym_type != "previous_systematic_id"))
+                    pub_id=self._default_pub.pub_id)
                 feature_synonym_entry = self._handle_feature_synonym(new_feature_synonym_entry,
                                                                      existing_feature_synonyms)
                 all_feature_synonyms.append(feature_synonym_entry)
 
+        # Delete obsolete entries
+        self._delete_feature_synonym(all_feature_synonyms, existing_feature_synonyms, feature_entry.uniquename)
         return all_feature_synonyms
 
     def _handle_publications(self, gff_feature: gffutils.Feature, feature_entry: sequence.Feature
                              ) -> List[sequence.FeaturePub]:
-        """Inserts or updates entries in the 'pub' and 'feature_pub' tables and returns the latter"""
+        """Inserts, updates and deletes entries in the 'pub' and 'feature_pub' tables and returns the latter"""
 
         # Extract existing publications for this feature from the database
         existing_feature_pubs = self.query_all(sequence.FeaturePub, feature_id=feature_entry.feature_id)
@@ -235,11 +283,13 @@ class GFFImportClient(iobase.ImportClient):
                                                          feature_entry.uniquename, pub_entry.uniquename)
             all_feature_pubs.append(feature_pub_entry)
 
+        # Delete obsolete entries
+        self._delete_feature_pub(all_feature_pubs, existing_feature_pubs, feature_entry.uniquename)
         return all_feature_pubs
 
     def _handle_relationships(self, gff_feature: gffutils.Feature, all_features: Dict[str, sequence.Feature]
                               ) -> List[sequence.FeatureRelationship]:
-        """Inserts or updates entries in the 'feature_relationship' table and returns them"""
+        """Inserts, updates and deletes entries in the 'feature_relationship' table and returns them"""
 
         # Get database entry for relationship subject from array
         if gff_feature.id not in all_features:
@@ -248,8 +298,8 @@ class GFFImportClient(iobase.ImportClient):
         subject_entry = all_features[gff_feature.id]
 
         # Extract existing relationships for this subject from the database
-        existing_feature_relationships = self.query_all(sequence.FeatureRelationship,
-                                                        subject_id=subject_entry.feature_id)
+        existing_feature_relationships = self.query_feature_relationship_by_type(
+            subject_entry.feature_id, self._feature_relationship_types()).all()
         all_feature_relationships = []
 
         # Loop over all relationships for this feature in the GFF file
@@ -279,14 +329,18 @@ class GFFImportClient(iobase.ImportClient):
                     object_entry.uniquename, type_entry.name)
                 all_feature_relationships.append(feature_relationship_entry)
 
+        # Delete obsolete entries
+        self._delete_feature_relationship(all_feature_relationships, existing_feature_relationships,
+                                          subject_entry.uniquename)
         return all_feature_relationships
 
     def _handle_properties(self, gff_feature: gffutils.Feature, feature_entry: sequence.Feature
                            ) -> List[sequence.FeatureProp]:
-        """Inserts or updates entries in the 'featureprop' table and returns them"""
+        """Inserts, updates and deletes entries in the 'featureprop' table and returns them"""
 
         # Extract existing properties for this feature from the database
-        existing_featureprops = self.query_all(sequence.FeatureProp, feature_id=feature_entry.feature_id)
+        existing_featureprops = self.query_featureprop_by_type(
+            feature_entry.feature_id, self._feature_property_types()).all()
         all_featureprops = []
 
         # Loop over all properties of this feature in the GFF file
@@ -307,11 +361,13 @@ class GFFImportClient(iobase.ImportClient):
                                                              feature_entry.uniquename)
                 all_featureprops.append(featureprop_entry)
 
+        # Delete obsolete entries
+        self._delete_featureprop(all_featureprops, existing_featureprops, feature_entry.uniquename)
         return all_featureprops
 
     def _handle_cross_references(self, gff_feature: gffutils.Feature, feature_entry: sequence.Feature
                                  ) -> List[sequence.FeatureDbxRef]:
-        """Inserts or updates entries in the 'feature_dbxref' table and returns them"""
+        """Inserts, updates and deletes entries in the 'feature_dbxref' table and returns them"""
 
         # Extract existing cross references for this feature from the database
         existing_feature_dbxrefs = self.query_all(sequence.FeatureDbxRef, feature_id=feature_entry.feature_id)
@@ -339,14 +395,17 @@ class GFFImportClient(iobase.ImportClient):
                                                                crossref, feature_entry.uniquename)
             all_feature_dbxrefs.append(feature_dbxref_entry)
 
+        # Delete obsolete entries
+        self._delete_feature_dbxref(all_feature_dbxrefs, existing_feature_dbxrefs, feature_entry.uniquename)
         return all_feature_dbxrefs
 
     def _handle_ontology_terms(self, gff_feature: gffutils.Feature, feature_entry: sequence.Feature
                                ) -> List[sequence.FeatureCvTerm]:
-        """Inserts or updates entries in the 'feature_cvterm' table and returns them"""
+        """Inserts, updates and deletes entries in the 'feature_cvterm' table and returns them"""
 
         # Extract existing ontology terms for this feature from the database
-        existing_feature_cvterms = self.query_all(sequence.FeatureCvTerm, feature_id=feature_entry.feature_id)
+        existing_feature_cvterms = self.query_feature_cvterm_by_ontology(
+            feature_entry.feature_id, self._ontologies()).all()
         all_feature_cvterms = []
 
         ontology_terms = self._extract_ontology_terms(gff_feature)
@@ -382,6 +441,8 @@ class GFFImportClient(iobase.ImportClient):
                                                                cvterm_entry.name, feature_entry.uniquename)
             all_feature_cvterms.append(feature_cvterm_entry)
 
+        # Delete obsolete entries
+        self._delete_feature_cvterm(all_feature_cvterms, existing_feature_cvterms, feature_entry.uniquename)
         return all_feature_cvterms
 
     def _create_feature(self, gff_feature: gffutils.Feature, organism_id: int, type_id: int) -> sequence.Feature:
@@ -424,49 +485,63 @@ class GFFImportClient(iobase.ImportClient):
                 ontology_terms = [ontology_terms]
         return ontology_terms
 
-    @staticmethod
-    def _extract_properties(gff_feature: gffutils.Feature) -> Dict[str, List[str]]:
-        """Extracts properties from a GFF file entry
-        Properties are the 'score' and the 'source' as well as the attributes 'Note', 'description', 'comment'"""
-        gff_to_chado_key = {"Note": "comment", "comment": "comment", "description": "description"}
+    def _extract_properties(self, gff_feature: gffutils.Feature) -> Dict[str, List[str]]:
+        """Extracts properties from a GFF file entry. Properties are 'score', 'source' and certain attributes"""
+        gff_to_chado_key = {"note": "comment"}
         properties = {}
         if gff_feature.score and gff_feature.score != '.':
             properties["score"] = [gff_feature.score]
         if gff_feature.source and gff_feature.source != '.':
             properties["source"] = [gff_feature.source]
+
         for gff_key, value in gff_feature.attributes.items():
-            if gff_key in gff_to_chado_key.keys():
-                chado_key = gff_to_chado_key[gff_key]
+
+            chado_key = None
+            if gff_key.lower() in gff_to_chado_key.keys():
+                chado_key = gff_to_chado_key[gff_key.lower()]
+            elif gff_key.lower() in self._feature_property_types():
+                chado_key = gff_key.lower()
+
+            if chado_key:
                 if isinstance(value, str):
                     properties[chado_key] = [value]
                 elif isinstance(value, list):
                     properties[chado_key] = value
         return properties
 
-    @staticmethod
-    def _extract_relationships(gff_feature: gffutils.Feature) -> Dict[str, List[str]]:
+    def _extract_relationships(self, gff_feature: gffutils.Feature) -> Dict[str, List[str]]:
         """Extracts the relationships to other features from a GFF file entry"""
-        gff_to_chado_key = {"Parent": "part_of", "Derives_from": "derives_from"}
+        gff_to_chado_key = {"parent": "part_of"}
         relationships = {}
         for gff_key, value in gff_feature.attributes.items():
-            if gff_key in gff_to_chado_key.keys():
-                chado_key = gff_to_chado_key[gff_key]
+
+            chado_key = None
+            if gff_key.lower() in gff_to_chado_key.keys():
+                chado_key = gff_to_chado_key[gff_key.lower()]
+            elif gff_key.lower() in self._feature_relationship_types():
+                chado_key = gff_key.lower()
+
+            if chado_key:
                 if isinstance(value, str):
                     relationships[chado_key] = [value]
                 elif isinstance(value, list):
                     relationships[chado_key] = value
         return relationships
 
-    @staticmethod
-    def _extract_synonyms(gff_feature: gffutils.Feature) -> Dict[str, List[str]]:
+    def _extract_synonyms(self, gff_feature: gffutils.Feature) -> Dict[str, List[str]]:
         """Extracts synonyms/alias names from a GFF file entry"""
         aliases = {}
-        for key, value in gff_feature.attributes.items():
-            if key.lower() in ["alias", "synonym", "previous_systematic_id"]:
+        for gff_key, value in gff_feature.attributes.items():
+
+            chado_key = None
+            if gff_key.lower() in self._synonym_types():
+                chado_key = gff_key.lower()
+
+            if chado_key:
                 if isinstance(value, str):
-                    aliases[key.lower()] = [value]
+                    aliases[gff_key.lower()] = [value]
                 elif isinstance(value, list):
-                    aliases[key.lower()] = value
+                    aliases[gff_key.lower()] = value
         return aliases
 
     @staticmethod
@@ -500,6 +575,37 @@ class GFFImportClient(iobase.ImportClient):
             if isinstance(publications, str):
                 publications = [publications]
         return publications
+
+    @staticmethod
+    def _extract_sequence_names(gff_db: gffutils.FeatureDB) -> List[str]:
+        """Extracts sequence names from a GFF file"""
+        sequences = []
+        for directive in gff_db.directives:
+            if directive.startswith("sequence-region"):
+                split_directive = directive.split()
+                sequence_name = split_directive[1].strip()
+                sequences.append(sequence_name)
+        return sequences
+
+    @staticmethod
+    def _feature_relationship_types() -> List[str]:
+        """Lists considered feature_relationship types"""
+        return ["part_of", "derives_from"]
+
+    @staticmethod
+    def _feature_property_types() -> List[str]:
+        """Lists considered featureprop types"""
+        return ["comment", "description", "score", "source"]
+
+    @staticmethod
+    def _synonym_types() -> List[str]:
+        """Lists considered synonym types"""
+        return ["alias", "synonym", "previous_systematic_id"]
+
+    @staticmethod
+    def _ontologies() -> List[str]:
+        """Lists considered ontologies"""
+        return ["GO"]
 
 
 def convert_strand(strand: str) -> Union[None, int]:

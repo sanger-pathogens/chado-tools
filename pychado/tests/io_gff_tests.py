@@ -387,6 +387,15 @@ class TestGFF(unittest.TestCase):
         mock_mark.assert_any_call(organism_entry, "id2")
         self.assertEqual(mock_mark.call_count, 2)
 
+    def test_check_attributes(self):
+        # Tests the function that checks if all attributes of a GFF file entry are recognized
+        feature = self.default_gff_entry
+        recognized = self.client._check_if_attributes_are_recognized(feature)
+        self.assertTrue(recognized)
+        feature.attributes["other_attribute"] = "other_value"
+        recognized = self.client._check_if_attributes_are_recognized(feature)
+        self.assertFalse(recognized)
+
     def test_create_feature(self):
         # Tests the function that creates an entry for the 'feature' table
         feature = self.client._create_feature(self.default_gff_entry, 3, 5)
@@ -418,6 +427,15 @@ class TestGFF(unittest.TestCase):
         feature.attributes = {"Name": ["othername"]}
         name = self.client._extract_name(feature)
         self.assertEqual(name, "othername")
+
+    def test_extract_size(self):
+        # Tests the function that extracts the sequence length from a GFF file entry
+        feature = gffutils.Feature()
+        size = self.client._extract_size(feature)
+        self.assertIsNone(size)
+        feature.attributes = {"size": "587"}
+        size = self.client._extract_size(feature)
+        self.assertEqual(size, 587)
 
     def test_extract_synonyms(self):
         # Tests the function that extracts the synonyms from a GFF file entry

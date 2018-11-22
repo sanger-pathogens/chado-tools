@@ -75,6 +75,7 @@ class GFFImportClient(iobase.ImportClient):
                 self._handle_publications(gff_feature, feature_entry)
 
                 # Save feature entry in global array
+                self._check_if_attributes_are_recognized(gff_feature)
                 all_feature_entries[feature_entry.uniquename] = feature_entry
 
         # Second loop over all entries in the gff file
@@ -445,11 +446,21 @@ class GFFImportClient(iobase.ImportClient):
         self._delete_feature_cvterm(all_feature_cvterms, existing_feature_cvterms, feature_entry.uniquename)
         return all_feature_cvterms
 
+    def _check_if_attributes_are_recognized(self, gff_feature: gffutils.Feature) -> bool:
+        """Checks if all attributes of a GFF file entry can be recognized"""
+        all_recognized = True
+        for key in gff_feature.attributes.keys():
+            if key.lower() not in self._recognized_attributes():
+                self.printer.print("WARNING: The attribute '" + key + "' for feature '" + gff_feature.id +
+                                   "' is unknown by this program and can't be loaded into the database.")
+                all_recognized = False
+        return all_recognized
+
     def _create_feature(self, gff_feature: gffutils.Feature, organism_id: int, type_id: int) -> sequence.Feature:
         """Creates a feature object from a GFF file entry"""
         name = self._extract_name(gff_feature)
         residues = self._extract_residues(gff_feature)
-        seqlen = None
+        seqlen = self._extract_size(gff_feature)
         if residues is not None:
             seqlen = len(residues)
         return sequence.Feature(organism_id=organism_id, type_id=type_id, uniquename=gff_feature.id, name=name,
@@ -555,6 +566,17 @@ class GFFImportClient(iobase.ImportClient):
         return name
 
     @staticmethod
+    def _extract_size(gff_feature: gffutils.Feature) -> Union[None, int]:
+        """Extracts the sequence length of a feature from a GFF file entry"""
+        size = None
+        if "size" in gff_feature.attributes:
+            size = gff_feature.attributes["size"]
+            if isinstance(size, list):
+                size = size[0]
+            size = int(size)
+        return size
+
+    @staticmethod
     def _extract_residues(gff_feature: gffutils.Feature) -> Union[None, str]:
         """Extracts the sequence of amino acids from a GFF file entry representing a polypeptide"""
         residues = None
@@ -586,6 +608,11 @@ class GFFImportClient(iobase.ImportClient):
                 sequence_name = split_directive[1].strip()
                 sequences.append(sequence_name)
         return sequences
+
+    def _recognized_attributes(self) -> List[str]:
+        """Lists GFF attributes that are handled by this program"""
+        return self._feature_property_types() + self._feature_relationship_types() + self._synonym_types() \
+            + ["id", "name", "parent", "note", "dbxref", "ontology_term", "size", "literature", "translation"]
 
     @staticmethod
     def _feature_relationship_types() -> List[str]:

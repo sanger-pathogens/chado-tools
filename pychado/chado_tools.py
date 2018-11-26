@@ -105,7 +105,8 @@ def import_commands() -> dict:
         "essentials": "import basic terms into the CHADO database (for setup)",
         "ontology": "import an ontology into the CHADO database",
         "fasta": "import sequences from a FASTA file into the CHADO database",
-        "gff": "import genomic data from a GFF3 file into the CHADO database"
+        "gff": "import genomic data from a GFF3 file into the CHADO database",
+        "gaf": "import gene annotation data from a GAF file into the CHADO database"
     }
 
 
@@ -369,6 +370,8 @@ def add_import_arguments_by_command(command: str, parser: argparse.ArgumentParse
         add_import_gff_arguments(parser)
     elif command == "fasta":
         add_import_fasta_arguments(parser)
+    elif command == "gaf":
+        add_import_gaf_arguments(parser)
     else:
         print("Command '" + parser.prog + "' is not available.")
 
@@ -390,6 +393,8 @@ def add_import_gff_arguments(parser: argparse.ArgumentParser):
     parser.add_argument("-a", "--abbreviation", required=True, dest="organism",
                         help="abbreviation/short name of the organism")
     parser.add_argument("--fasta", help="FASTA input file with sequences")
+    parser.add_argument("-t", "--sequence_type", choices={"chromosome", "supercontig", "contig", "region"},
+                        default="region", help="type of the FASTA sequences, if present (default: region)")
     parser.add_argument("--fresh_load", action="store_true",
                         help="load a genome from scratch (default: load an update to an existing genome)")
     parser.add_argument("--force", action="store_true",
@@ -405,3 +410,10 @@ def add_import_fasta_arguments(parser: argparse.ArgumentParser):
                         help="abbreviation/short name of the organism")
     parser.add_argument("-t", "--sequence_type", choices={"chromosome", "supercontig", "contig", "region"},
                         default="region", help="type of the sequences (default: region)")
+
+
+def add_import_gaf_arguments(parser: argparse.ArgumentParser):
+    """Defines formal arguments for the 'chado import gaf' sub-command"""
+    parser.add_argument("-f", "--input_file", required=True, help="GFF3 input file")
+    parser.add_argument("-a", "--abbreviation", required=True, dest="organism",
+                        help="abbreviation/short name of the organism")

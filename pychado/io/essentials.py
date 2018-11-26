@@ -14,6 +14,7 @@ class EssentialsClient(iobase.ImportClient):
         self._load_feature_property_entries()
         self._load_genedb_synonymtype_entries()
         self._load_genedb_misc_entries()
+        self._load_genedb_products_vocabulary()
         self.session.commit()
 
     def _load_generic_entries(self):
@@ -92,7 +93,7 @@ class EssentialsClient(iobase.ImportClient):
         new_feature_property_cv = cv.Cv(name="feature_property")
         feature_property_cv = self._handle_cv(new_feature_property_cv)
 
-        for term in ["comment", "score", "source", "description"]:
+        for term in ["comment", "score", "source", "description", "date"]:
 
             new_dbxref = general.DbxRef(db_id=feature_property_db.db_id, accession=term)
             dbxref = self._handle_dbxref(new_dbxref, feature_property_db.name)
@@ -120,12 +121,19 @@ class EssentialsClient(iobase.ImportClient):
         new_misc_cv = cv.Cv(name="genedb_misc")
         misc_cv = self._handle_cv(new_misc_cv)
 
-        for term in ["top_level_seq"]:
+        for term in ["top_level_seq", "evidence"]:
 
             new_dbxref = general.DbxRef(db_id=misc_db.db_id, accession=term)
             dbxref = self._handle_dbxref(new_dbxref, misc_db.name)
             new_cvterm = cv.CvTerm(cv_id=misc_cv.cv_id, dbxref_id=dbxref.dbxref_id, name=term)
             self._handle_cvterm(new_cvterm, misc_cv.name)
+
+    def _load_genedb_products_vocabulary(self):
+        """Import CV for GeneDB products"""
+        new_product_db = general.Db(name="PRODUCT")
+        self._handle_db(new_product_db)
+        new_product_cv = cv.Cv(name="genedb_products")
+        self._handle_cv(new_product_cv)
 
     def _load_sequence_type_entries(self):
         """Import CV terms for sequence types; for testing only (all terms are part of the SO sequence ontology)"""

@@ -104,7 +104,7 @@ class RolesClient(DDLClient):
         if specific_schema:
             schemata = [specific_schema]
         else:
-            schemata = ["public", "audit"]
+            schemata = ["public", "audit", "graph"]
 
         # Loop over all schemata
         for schema in schemata:

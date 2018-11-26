@@ -36,7 +36,7 @@ class TestGFF(unittest.TestCase):
         dbutils.drop_database(cls.connection_uri, True)
 
     def setUp(self):
-        # Inserts default entries into database tables
+        # Creates a default GFF file entry
         self.default_gff_entry = gffutils.Feature(
             id="testid", seqid="testseqid", source="testsource", featuretype="testtype", start=1, end=30, score="3.5",
             strand="+", frame="2", attributes={
@@ -81,6 +81,7 @@ class TestGFF(unittest.TestCase):
     @unittest.mock.patch("pychado.io.gff.GFFImportClient._has_fasta")
     def test_import_fasta(self, mock_includes: unittest.mock.Mock, mock_copy: unittest.mock.Mock,
                           mock_fasta: unittest.mock.Mock):
+        # Tests the function that imports the FASTA sequences for a GFF file
         self.assertIs(mock_includes, self.client._has_fasta)
         self.assertIs(mock_copy, self.client._split_off_fasta)
         self.assertIs(mock_fasta, fasta.FastaImportClient)
@@ -88,13 +89,13 @@ class TestGFF(unittest.TestCase):
         # FASTA in GFF and separate file
         mock_includes.return_value = True
         with self.assertRaises(iobase.InputFileError):
-            self.client._import_fasta("testgff", "testfasta", "testorganism")
+            self.client._import_fasta("testgff", "testfasta", "testorganism", "region")
 
         # FASTA in separate file only
         mock_includes.return_value = False
         mock_copy.reset_mock()
         mock_fasta.reset_mock()
-        self.client._import_fasta("testgff", "testfasta", "testorganism")
+        self.client._import_fasta("testgff", "testfasta", "testorganism", "region")
         mock_includes.assert_called_with("testgff")
         mock_copy.assert_not_called()
         mock_fasta.assert_called_with(self.client.uri, self.client.verbose)
@@ -104,7 +105,7 @@ class TestGFF(unittest.TestCase):
         mock_includes.return_value = True
         mock_copy.reset_mock()
         mock_fasta.reset_mock()
-        self.client._import_fasta("testgff", "", "testorganism")
+        self.client._import_fasta("testgff", "", "testorganism", "region")
         mock_includes.assert_called_with("testgff")
         mock_copy.assert_called()
         mock_fasta.assert_called()
@@ -113,7 +114,7 @@ class TestGFF(unittest.TestCase):
         mock_includes.return_value = False
         mock_copy.reset_mock()
         mock_fasta.reset_mock()
-        self.client._import_fasta("testgff", "", "testorganism")
+        self.client._import_fasta("testgff", "", "testorganism", "region")
         mock_includes.assert_called_with("testgff")
         mock_copy.assert_not_called()
         mock_fasta.assert_not_called()
@@ -374,10 +375,10 @@ class TestGFF(unittest.TestCase):
         self.assertEqual(len(all_ontology_terms), 1)
 
     @unittest.mock.patch("pychado.io.gff.GFFImportClient._mark_feature_as_obsolete")
-    @unittest.mock.patch("pychado.io.gff.GFFImportClient._load_feature_ids")
+    @unittest.mock.patch("pychado.io.gff.GFFImportClient._load_feature_names")
     def test_mark_obsolete_features(self, mock_load: unittest.mock.Mock, mock_mark: unittest.mock.Mock):
         # Tests the function that marks features as obsolete if they are not present in a given dictionary
-        self.assertIs(mock_load, self.client._load_feature_ids)
+        self.assertIs(mock_load, self.client._load_feature_names)
         self.assertIs(mock_mark, self.client._mark_feature_as_obsolete)
         organism_entry = organism.Organism(genus="", species="", abbreviation="testorganism", organism_id=1)
         mock_load.return_value = ["id1", "id2", "id3", "seq"]

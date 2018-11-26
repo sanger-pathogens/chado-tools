@@ -13,21 +13,22 @@ Python3 command line script providing various tools for accessing CHADO database
     * [Required dependencies](#required-dependencies)
     * [From source](#from-source)
     * [Using pip](#using-pip)
-    * [Bioconda](#bioconda)
+    * [Using Bioconda](#using-bioconda)
   * [Usage](#usage)
     * [Available commands](#available-commands)
     * [Examples](#examples)
+    * [Note](#note)
   * [License](#license)
   * [Feedback/Issues](#feedbackissues)
 
 ## Installation
-chado-tools has the following dependencies:
-
-### Required dependencies
-* Python 3.6 or higher
-* PostgreSQL 9.6 or higher
 
 There are a number of ways to install chado-tools and details are provided below. If you encounter an issue when installing chado-tools please contact your local system administrator. If you encounter a bug please log it [here](https://github.com/sanger-pathogens/chado-tools/issues) or email us at path-help@sanger.ac.uk.
+
+### Required dependencies
+
+* Python 3.6 or higher
+* PostgreSQL 9.6 or higher
 
 ### From source
 
@@ -49,12 +50,13 @@ You can install the program from the *Python Package Index (PyPI)* using the com
 
     pip install chado-tools
 
-### Bioconda    
+Now change the default connection parameters by running `chado init`. You can always reset them to the original state by running `chado reset`.
+
+### Using Bioconda
+
 The program is also available as *Bioconda* package. Install it with the command
 
     conda install -c bioconda chado-tools
-
-Now change the default connection parameters by running `chado init`. You can always reset them to the original state by running `chado reset`.
 
 ## Usage
 

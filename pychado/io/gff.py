@@ -40,8 +40,8 @@ class GFFImportClient(iobase.ImportClient):
             if os.path.exists(database):
                 os.remove(database)
 
-    def load(self, filename: str, organism_name: str, fasta_filename: str, fresh_load=False, force_purge=False,
-             full_genome=False):
+    def load(self, filename: str, organism_name: str, fasta_filename: str, sequence_type: str, fresh_load=False,
+             force_purge=False, full_genome=False):
         """Import data from a GFF3 file into a Chado database"""
 
         # Check for file existence
@@ -53,7 +53,7 @@ class GFFImportClient(iobase.ImportClient):
         self._handle_existing_features(default_organism, fresh_load, force_purge)
 
         # Import FASTA sequences, if present
-        self._import_fasta(filename, fasta_filename, organism_name)
+        self._import_fasta(filename, fasta_filename, organism_name, sequence_type)
 
         # Create temporary SQLite database
         gff_db = self._create_sqlite_db(filename)
@@ -92,7 +92,7 @@ class GFFImportClient(iobase.ImportClient):
         # Commit changes
         self.session.commit()
 
-    def _import_fasta(self, gff_file: str, fasta_file: str, organism_name: str) -> None:
+    def _import_fasta(self, gff_file: str, fasta_file: str, organism_name: str, sequence_type: str) -> None:
         """Imports sequences from a FASTA file into the Chado database"""
 
         # Check if the GFF file contains FASTA sequences
@@ -114,7 +114,7 @@ class GFFImportClient(iobase.ImportClient):
         # Import sequences from FASTA file, if present
         if fasta_file:
             fasta_client = fasta.FastaImportClient(self.uri, self.verbose)
-            fasta_client.load(fasta_file, organism_name, "region")
+            fasta_client.load(fasta_file, organism_name, sequence_type)
 
         # Delete temporary file
         if fasta_is_temporary and os.path.exists(fasta_file):
@@ -185,13 +185,13 @@ class GFFImportClient(iobase.ImportClient):
         """Marks features as obsolete"""
 
         # Loop over all features for the given organism in the database
-        for feature_id in self._load_feature_ids(organism_entry):
+        for feature_name in self._load_feature_names(organism_entry):
 
             # Check if the feature is also present in the input file
-            if feature_id not in all_features and feature_id not in top_level_features:
+            if feature_name not in all_features and feature_name not in top_level_features:
 
                 # Mark the feature as obsolete, if necessary
-                self._mark_feature_as_obsolete(organism_entry, feature_id)
+                self._mark_feature_as_obsolete(organism_entry, feature_name)
 
     def _handle_child_feature(self, gff_feature: gffutils.Feature, organism_entry: organism.Organism
                               ) -> Union[None, sequence.Feature]:

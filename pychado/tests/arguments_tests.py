@@ -268,12 +268,24 @@ class TestArguments(unittest.TestCase):
 
     def test_import_gff_args(self):
         # Tests if the command line arguments for the subcommand 'chado import gff' are parsed correctly
-        args = ["chado", "import", "gff", "-f", "testfile", "-a", "testorganism", "--fasta", "testfasta", "testdb"]
+        args = ["chado", "import", "gff", "-f", "testfile", "-a", "testorganism", "--fasta", "testfasta",
+                "--fresh_load", "--force", "--full_genome", "testdb"]
         parsed_args = vars(chado_tools.parse_arguments(args))
         self.assertEqual(parsed_args["input_file"], "testfile")
         self.assertEqual(parsed_args["organism"], "testorganism")
         self.assertEqual(parsed_args["fasta"], "testfasta")
+        self.assertTrue(parsed_args["fresh_load"])
+        self.assertTrue(parsed_args["force"])
+        self.assertTrue(parsed_args["full_genome"])
         self.assertEqual(parsed_args["dbname"], "testdb")
+
+        # Test the default values / alternatives
+        args = ["chado", "import", "gff", "-f", "testfile", "-a", "testorganism", "testdb"]
+        parsed_args = vars(chado_tools.parse_arguments(args))
+        self.assertIsNone(parsed_args["fasta"])
+        self.assertFalse(parsed_args["fresh_load"])
+        self.assertFalse(parsed_args["force"])
+        self.assertFalse(parsed_args["full_genome"])
 
     def test_import_fasta_args(self):
         # Tests if the command line arguments for the subcommand 'chado import fasta' are parsed correctly

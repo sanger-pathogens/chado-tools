@@ -86,6 +86,44 @@ class TestIOClient(unittest.TestCase):
         full_table = self.client.query_all(Species)
         self.assertEqual(len(full_table), 3)
 
+    def test_query_feature_relationship_by_type(self):
+        # Tests the function that creates a query against the feature_relationship table
+        query = self.client.query_feature_relationship_by_type(12, ["testtype"])
+        compiled_query = str(query.statement.compile(compile_kwargs={"literal_binds": True}))
+        self.assertIn("FROM public.feature_relationship JOIN public.cvterm ON public.cvterm.cvterm_id = "
+                      "public.feature_relationship.type_id ", compiled_query)
+        self.assertIn("feature_relationship.subject_id = 12", compiled_query)
+        self.assertIn("cvterm.name IN ('testtype')", compiled_query)
+
+    def test_query_featureprop_by_type(self):
+        # Tests the function that creates a query against the feature_relationship table
+        query = self.client.query_featureprop_by_type(12, ["testtype"])
+        compiled_query = str(query.statement.compile(compile_kwargs={"literal_binds": True}))
+        self.assertIn("FROM public.featureprop JOIN public.cvterm ON public.cvterm.cvterm_id = "
+                      "public.featureprop.type_id ", compiled_query)
+        self.assertIn("featureprop.feature_id = 12", compiled_query)
+        self.assertIn("cvterm.name IN ('testtype')", compiled_query)
+
+    def test_query_feature_synonym_by_type(self):
+        # Tests the function that creates a query against the feature_synonym table
+        query = self.client.query_feature_synonym_by_type(12, ["testtype"])
+        compiled_query = str(query.statement.compile(compile_kwargs={"literal_binds": True}))
+        self.assertIn("FROM public.feature_synonym JOIN public.synonym ON public.synonym.synonym_id = "
+                      "public.feature_synonym.synonym_id JOIN public.cvterm ON public.cvterm.cvterm_id = "
+                      "public.synonym.type_id ", compiled_query)
+        self.assertIn("feature_synonym.feature_id = 12", compiled_query)
+        self.assertIn("cvterm.name IN ('testtype')", compiled_query)
+
+    def test_query_feature_cvterm_by_ontology(self):
+        # Tests the function that creates a query against the feature_cvterm table
+        query = self.client.query_feature_cvterm_by_ontology(12, ["testontology"])
+        compiled_query = str(query.statement.compile(compile_kwargs={"literal_binds": True}))
+        self.assertIn("FROM public.feature_cvterm JOIN public.cvterm ON public.cvterm.cvterm_id = "
+                      "public.feature_cvterm.cvterm_id JOIN public.dbxref ON public.dbxref.dbxref_id = "
+                      "public.cvterm.dbxref_id JOIN public.db ON public.db.db_id = public.dbxref.db_id", compiled_query)
+        self.assertIn("feature_cvterm.feature_id = 12", compiled_query)
+        self.assertIn("db.name IN ('testontology')", compiled_query)
+
 
 class TestImportClient(unittest.TestCase):
     """Test functions for loading data into a CHADO database"""
@@ -173,43 +211,13 @@ class TestImportClient(unittest.TestCase):
         with self.assertRaises(iobase.DatabaseError):
             self.client._load_pub("inexistent_pub")
 
-    def test_handle_feature(self):
-        # Tests the function importing a feature to the database
-        new_entry = sequence.Feature(organism_id=self.default_organism.organism_id,
-                                     type_id=self.default_cvterm.cvterm_id, uniquename="testname", name="name1")
-        first_entry = self.client._handle_feature(new_entry)
-        self.assertIsNotNone(first_entry.feature_id)
-        self.assertEqual(first_entry.uniquename, "testname")
-        self.assertEqual(first_entry.name, "name1")
-
-        another_entry = sequence.Feature(organism_id=self.default_organism.organism_id,
-                                         type_id=self.default_cvterm.cvterm_id, uniquename="testname", name="name2")
-        second_entry = self.client._handle_feature(another_entry)
-        self.assertIs(second_entry, first_entry)
-        self.assertEqual(second_entry.name, "name2")
-
-        yet_another_entry = sequence.Feature(organism_id=self.default_organism.organism_id,
-                                             type_id=self.default_cvterm.cvterm_id, uniquename="othername")
-        third_entry = self.client._handle_feature(yet_another_entry)
-        self.assertIsNot(third_entry, first_entry)
-        self.assertEqual(third_entry.uniquename, "othername")
-
-    def test_handle_featureloc(self):
-        # Tests the function importing a featureloc to the database
-        other_feature = sequence.Feature(organism_id=self.default_organism.organism_id,
-                                         type_id=self.default_cvterm.cvterm_id, uniquename="othername")
-        self.client.add_and_flush(other_feature)
-        new_entry = sequence.FeatureLoc(feature_id=self.default_feature.feature_id,
-                                        srcfeature_id=other_feature.feature_id, strand=1)
-        first_entry = self.client._handle_featureloc(new_entry)
-        self.assertIsNotNone(first_entry.featureloc_id)
-        self.assertEqual(first_entry.strand, 1)
-
-        another_entry = sequence.FeatureLoc(feature_id=self.default_feature.feature_id,
-                                            srcfeature_id=other_feature.feature_id, strand=-1)
-        second_entry = self.client._handle_featureloc(another_entry)
-        self.assertIs(second_entry, first_entry)
-        self.assertEqual(second_entry.strand, -1)
+    def test_load_feature_ids(self):
+        # Tests the function loading all existing IDs of features from a database
+        feature_entry = sequence.Feature(organism_id=self.default_organism.organism_id,
+                                         type_id=self.default_cvterm.cvterm_id, uniquename="testname")
+        self.client.add_and_flush(feature_entry)
+        all_uniquenames = self.client._load_feature_ids(self.default_organism)
+        self.assertIn("testname", all_uniquenames)
 
     def test_handle_db(self):
         # Tests the function importing a db to the database
@@ -279,20 +287,43 @@ class TestImportClient(unittest.TestCase):
         self.assertIsNot(fourth_entry, first_entry)
         self.assertEqual(fourth_entry.name, "othername")
 
-    def test_handle_feature_dbxref(self):
-        # Tests the function importing a feature_dbxref to the database
-        new_entry = sequence.FeatureDbxRef(feature_id=self.default_feature.feature_id,
-                                           dbxref_id=self.default_dbxref.dbxref_id, is_current=True)
-        first_entry = self.client._handle_feature_dbxref(new_entry, [])
-        self.assertIsNotNone(first_entry.feature_dbxref_id)
-        self.assertTrue(first_entry.is_current)
+    def test_handle_feature(self):
+        # Tests the function importing a feature to the database
+        new_entry = sequence.Feature(organism_id=self.default_organism.organism_id,
+                                     type_id=self.default_cvterm.cvterm_id, uniquename="testname", name="name1")
+        first_entry = self.client._handle_feature(new_entry)
+        self.assertIsNotNone(first_entry.feature_id)
+        self.assertEqual(first_entry.uniquename, "testname")
+        self.assertEqual(first_entry.name, "name1")
 
-        another_entry = sequence.FeatureDbxRef(feature_id=self.default_feature.feature_id,
-                                               dbxref_id=self.default_dbxref.dbxref_id, is_current=False)
-        existing_entries = self.client.query_all(sequence.FeatureDbxRef, feature_id=new_entry.feature_id)
-        second_entry = self.client._handle_feature_dbxref(another_entry, existing_entries)
+        another_entry = sequence.Feature(organism_id=self.default_organism.organism_id,
+                                         type_id=self.default_cvterm.cvterm_id, uniquename="testname", name="name2")
+        second_entry = self.client._handle_feature(another_entry)
         self.assertIs(second_entry, first_entry)
-        self.assertFalse(second_entry.is_current)
+        self.assertEqual(second_entry.name, "name2")
+
+        yet_another_entry = sequence.Feature(organism_id=self.default_organism.organism_id,
+                                             type_id=self.default_cvterm.cvterm_id, uniquename="othername")
+        third_entry = self.client._handle_feature(yet_another_entry)
+        self.assertIsNot(third_entry, first_entry)
+        self.assertEqual(third_entry.uniquename, "othername")
+
+    def test_handle_featureloc(self):
+        # Tests the function importing a featureloc to the database
+        other_feature = sequence.Feature(organism_id=self.default_organism.organism_id,
+                                         type_id=self.default_cvterm.cvterm_id, uniquename="othername")
+        self.client.add_and_flush(other_feature)
+        new_entry = sequence.FeatureLoc(feature_id=self.default_feature.feature_id,
+                                        srcfeature_id=other_feature.feature_id, strand=1)
+        first_entry = self.client._handle_featureloc(new_entry)
+        self.assertIsNotNone(first_entry.featureloc_id)
+        self.assertEqual(first_entry.strand, 1)
+
+        another_entry = sequence.FeatureLoc(feature_id=self.default_feature.feature_id,
+                                            srcfeature_id=other_feature.feature_id, strand=-1)
+        second_entry = self.client._handle_featureloc(another_entry)
+        self.assertIs(second_entry, first_entry)
+        self.assertEqual(second_entry.strand, -1)
 
     def test_handle_featureprop(self):
         # Tests the function importing a featureprop to the database
@@ -314,6 +345,49 @@ class TestImportClient(unittest.TestCase):
         self.assertIsNot(third_entry, first_entry)
         self.assertEqual(third_entry.rank, 1)
 
+    def test_delete_featureprop(self):
+        # Tests the function deleting a featureprop from the database
+        existing_entry = sequence.FeatureProp(feature_id=self.default_feature.feature_id,
+                                              type_id=self.default_cvterm.cvterm_id, value="testvalue")
+        self.client.add_and_flush(existing_entry)
+        all_entries = self.client.query_all(sequence.FeatureProp)
+        self.assertIn(existing_entry, all_entries)
+
+        deleted_entries = self.client._delete_featureprop([], [existing_entry])
+        self.assertEqual(len(deleted_entries), 1)
+        self.assertIn(existing_entry, deleted_entries)
+        all_entries = self.client.query_all(sequence.FeatureProp)
+        self.assertNotIn(existing_entry, all_entries)
+
+    def test_handle_feature_dbxref(self):
+        # Tests the function importing a feature_dbxref to the database
+        new_entry = sequence.FeatureDbxRef(feature_id=self.default_feature.feature_id,
+                                           dbxref_id=self.default_dbxref.dbxref_id, is_current=True)
+        first_entry = self.client._handle_feature_dbxref(new_entry, [])
+        self.assertIsNotNone(first_entry.feature_dbxref_id)
+        self.assertTrue(first_entry.is_current)
+
+        another_entry = sequence.FeatureDbxRef(feature_id=self.default_feature.feature_id,
+                                               dbxref_id=self.default_dbxref.dbxref_id, is_current=False)
+        existing_entries = self.client.query_all(sequence.FeatureDbxRef, feature_id=new_entry.feature_id)
+        second_entry = self.client._handle_feature_dbxref(another_entry, existing_entries)
+        self.assertIs(second_entry, first_entry)
+        self.assertFalse(second_entry.is_current)
+
+    def test_delete_feature_dbxref(self):
+        # Tests the function deleting a feature_dbxref from the database
+        existing_entry = sequence.FeatureDbxRef(feature_id=self.default_feature.feature_id,
+                                                dbxref_id=self.default_dbxref.dbxref_id)
+        self.client.add_and_flush(existing_entry)
+        all_entries = self.client.query_all(sequence.FeatureDbxRef)
+        self.assertIn(existing_entry, all_entries)
+
+        deleted_entries = self.client._delete_feature_dbxref([], [existing_entry])
+        self.assertEqual(len(deleted_entries), 1)
+        self.assertIn(existing_entry, deleted_entries)
+        all_entries = self.client.query_all(sequence.FeatureDbxRef)
+        self.assertNotIn(existing_entry, all_entries)
+
     def test_handle_feature_cvterm(self):
         # Tests the function importing a feature_cvterm to the database
         new_entry = sequence.FeatureCvTerm(feature_id=self.default_feature.feature_id,
@@ -328,6 +402,20 @@ class TestImportClient(unittest.TestCase):
         existing_entries = self.client.query_all(sequence.FeatureCvTerm, feature_id=new_entry.feature_id)
         second_entry = self.client._handle_feature_cvterm(another_entry, existing_entries)
         self.assertIs(second_entry, first_entry)
+
+    def test_delete_feature_cvterm(self):
+        # Tests the function deleting a feature_cvterm from the database
+        existing_entry = sequence.FeatureCvTerm(feature_id=self.default_feature.feature_id,
+                                                cvterm_id=self.default_cvterm.cvterm_id, pub_id=self.default_pub.pub_id)
+        self.client.add_and_flush(existing_entry)
+        all_entries = self.client.query_all(sequence.FeatureCvTerm)
+        self.assertIn(existing_entry, all_entries)
+
+        deleted_entries = self.client._delete_feature_cvterm([], [existing_entry])
+        self.assertEqual(len(deleted_entries), 1)
+        self.assertIn(existing_entry, deleted_entries)
+        all_entries = self.client.query_all(sequence.FeatureCvTerm)
+        self.assertNotIn(existing_entry, all_entries)
 
     def test_handle_feature_relationship(self):
         # Tests the function importing a feature_relationship to the database
@@ -348,6 +436,24 @@ class TestImportClient(unittest.TestCase):
         second_entry = self.client._handle_feature_relationship(another_entry, existing_entries)
         self.assertIs(second_entry, first_entry)
         self.assertEqual(second_entry.value, "othervalue")
+
+    def test_delete_feature_relationship(self):
+        # Tests the function deleting a feature_relationship from the database
+        other_feature = sequence.Feature(organism_id=self.default_organism.organism_id,
+                                         type_id=self.default_cvterm.cvterm_id, uniquename="otherfeature")
+        self.client.add_and_flush(other_feature)
+        existing_entry = sequence.FeatureRelationship(subject_id=self.default_feature.feature_id,
+                                                      object_id=other_feature.feature_id,
+                                                      type_id=self.default_cvterm.cvterm_id)
+        self.client.add_and_flush(existing_entry)
+        all_entries = self.client.query_all(sequence.FeatureRelationship)
+        self.assertIn(existing_entry, all_entries)
+
+        deleted_entries = self.client._delete_feature_relationship([], [existing_entry])
+        self.assertEqual(len(deleted_entries), 1)
+        self.assertIn(existing_entry, deleted_entries)
+        all_entries = self.client.query_all(sequence.FeatureRelationship)
+        self.assertNotIn(existing_entry, all_entries)
 
     def test_handle_synonym(self):
         # Tests the function importing a synonym to the database
@@ -378,6 +484,21 @@ class TestImportClient(unittest.TestCase):
         self.assertIs(second_entry, first_entry)
         self.assertFalse(second_entry.is_current)
 
+    def test_delete_feature_synonym(self):
+        # Tests the function deleting a feature_synonym from the database
+        existing_entry = sequence.FeatureSynonym(feature_id=self.default_feature.feature_id,
+                                                 synonym_id=self.default_synonym.synonym_id,
+                                                 pub_id=self.default_pub.pub_id)
+        self.client.add_and_flush(existing_entry)
+        all_entries = self.client.query_all(sequence.FeatureSynonym)
+        self.assertIn(existing_entry, all_entries)
+
+        deleted_entries = self.client._delete_feature_synonym([], [existing_entry])
+        self.assertEqual(len(deleted_entries), 1)
+        self.assertIn(existing_entry, deleted_entries)
+        all_entries = self.client.query_all(sequence.FeatureSynonym)
+        self.assertNotIn(existing_entry, all_entries)
+
     def test_handle_pub(self):
         # Tests the function importing a publication to the database
         new_entry = pub.Pub(uniquename="testname", type_id=self.default_cvterm.cvterm_id, volume="testvolume")
@@ -400,6 +521,28 @@ class TestImportClient(unittest.TestCase):
         existing_entries = self.client.query_all(sequence.FeaturePub, feature_id=new_entry.feature_id)
         second_entry = self.client._handle_feature_pub(another_entry, existing_entries)
         self.assertIs(second_entry, first_entry)
+
+    def test_delete_featurepub(self):
+        # Tests the function deleting a feature_pub from the database
+        existing_entry = sequence.FeaturePub(feature_id=self.default_feature.feature_id, pub_id=self.default_pub.pub_id)
+        self.client.add_and_flush(existing_entry)
+        all_entries = self.client.query_all(sequence.FeaturePub)
+        self.assertIn(existing_entry, all_entries)
+
+        deleted_entries = self.client._delete_feature_pub([], [existing_entry])
+        self.assertEqual(len(deleted_entries), 1)
+        self.assertIn(existing_entry, deleted_entries)
+        all_entries = self.client.query_all(sequence.FeaturePub)
+        self.assertNotIn(existing_entry, all_entries)
+
+    def test_mark_feature_as_obsolete(self):
+        # Tests the function that marks a feature as obsolete
+        feature = sequence.Feature(organism_id=self.default_organism.organism_id, type_id=self.default_cvterm.cvterm_id,
+                                   uniquename="testname", is_obsolete=False)
+        self.client.add_and_flush(feature)
+        obsolete_feature = self.client._mark_feature_as_obsolete(self.default_organism, "testname")
+        self.assertIs(obsolete_feature, feature)
+        self.assertTrue(obsolete_feature.is_obsolete)
 
     def test_update_feature_properties(self):
         # Tests the function that transfers properties from one feature object to another

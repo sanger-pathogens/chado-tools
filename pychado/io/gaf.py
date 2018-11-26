@@ -52,6 +52,9 @@ class GAFImportClient(iobase.ImportClient):
                 # Update/insert feature_cvterm_dbxref entries
                 self._handle_crossrefs(gaf_record, feature_cvterm_entry)
 
+                # Update/insert feature_cvterm_pub entries
+                self._handle_publications(gaf_record, feature_cvterm_entry)
+
         # Commit changes
         self.session.commit()
 
@@ -213,6 +216,32 @@ class GAFImportClient(iobase.ImportClient):
             all_feature_cvterm_dbxrefs.append(feature_cvterm_dbxref_entry)
 
         return all_feature_cvterm_dbxrefs
+
+    def _handle_publications(self, gaf_record: dict, feature_cvterm_entry: sequence.FeatureCvTerm
+                             ) -> List[sequence.FeatureCvTermPub]:
+        """Inserts or updates entries in the 'feature_cvterm_pub' table and returns them"""
+
+        # Extract existing publications for this feature_cvterm from the database
+        existing_feature_cvterm_pubs = self.query_all(sequence.FeatureCvTermPub,
+                                                      feature_cvterm_id=feature_cvterm_entry.feature_cvterm_id)
+        all_feature_cvterm_pubs = []
+
+        # Loop over all publications of the given GAF record
+        publications = gaf_record["DB:Reference"][1:]
+        for publication in publications:
+
+            # Insert/update entry in the 'pub' table
+            new_pub_entry = pub.Pub(uniquename=publication, type_id=self._default_pub.type_id)
+            pub_entry = self._handle_pub(new_pub_entry)
+
+            # Insert/update entry in the 'feature_cvterm_pub' table
+            new_feature_cvterm_pub_entry = sequence.FeatureCvTermPub(
+                feature_cvterm_id=feature_cvterm_entry.feature_cvterm_id, pub_id=pub_entry.pub_id)
+            feature_cvterm_pub_entry = self._handle_feature_cvterm_pub(
+                new_feature_cvterm_pub_entry, existing_feature_cvterm_pubs, publication)
+            all_feature_cvterm_pubs.append(feature_cvterm_pub_entry)
+
+        return all_feature_cvterm_pubs
 
     def _convert_evidence_code(self, abbreviation: str) -> str:
         """Converts the abbreviation for an evidence code into the spelled-out version, if applicable"""

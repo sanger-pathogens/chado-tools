@@ -580,9 +580,9 @@ class ImportClient(IOClient):
     def _handle_feature_cvterm_dbxref(self, new_entry: sequence.FeatureCvTermDbxRef,
                                       existing_entries: List[sequence.FeatureCvTermDbxRef], crossref=""
                                       ) -> sequence.FeatureCvTermDbxRef:
-        """Inserts or updates an entry in the 'feature_pub' table, and returns it"""
+        """Inserts or updates an entry in the 'feature_cvterm_dbxref' table, and returns it"""
 
-        # Check if the feature_pub is already present in the database
+        # Check if the feature_cvterm_dbxref is already present in the database
         matching_entries = utils.filter_objects(existing_entries, dbxref_id=new_entry.dbxref_id)
         if matching_entries:
 
@@ -594,6 +594,25 @@ class ImportClient(IOClient):
             # Insert a new feature_cvterm_dbxref entry
             self.add_and_flush(new_entry)
             self.printer.print("Inserted cross reference '" + crossref + "'")
+            return new_entry
+
+    def _handle_feature_cvterm_pub(self, new_entry: sequence.FeatureCvTermPub,
+                                   existing_entries: List[sequence.FeatureCvTermPub], publication=""
+                                   ) -> sequence.FeatureCvTermPub:
+        """Inserts or updates an entry in the 'feature_cvterm_pub' table, and returns it"""
+
+        # Check if the feature_cvterm_pub is already present in the database
+        matching_entries = utils.filter_objects(existing_entries, pub_id=new_entry.pub_id)
+        if matching_entries:
+
+            # Nothing to update, return existing entry
+            matching_entry = matching_entries[0]
+            return matching_entry
+        else:
+
+            # Insert a new feature_cvterm_pub entry
+            self.add_and_flush(new_entry)
+            self.printer.print("Inserted publication '" + publication + "'")
             return new_entry
 
     def _mark_feature_as_obsolete(self, organism_entry: organism.Organism, uniquename: str) -> sequence.Feature:

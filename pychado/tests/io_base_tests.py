@@ -585,6 +585,28 @@ class TestImportClient(unittest.TestCase):
         self.assertIs(second_entry, new_entry)
         self.assertIsNot(second_entry, another_entry)
 
+    def test_handle_feature_cvterm_pub(self):
+        # Tests the function importing a feature_cvterm_pub to the database
+        pub_entry = pub.Pub(uniquename="otherpub", type_id=self.default_cvterm.cvterm_id)
+        self.client.add_and_flush(pub_entry)
+        feature_cvterm_entry = sequence.FeatureCvTerm(feature_id=self.default_feature.feature_id,
+                                                      cvterm_id=self.default_cvterm.cvterm_id,
+                                                      pub_id=self.default_pub.pub_id)
+        self.client.add_and_flush(feature_cvterm_entry)
+
+        new_entry = sequence.FeatureCvTermPub(feature_cvterm_id=feature_cvterm_entry.feature_cvterm_id,
+                                              pub_id=pub_entry.pub_id)
+        first_entry = self.client._handle_feature_cvterm_pub(new_entry, [])
+        self.assertIs(first_entry, new_entry)
+
+        another_entry = sequence.FeatureCvTermPub(feature_cvterm_id=feature_cvterm_entry.feature_cvterm_id,
+                                                  pub_id=pub_entry.pub_id)
+        existing_entries = self.client.query_all(sequence.FeatureCvTermPub,
+                                                 feature_cvterm_id=new_entry.feature_cvterm_id)
+        second_entry = self.client._handle_feature_cvterm_pub(another_entry, existing_entries)
+        self.assertIs(second_entry, new_entry)
+        self.assertIsNot(second_entry, another_entry)
+
     def test_mark_feature_as_obsolete(self):
         # Tests the function that marks a feature as obsolete
         feature = sequence.Feature(organism_id=self.default_organism.organism_id, type_id=self.default_cvterm.cvterm_id,

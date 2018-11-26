@@ -34,7 +34,6 @@ class TestGAF(unittest.TestCase):
                                    'DB_Object_Name': 'testproduct', 'Synonym': [''], 'DB_Object_Type': 'transcript',
                                    'Taxon_ID': ['testtaxon'], 'Date': 'testdate', 'Assigned_By': 'testdb'}
 
-
     @unittest.mock.patch("pychado.io.gaf.GAFImportClient.query_first")
     def test_load_feature(self, mock_query: unittest.mock.Mock):
         # Tests the function loading the entry from the 'feature' table that corresponds to a GAF record
@@ -190,6 +189,38 @@ class TestGAF(unittest.TestCase):
         self.assertEqual(mock_insert_dbxref.call_count, 1)
         self.assertEqual(mock_insert_feature_cvterm_dbxref.call_count, 1)
         self.assertEqual(len(all_crossrefs), 1)
+
+    @unittest.mock.patch("pychado.io.gaf.GAFImportClient._handle_feature_cvterm_pub")
+    @unittest.mock.patch("pychado.orm.sequence.FeatureCvTermPub")
+    @unittest.mock.patch("pychado.io.gaf.GAFImportClient._handle_pub")
+    @unittest.mock.patch("pychado.orm.pub.Pub")
+    @unittest.mock.patch("pychado.io.gaf.GAFImportClient.query_all")
+    def test_handle_publications(self, mock_query: unittest.mock.Mock,
+                                 mock_pub: unittest.mock.Mock, mock_insert_pub: unittest.mock.Mock,
+                                 mock_feature_cvterm_pub: unittest.mock.Mock,
+                                 mock_insert_feature_cvterm_pub: unittest.mock.Mock):
+        # Tests the function transferring data from a GAF record to the 'feature_cvterm_pub' table
+        self.assertIs(mock_query, self.client.query_all)
+        self.assertIs(mock_pub, pub.Pub)
+        self.assertIs(mock_insert_pub, self.client._handle_pub)
+        self.assertIs(mock_feature_cvterm_pub, sequence.FeatureCvTermPub)
+        self.assertIs(mock_insert_feature_cvterm_pub, self.client._handle_feature_cvterm_pub)
+
+        feature_cvterm_entry = sequence.FeatureCvTerm(feature_id=1, cvterm_id=2, pub_id=3, feature_cvterm_id=4)
+        mock_insert_pub.return_value = utils.EmptyObject(pub_id=33, uniquename="")
+
+        all_publications = self.client._handle_publications(self.default_gaf_record, feature_cvterm_entry)
+        mock_query.assert_called_with(sequence.FeatureCvTermPub, feature_cvterm_id=4)
+        mock_pub.assert_not_called()
+        self.assertEqual(len(all_publications), 0)
+
+        self.default_gaf_record["DB:Reference"].append("new_publication")
+        all_publications = self.client._handle_publications(self.default_gaf_record, feature_cvterm_entry)
+        mock_pub.assert_called_with(uniquename="new_publication", type_id=self.client._default_pub.type_id)
+        self.assertEqual(mock_insert_pub.call_count, 1)
+        mock_feature_cvterm_pub.assert_called_with(feature_cvterm_id=4, pub_id=33)
+        self.assertEqual(mock_insert_feature_cvterm_pub.call_count, 1)
+        self.assertEqual(len(all_publications), 1)
 
     def test_convert_evidence_code(self):
         # Tests the function converting an evidence code abbreviation into the spelled-out form

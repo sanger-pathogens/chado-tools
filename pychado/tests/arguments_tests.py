@@ -57,11 +57,12 @@ class TestCommands(unittest.TestCase):
 
     def test_import_commands(self):
         commands = chado_tools.import_commands()
-        self.assertEqual(len(commands), 4)
+        self.assertEqual(len(commands), 5)
         self.assertIn("essentials", commands)
         self.assertIn("ontology", commands)
         self.assertIn("gff", commands)
         self.assertIn("fasta", commands)
+        self.assertIn("gaf", commands)
 
 
 class TestArguments(unittest.TestCase):
@@ -294,6 +295,14 @@ class TestArguments(unittest.TestCase):
         self.assertEqual(parsed_args["input_file"], "testfile")
         self.assertEqual(parsed_args["organism"], "testorganism")
         self.assertEqual(parsed_args["sequence_type"], "contig")
+        self.assertEqual(parsed_args["dbname"], "testdb")
+
+    def test_import_gaf_args(self):
+        # Tests if the command line arguments for the subcommand 'chado import gaf' are parsed correctly
+        args = ["chado", "import", "gaf", "-f", "testfile", "-a", "testorganism", "testdb"]
+        parsed_args = vars(chado_tools.parse_arguments(args))
+        self.assertEqual(parsed_args["input_file"], "testfile")
+        self.assertEqual(parsed_args["organism"], "testorganism")
         self.assertEqual(parsed_args["dbname"], "testdb")
 
 

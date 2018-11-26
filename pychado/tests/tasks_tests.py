@@ -1,6 +1,6 @@
 import unittest.mock
 from .. import chado_tools, tasks, queries, dbutils, utils, ddl
-from ..io import direct, essentials, ontology, fasta, gff
+from ..io import direct, essentials, ontology, fasta, gff, gaf
 
 
 class TestTasks(unittest.TestCase):
@@ -430,6 +430,16 @@ class TestTasks(unittest.TestCase):
         tasks.run_import_command(args[2], parsed_args, self.uri)
         mock_client.assert_called_with(self.uri, False)
         self.assertIn(unittest.mock.call().load("testfile", "testorganism", "contig"), mock_client.mock_calls)
+
+    @unittest.mock.patch('pychado.io.gaf.GAFImportClient')
+    def test_import_gaf(self, mock_client):
+        # Checks that the function importing a GAF file into the database is correctly called
+        self.assertIs(mock_client, gaf.GAFImportClient)
+        args = ["chado", "import", "gaf", "-f", "testfile", "-a", "testorganism", "testdb"]
+        parsed_args = chado_tools.parse_arguments(args)
+        tasks.run_import_command(args[2], parsed_args, self.uri)
+        mock_client.assert_called_with(self.uri, False)
+        self.assertIn(unittest.mock.call().load("testfile", "testorganism"), mock_client.mock_calls)
 
 
 if __name__ == '__main__':

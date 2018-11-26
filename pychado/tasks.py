@@ -1,5 +1,5 @@
 from . import utils, dbutils, queries, ddl
-from .io import direct, essentials, ontology, fasta, gff
+from .io import direct, essentials, ontology, fasta, gff, gaf
 
 
 def create_connection_string(filename: str, dbname: str) -> str:
@@ -179,5 +179,8 @@ def run_import_command(specifier: str, arguments, uri: str) -> None:
     elif specifier == "fasta":
         loader = fasta.FastaImportClient(uri, arguments.verbose)
         loader.load(file, arguments.organism, arguments.sequence_type)
+    elif specifier == "gaf":
+        loader = gaf.GAFImportClient(uri, arguments.verbose)
+        loader.load(file, arguments.organism)
     else:
         print("Functionality 'import " + specifier + "' is not yet implemented.")

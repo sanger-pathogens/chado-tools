@@ -136,13 +136,13 @@ class ImportClient(IOClient):
             raise DatabaseError("Organism '" + organism_name + "' not present in database")
         return organism_entry
 
-    def _load_feature_ids(self, organism_entry: organism.Organism) -> List[str]:
+    def _load_feature_names(self, organism_entry: organism.Organism) -> List[str]:
         """Returns the IDs of all features for a given organism present in the database"""
-        all_feature_ids = []
-        for feature_id, in self.session.query(sequence.Feature.uniquename).filter_by(
+        all_feature_names = []
+        for feature_name, in self.session.query(sequence.Feature.uniquename).filter_by(
                 organism_id=organism_entry.organism_id):
-            all_feature_ids.append(feature_id)
-        return all_feature_ids
+            all_feature_names.append(feature_name)
+        return all_feature_names
 
     def _handle_db(self, new_entry: general.Db) -> general.Db:
         """Inserts or updates an entry in the 'db' table, and returns it"""
@@ -352,9 +352,12 @@ class ImportClient(IOClient):
         matching_entries = utils.filter_objects(existing_entries, cvterm_id=new_entry.cvterm_id)
         if matching_entries:
 
-            # Nothing to update; return existing entry
+            # Check if the entries in database and file have the same properties, and update if not
             # Note that there are potentially multiple entries (for different pub_ids/ranks). Ignored here.
-            return matching_entries[0]
+            matching_entry = matching_entries[0]
+            if self.update_feature_cvterm_properties(matching_entry, new_entry):
+                self.printer.print("Updated CV term CV term '" + term + "' for feature '" + feature_name + "'")
+            return matching_entry
         else:
 
             # Insert new feature_cvterm entry
@@ -499,7 +502,7 @@ class ImportClient(IOClient):
         """Inserts or updates an entry in the 'pub' table, and returns it"""
 
         # Check if the publication is already present in the database
-        existing_entry = self.query_first(pub.Pub, uniquename=new_entry.uniquename, type_id=new_entry.type_id)
+        existing_entry = self.query_first(pub.Pub, uniquename=new_entry.uniquename)
         if existing_entry:
 
             # Check if the entries in database and file have the same properties, and update if not
@@ -552,6 +555,47 @@ class ImportClient(IOClient):
 
         return deleted_entries
 
+    def _handle_feature_cvtermprop(self, new_entry: sequence.FeatureCvTermProp,
+                                   existing_entries: List[sequence.FeatureCvTermProp], key=""
+                                   ) -> sequence.FeatureCvTermProp:
+        """Inserts or updates an entry in the 'feature_cvtermprop' table, and returns it"""
+
+        # Check if the feature_pub is already present in the database
+        matching_entries = utils.filter_objects(existing_entries, type_id=new_entry.type_id)
+        if matching_entries:
+
+            # Check if the entries in database and file have the same properties, and update if not
+            # Nothing to update, return existing entry
+            matching_entry = matching_entries[0]
+            if self.update_feature_cvtermprop_properties(matching_entry, new_entry):
+                self.printer.print("Updated property '" + key + "' = '" + new_entry.value + "'")
+            return matching_entry
+        else:
+
+            # Insert a new feature_cvtermprop entry
+            self.add_and_flush(new_entry)
+            self.printer.print("Inserted property '" + key + "' = '" + new_entry.value + "'")
+            return new_entry
+
+    def _handle_feature_cvterm_dbxref(self, new_entry: sequence.FeatureCvTermDbxRef,
+                                      existing_entries: List[sequence.FeatureCvTermDbxRef], crossref=""
+                                      ) -> sequence.FeatureCvTermDbxRef:
+        """Inserts or updates an entry in the 'feature_pub' table, and returns it"""
+
+        # Check if the feature_pub is already present in the database
+        matching_entries = utils.filter_objects(existing_entries, dbxref_id=new_entry.dbxref_id)
+        if matching_entries:
+
+            # Nothing to update, return existing entry
+            matching_entry = matching_entries[0]
+            return matching_entry
+        else:
+
+            # Insert a new feature_cvterm_dbxref entry
+            self.add_and_flush(new_entry)
+            self.printer.print("Inserted cross reference '" + crossref + "'")
+            return new_entry
+
     def _mark_feature_as_obsolete(self, organism_entry: organism.Organism, uniquename: str) -> sequence.Feature:
         """Marks a feature as obsolete"""
         feature_entry = self.query_first(sequence.Feature, organism_id=organism_entry.organism_id,
@@ -595,6 +639,24 @@ class ImportClient(IOClient):
         """Updates the properties of a feature_dbxref entry in the database"""
         updated = False
         if utils.copy_attribute(existing_entry, new_entry, "is_current"):
+            updated = True
+        return updated
+
+    @staticmethod
+    def update_feature_cvterm_properties(existing_entry: sequence.FeatureCvTerm,
+                                         new_entry: sequence.FeatureCvTerm) -> bool:
+        """Updates the properties of a feature_cvterm entry in the database"""
+        updated = False
+        if utils.copy_attribute(existing_entry, new_entry, "is_not"):
+            updated = True
+        return updated
+
+    @staticmethod
+    def update_feature_cvtermprop_properties(existing_entry: sequence.FeatureCvTermProp,
+                                             new_entry: sequence.FeatureCvTermProp) -> bool:
+        """Updates the properties of a feature_cvtermprop entry in the database"""
+        updated = False
+        if utils.copy_attribute(existing_entry, new_entry, "value"):
             updated = True
         return updated
 

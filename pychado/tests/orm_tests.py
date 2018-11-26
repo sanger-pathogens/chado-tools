@@ -899,6 +899,46 @@ class TestPublic(unittest.TestCase):
         with self.assertRaises(sqlalchemy.exc.IntegrityError):
             self.client.add_and_flush(obj)
 
+    # Test suite for the Chado 'feature_cvterm_pub' table
+    def add_feature_cvterm_pub_object(self) -> sequence.FeatureCvTermPub:
+        # Insert a random entry into the 'feature_cvterm_pub' table
+        feature_cvterm_obj = self.add_feature_cvterm_object()
+        pub_obj = self.add_pub_object()
+        feature_cvterm_pub_obj = sequence.FeatureCvTermPub(feature_cvterm_id=feature_cvterm_obj.feature_cvterm_id,
+                                                           pub_id=pub_obj.pub_id)
+        self.client.add_and_flush(feature_cvterm_pub_obj)
+        return feature_cvterm_pub_obj
+
+    def test_feature_cvterm_pub(self):
+        # Test adding a new 'feature_cvterm_pub' object to the database
+        existing_obj = self.add_feature_cvterm_pub_object()
+        self.assertIsNotNone(existing_obj.feature_cvterm_pub_id)
+        self.assertEqual(existing_obj.__tablename__, 'feature_cvterm_pub')
+
+    def test_feature_cvterm_pub_feature_cvterm_id_fkey(self):
+        # Test foreign key constraint on 'feature_cvterm_pub.feature_cvterm_id'
+        existing_obj = self.add_feature_cvterm_pub_object()
+        obj = sequence.FeatureCvTermPub(feature_cvterm_id=(existing_obj.feature_cvterm_id+100),
+                                        pub_id=existing_obj.pub_id)
+        with self.assertRaises(sqlalchemy.exc.IntegrityError):
+            self.client.add_and_flush(obj)
+
+    def test_feature_cvterm_pub_pub_id_fkey(self):
+        # Test foreign key constraint on 'feature_cvterm_pub.pub_id'
+        existing_obj = self.add_feature_cvterm_pub_object()
+        obj = sequence.FeatureCvTermPub(feature_cvterm_id=existing_obj.feature_cvterm_id,
+                                        pub_id=(existing_obj.pub_id+100))
+        with self.assertRaises(sqlalchemy.exc.IntegrityError):
+            self.client.add_and_flush(obj)
+
+    def test_feature_cvterm_pub_c1(self):
+        # Test unique constraint on 'feature_cvterm_pub.feature_cvterm_id', 'feature_cvterm_pub.pub_id'
+        existing_obj = self.add_feature_cvterm_pub_object()
+        obj = sequence.FeatureCvTermPub(feature_cvterm_id=existing_obj.feature_cvterm_id,
+                                        pub_id=existing_obj.pub_id)
+        with self.assertRaises(sqlalchemy.exc.IntegrityError):
+            self.client.add_and_flush(obj)
+
     # Test suite for the Chado 'feature_dbxref' table
     def add_feature_dbxref_object(self) -> sequence.FeatureDbxRef:
         # Insert a random entry into the 'feature_dbxref' table

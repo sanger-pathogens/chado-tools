@@ -36,7 +36,7 @@ class TestGFF(unittest.TestCase):
         dbutils.drop_database(cls.connection_uri, True)
 
     def setUp(self):
-        # Inserts default entries into database tables
+        # Creates a default GFF file entry
         self.default_gff_entry = gffutils.Feature(
             id="testid", seqid="testseqid", source="testsource", featuretype="testtype", start=1, end=30, score="3.5",
             strand="+", frame="2", attributes={
@@ -374,10 +374,10 @@ class TestGFF(unittest.TestCase):
         self.assertEqual(len(all_ontology_terms), 1)
 
     @unittest.mock.patch("pychado.io.gff.GFFImportClient._mark_feature_as_obsolete")
-    @unittest.mock.patch("pychado.io.gff.GFFImportClient._load_feature_ids")
+    @unittest.mock.patch("pychado.io.gff.GFFImportClient._load_feature_names")
     def test_mark_obsolete_features(self, mock_load: unittest.mock.Mock, mock_mark: unittest.mock.Mock):
         # Tests the function that marks features as obsolete if they are not present in a given dictionary
-        self.assertIs(mock_load, self.client._load_feature_ids)
+        self.assertIs(mock_load, self.client._load_feature_names)
         self.assertIs(mock_mark, self.client._mark_feature_as_obsolete)
         organism_entry = organism.Organism(genus="", species="", abbreviation="testorganism", organism_id=1)
         mock_load.return_value = ["id1", "id2", "id3", "seq"]

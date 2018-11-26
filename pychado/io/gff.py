@@ -185,13 +185,13 @@ class GFFImportClient(iobase.ImportClient):
         """Marks features as obsolete"""
 
         # Loop over all features for the given organism in the database
-        for feature_id in self._load_feature_ids(organism_entry):
+        for feature_name in self._load_feature_names(organism_entry):
 
             # Check if the feature is also present in the input file
-            if feature_id not in all_features and feature_id not in top_level_features:
+            if feature_name not in all_features and feature_name not in top_level_features:
 
                 # Mark the feature as obsolete, if necessary
-                self._mark_feature_as_obsolete(organism_entry, feature_id)
+                self._mark_feature_as_obsolete(organism_entry, feature_name)
 
     def _handle_child_feature(self, gff_feature: gffutils.Feature, organism_entry: organism.Organism
                               ) -> Union[None, sequence.Feature]:

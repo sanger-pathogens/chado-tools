@@ -216,7 +216,7 @@ class TestImportClient(unittest.TestCase):
         feature_entry = sequence.Feature(organism_id=self.default_organism.organism_id,
                                          type_id=self.default_cvterm.cvterm_id, uniquename="testname")
         self.client.add_and_flush(feature_entry)
-        all_uniquenames = self.client._load_feature_ids(self.default_organism)
+        all_uniquenames = self.client._load_feature_names(self.default_organism)
         self.assertIn("testname", all_uniquenames)
 
     def test_handle_db(self):
@@ -292,20 +292,22 @@ class TestImportClient(unittest.TestCase):
         new_entry = sequence.Feature(organism_id=self.default_organism.organism_id,
                                      type_id=self.default_cvterm.cvterm_id, uniquename="testname", name="name1")
         first_entry = self.client._handle_feature(new_entry)
-        self.assertIsNotNone(first_entry.feature_id)
+        self.assertIs(first_entry, new_entry)
         self.assertEqual(first_entry.uniquename, "testname")
         self.assertEqual(first_entry.name, "name1")
 
         another_entry = sequence.Feature(organism_id=self.default_organism.organism_id,
                                          type_id=self.default_cvterm.cvterm_id, uniquename="testname", name="name2")
         second_entry = self.client._handle_feature(another_entry)
-        self.assertIs(second_entry, first_entry)
+        self.assertIs(second_entry, new_entry)
+        self.assertIsNot(second_entry, another_entry)
         self.assertEqual(second_entry.name, "name2")
 
         yet_another_entry = sequence.Feature(organism_id=self.default_organism.organism_id,
                                              type_id=self.default_cvterm.cvterm_id, uniquename="othername")
         third_entry = self.client._handle_feature(yet_another_entry)
-        self.assertIsNot(third_entry, first_entry)
+        self.assertIsNot(third_entry, new_entry)
+        self.assertIs(third_entry, yet_another_entry)
         self.assertEqual(third_entry.uniquename, "othername")
 
     def test_handle_featureloc(self):
@@ -316,13 +318,14 @@ class TestImportClient(unittest.TestCase):
         new_entry = sequence.FeatureLoc(feature_id=self.default_feature.feature_id,
                                         srcfeature_id=other_feature.feature_id, strand=1)
         first_entry = self.client._handle_featureloc(new_entry)
-        self.assertIsNotNone(first_entry.featureloc_id)
+        self.assertIs(first_entry, new_entry)
         self.assertEqual(first_entry.strand, 1)
 
         another_entry = sequence.FeatureLoc(feature_id=self.default_feature.feature_id,
                                             srcfeature_id=other_feature.feature_id, strand=-1)
         second_entry = self.client._handle_featureloc(another_entry)
-        self.assertIs(second_entry, first_entry)
+        self.assertIs(second_entry, new_entry)
+        self.assertIsNot(second_entry, another_entry)
         self.assertEqual(second_entry.strand, -1)
 
     def test_handle_featureprop(self):
@@ -330,19 +333,21 @@ class TestImportClient(unittest.TestCase):
         new_entry = sequence.FeatureProp(feature_id=self.default_feature.feature_id,
                                          type_id=self.default_cvterm.cvterm_id, value="testvalue")
         first_entry = self.client._handle_featureprop(new_entry, [])
-        self.assertIsNotNone(first_entry.featureprop_id)
+        self.assertIs(first_entry, new_entry)
         self.assertEqual(first_entry.rank, 0)
 
         another_entry = sequence.FeatureProp(feature_id=self.default_feature.feature_id,
                                              type_id=self.default_cvterm.cvterm_id, value="testvalue")
         existing_entries = self.client.query_all(sequence.FeatureProp, feature_id=new_entry.feature_id)
         second_entry = self.client._handle_featureprop(another_entry, existing_entries)
-        self.assertIs(second_entry, first_entry)
+        self.assertIs(second_entry, new_entry)
+        self.assertIsNot(second_entry, another_entry)
 
         yet_another_entry = sequence.FeatureProp(feature_id=self.default_feature.feature_id,
                                                  type_id=self.default_cvterm.cvterm_id, value="othervalue")
         third_entry = self.client._handle_featureprop(yet_another_entry, existing_entries)
-        self.assertIsNot(third_entry, first_entry)
+        self.assertIsNot(third_entry, new_entry)
+        self.assertIs(third_entry, yet_another_entry)
         self.assertEqual(third_entry.rank, 1)
 
     def test_delete_featureprop(self):
@@ -364,14 +369,15 @@ class TestImportClient(unittest.TestCase):
         new_entry = sequence.FeatureDbxRef(feature_id=self.default_feature.feature_id,
                                            dbxref_id=self.default_dbxref.dbxref_id, is_current=True)
         first_entry = self.client._handle_feature_dbxref(new_entry, [])
-        self.assertIsNotNone(first_entry.feature_dbxref_id)
+        self.assertIs(first_entry, new_entry)
         self.assertTrue(first_entry.is_current)
 
         another_entry = sequence.FeatureDbxRef(feature_id=self.default_feature.feature_id,
                                                dbxref_id=self.default_dbxref.dbxref_id, is_current=False)
         existing_entries = self.client.query_all(sequence.FeatureDbxRef, feature_id=new_entry.feature_id)
         second_entry = self.client._handle_feature_dbxref(another_entry, existing_entries)
-        self.assertIs(second_entry, first_entry)
+        self.assertIs(second_entry, new_entry)
+        self.assertIsNot(second_entry, another_entry)
         self.assertFalse(second_entry.is_current)
 
     def test_delete_feature_dbxref(self):
@@ -393,15 +399,17 @@ class TestImportClient(unittest.TestCase):
         new_entry = sequence.FeatureCvTerm(feature_id=self.default_feature.feature_id,
                                            cvterm_id=self.default_cvterm.cvterm_id, pub_id=self.default_pub.pub_id)
         first_entry = self.client._handle_feature_cvterm(new_entry, [])
-        self.assertIsNotNone(first_entry.feature_cvterm_id)
-        self.assertEqual(first_entry.rank, 0)
+        self.assertIs(first_entry, new_entry)
+        self.assertFalse(first_entry.is_not)
 
         another_entry = sequence.FeatureCvTerm(feature_id=self.default_feature.feature_id,
                                                cvterm_id=self.default_cvterm.cvterm_id, pub_id=self.default_pub.pub_id,
-                                               rank=1)
+                                               is_not=True)
         existing_entries = self.client.query_all(sequence.FeatureCvTerm, feature_id=new_entry.feature_id)
         second_entry = self.client._handle_feature_cvterm(another_entry, existing_entries)
-        self.assertIs(second_entry, first_entry)
+        self.assertIs(second_entry, new_entry)
+        self.assertIsNot(second_entry, another_entry)
+        self.assertTrue(second_entry.is_not)
 
     def test_delete_feature_cvterm(self):
         # Tests the function deleting a feature_cvterm from the database
@@ -426,7 +434,7 @@ class TestImportClient(unittest.TestCase):
                                                  object_id=other_feature.feature_id,
                                                  type_id=self.default_cvterm.cvterm_id, value="testvalue")
         first_entry = self.client._handle_feature_relationship(new_entry, [])
-        self.assertIsNotNone(first_entry.feature_relationship_id)
+        self.assertIs(first_entry, new_entry)
         self.assertEqual(first_entry.value, "testvalue")
 
         another_entry = sequence.FeatureRelationship(subject_id=self.default_feature.feature_id,
@@ -434,7 +442,8 @@ class TestImportClient(unittest.TestCase):
                                                      type_id=self.default_cvterm.cvterm_id, value="othervalue")
         existing_entries = self.client.query_all(sequence.FeatureRelationship, subject_id=new_entry.subject_id)
         second_entry = self.client._handle_feature_relationship(another_entry, existing_entries)
-        self.assertIs(second_entry, first_entry)
+        self.assertIs(second_entry, new_entry)
+        self.assertIsNot(second_entry, another_entry)
         self.assertEqual(second_entry.value, "othervalue")
 
     def test_delete_feature_relationship(self):
@@ -459,7 +468,7 @@ class TestImportClient(unittest.TestCase):
         # Tests the function importing a synonym to the database
         new_entry = sequence.Synonym(name="testname", type_id=self.default_cvterm.cvterm_id, synonym_sgml="testsgml")
         first_entry = self.client._handle_synonym(new_entry)
-        self.assertIsNotNone(first_entry.synonym_id)
+        self.assertIs(first_entry, new_entry)
         self.assertEqual(first_entry.synonym_sgml, "testsgml")
 
         another_entry = sequence.Synonym(name="testname", type_id=self.default_cvterm.cvterm_id, synonym_sgml="sgml")
@@ -473,7 +482,7 @@ class TestImportClient(unittest.TestCase):
                                             feature_id=self.default_feature.feature_id,
                                             pub_id=self.default_pub.pub_id, is_current=True)
         first_entry = self.client._handle_feature_synonym(new_entry, [])
-        self.assertIsNotNone(first_entry.feature_synonym_id)
+        self.assertIs(first_entry, new_entry)
         self.assertTrue(first_entry.is_current)
 
         another_entry = sequence.FeatureSynonym(synonym_id=self.default_synonym.synonym_id,
@@ -481,7 +490,8 @@ class TestImportClient(unittest.TestCase):
                                                 pub_id=self.default_pub.pub_id, is_current=False)
         existing_entries = self.client.query_all(sequence.FeatureSynonym, feature_id=new_entry.feature_id)
         second_entry = self.client._handle_feature_synonym(another_entry, existing_entries)
-        self.assertIs(second_entry, first_entry)
+        self.assertIs(second_entry, new_entry)
+        self.assertIsNot(second_entry, another_entry)
         self.assertFalse(second_entry.is_current)
 
     def test_delete_feature_synonym(self):
@@ -503,7 +513,7 @@ class TestImportClient(unittest.TestCase):
         # Tests the function importing a publication to the database
         new_entry = pub.Pub(uniquename="testname", type_id=self.default_cvterm.cvterm_id, volume="testvolume")
         first_entry = self.client._handle_pub(new_entry)
-        self.assertIsNotNone(first_entry.pub_id)
+        self.assertIs(first_entry, new_entry)
         self.assertEqual(first_entry.volume, "testvolume")
 
         another_entry = pub.Pub(uniquename="testname", type_id=self.default_cvterm.cvterm_id, volume="othervolume")
@@ -515,12 +525,13 @@ class TestImportClient(unittest.TestCase):
         # Tests the function importing a feature_pub to the database
         new_entry = sequence.FeaturePub(feature_id=self.default_feature.feature_id, pub_id=self.default_pub.pub_id)
         first_entry = self.client._handle_feature_pub(new_entry, [])
-        self.assertIsNotNone(first_entry.feature_pub_id)
+        self.assertIs(first_entry, new_entry)
 
         another_entry = sequence.FeaturePub(feature_id=self.default_feature.feature_id, pub_id=self.default_pub.pub_id)
         existing_entries = self.client.query_all(sequence.FeaturePub, feature_id=new_entry.feature_id)
         second_entry = self.client._handle_feature_pub(another_entry, existing_entries)
-        self.assertIs(second_entry, first_entry)
+        self.assertIs(second_entry, new_entry)
+        self.assertIsNot(second_entry, another_entry)
 
     def test_delete_featurepub(self):
         # Tests the function deleting a feature_pub from the database
@@ -534,6 +545,45 @@ class TestImportClient(unittest.TestCase):
         self.assertIn(existing_entry, deleted_entries)
         all_entries = self.client.query_all(sequence.FeaturePub)
         self.assertNotIn(existing_entry, all_entries)
+
+    def test_handle_feature_cvtermprop(self):
+        # Tests the function importing a feature_cvtermprop to the database
+        feature_cvterm_entry = sequence.FeatureCvTerm(feature_id=self.default_feature.feature_id,
+                                                      cvterm_id=self.default_cvterm.cvterm_id,
+                                                      pub_id=self.default_pub.pub_id)
+        self.client.add_and_flush(feature_cvterm_entry)
+        new_entry = sequence.FeatureCvTermProp(feature_cvterm_id=feature_cvterm_entry.feature_cvterm_id,
+                                               type_id=self.default_cvterm.cvterm_id, value="testvalue")
+        first_entry = self.client._handle_feature_cvtermprop(new_entry, [])
+        self.assertIs(first_entry, new_entry)
+        self.assertEqual(first_entry.value, "testvalue")
+
+        another_entry = sequence.FeatureCvTermProp(feature_cvterm_id=feature_cvterm_entry.feature_cvterm_id,
+                                                   type_id=self.default_cvterm.cvterm_id, value="othervalue")
+        existing_entries = self.client.query_all(sequence.FeatureCvTermProp,
+                                                 feature_cvterm_id=new_entry.feature_cvterm_id)
+        second_entry = self.client._handle_feature_cvtermprop(another_entry, existing_entries)
+        self.assertIs(second_entry, first_entry)
+        self.assertEqual(second_entry.value, "othervalue")
+
+    def test_handle_feature_cvterm_dbxref(self):
+        # Tests the function importing a feature_cvterm_dbxref to the database
+        feature_cvterm_entry = sequence.FeatureCvTerm(feature_id=self.default_feature.feature_id,
+                                                      cvterm_id=self.default_cvterm.cvterm_id,
+                                                      pub_id=self.default_pub.pub_id)
+        self.client.add_and_flush(feature_cvterm_entry)
+        new_entry = sequence.FeatureCvTermDbxRef(feature_cvterm_id=feature_cvterm_entry.feature_cvterm_id,
+                                                 dbxref_id=self.default_dbxref.dbxref_id)
+        first_entry = self.client._handle_feature_cvterm_dbxref(new_entry, [])
+        self.assertIs(first_entry, new_entry)
+
+        another_entry = sequence.FeatureCvTermDbxRef(feature_cvterm_id=feature_cvterm_entry.feature_cvterm_id,
+                                                     dbxref_id=self.default_dbxref.dbxref_id)
+        existing_entries = self.client.query_all(sequence.FeatureCvTermDbxRef,
+                                                 feature_cvterm_id=new_entry.feature_cvterm_id)
+        second_entry = self.client._handle_feature_cvterm_dbxref(another_entry, existing_entries)
+        self.assertIs(second_entry, new_entry)
+        self.assertIsNot(second_entry, another_entry)
 
     def test_mark_feature_as_obsolete(self):
         # Tests the function that marks a feature as obsolete
@@ -599,6 +649,14 @@ class TestImportClient(unittest.TestCase):
         self.assertTrue(updated)
         self.assertFalse(feature_dbxref1.is_current)
 
+    def test_update_feature_cvterm_properties(self):
+        # Tests the function that transfers properties from one feature_cvterm object to another
+        feature_cvterm1 = sequence.FeatureCvTerm(cvterm_id=1, feature_id=1, pub_id=1, is_not=True)
+        feature_cvterm2 = sequence.FeatureCvTerm(cvterm_id=1, feature_id=1, pub_id=1, is_not=False)
+        updated = self.client.update_feature_cvterm_properties(feature_cvterm1, feature_cvterm2)
+        self.assertTrue(updated)
+        self.assertFalse(feature_cvterm1.is_not)
+
     def test_update_pub_properties(self):
         # Tests the function that transfers properties from one pub object to another
         pub1 = pub.Pub(uniquename="testname", type_id=1, title="testtitle", volume="testvolume")
@@ -606,6 +664,14 @@ class TestImportClient(unittest.TestCase):
         updated = self.client.update_pub_properties(pub1, pub2)
         self.assertTrue(updated)
         self.assertEqual(pub1.volume, "othervolume")
+
+    def test_update_feature_cvtermprop_properties(self):
+        # Tests the function that transfers properties from one feature_cvtermprop object to another
+        feature_cvtermprop1 = sequence.FeatureCvTermProp(feature_cvterm_id=1, type_id=1, value="testvalue")
+        feature_cvtermprop2 = sequence.FeatureCvTermProp(feature_cvterm_id=1, type_id=1, value="othervalue")
+        updated = self.client.update_feature_cvtermprop_properties(feature_cvtermprop1, feature_cvtermprop2)
+        self.assertTrue(updated)
+        self.assertEqual(feature_cvtermprop1.value, "othervalue")
 
 
 if __name__ == '__main__':

@@ -270,11 +270,12 @@ class TestArguments(unittest.TestCase):
     def test_import_gff_args(self):
         # Tests if the command line arguments for the subcommand 'chado import gff' are parsed correctly
         args = ["chado", "import", "gff", "-f", "testfile", "-a", "testorganism", "--fasta", "testfasta",
-                "--fresh_load", "--force", "--full_genome", "testdb"]
+                "-t", "contig", "--fresh_load", "--force", "--full_genome", "testdb"]
         parsed_args = vars(chado_tools.parse_arguments(args))
         self.assertEqual(parsed_args["input_file"], "testfile")
         self.assertEqual(parsed_args["organism"], "testorganism")
         self.assertEqual(parsed_args["fasta"], "testfasta")
+        self.assertEqual(parsed_args["sequence_type"], "contig")
         self.assertTrue(parsed_args["fresh_load"])
         self.assertTrue(parsed_args["force"])
         self.assertTrue(parsed_args["full_genome"])

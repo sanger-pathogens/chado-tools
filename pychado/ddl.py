@@ -68,6 +68,14 @@ class DDLClient(ChadoClient):
             triggers_condition.bindparams(trigger_name=trigger_name)).select()
         return self.connection.execute(exists_query).scalar()
 
+    def function_exists(self, schema: str, function_name: str) -> bool:
+        """Checks if a given function exists in a database"""
+        functions_table = sqlalchemy.text("information_schema.routines")
+        functions_condition = sqlalchemy.text("routine_schema=:schema AND routine_name=:function")
+        exists_query = sqlalchemy.exists().select_from(functions_table).where(
+            functions_condition.bindparams(schema=schema, function=function_name)).select()
+        return self.connection.execute(exists_query).scalar()
+
     def role_exists(self, role_name: str) -> bool:
         """Checks if a given role/user exists in a database"""
         roles_table = sqlalchemy.text("pg_catalog.pg_roles")
@@ -237,15 +245,12 @@ class AuditSchemaSetupClient(SchemaSetupClient):
     def create(self):
         """Main function for filling the schema with life"""
 
-        # Make sure all required tables in the public schema exist
-        public_client = PublicSchemaSetupClient(self.uri)
-        public_client.create()
-        data_tables = public_client.metadata.sorted_tables
-
         # Create the schema
         self.create_schema()
 
         # Create the tables
+        public_client = PublicSchemaSetupClient(self.uri)
+        data_tables = public_client.metadata.sorted_tables
         audit_tables = self.create_audit_tables(data_tables)
         audit_tablenames = [table.name for table in audit_tables]
         self.metadata.create_all(self.engine, tables=([self.master_table] + audit_tables))
@@ -352,15 +357,12 @@ class AuditBackupSchemaSetupClient(AuditSchemaSetupClient):
     def create(self):
         """Main function for filling the schema with life"""
 
-        # Make sure all required tables in the public schema exist
-        public_client = PublicSchemaSetupClient(self.uri)
-        public_client.create()
-        data_tables = public_client.metadata.sorted_tables
-
         # Create the schema
         self.create_schema()
 
         # Create the tables
+        public_client = PublicSchemaSetupClient(self.uri)
+        data_tables = public_client.metadata.sorted_tables
         audit_tables = self.create_audit_tables(data_tables)
         audit_tablenames = [table.name for table in audit_tables]
         self.metadata.create_all(self.engine, tables=([self.backup_master_table] + audit_tables))
@@ -374,13 +376,27 @@ class AuditBackupSchemaSetupClient(AuditSchemaSetupClient):
         self.create_backup_function()
         print("Created a back_up function in schema '" + self.schema + "'.")
 
+    def execute_backup_function(self, date: str):
+        """Executes the function that backs up the audit tables"""
+        if self.function_exists(self.schema, self.backup_function_name()):
+            transaction = self.connection.begin()
+            res = self.connection.execute(sqlalchemy.func.audit_backup.backup_proc(date)).scalar()
+            transaction.commit()
+            print("Moved " + str(res) + " database entries to schema " + self.schema)
+        else:
+            print("Function '" + self.schema + "." + self.backup_function_name() + "' does not exist")
+
     def create_backup_function(self):
         """Creates a function for moving audit tracks from the audit schema to the audit_backup schema"""
-        function_name = self.schema + ".backup_proc"
+        function_name = self.schema + "." + self.backup_function_name()
         declarations = self.backup_declarations()
         definition = self.backup_function()
         backup_creator = self.backup_function_wrapper(function_name, declarations, definition)
         self.execute_ddl(backup_creator)
+
+    @staticmethod
+    def backup_function_name() -> str:
+        return "backup_proc"
 
     @staticmethod
     def backup_function_wrapper(name: str, declarations: List[str], definition: str) -> str:
@@ -393,7 +409,7 @@ class AuditBackupSchemaSetupClient(AuditSchemaSetupClient):
 
     @staticmethod
     def backup_declarations() -> List[str]:
-        return ["all_rows bigint", "table_rows bigint", "tabname RECORD"]
+        return ["all_rows BIGINT", "table_rows BIGINT", "tabname RECORD"]
 
     @staticmethod
     def backup_function() -> str:

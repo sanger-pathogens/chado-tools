@@ -222,7 +222,7 @@ class TestTasks(unittest.TestCase):
     @unittest.mock.patch('pychado.dbutils.query_to_file')
     def test_query(self, mock_query, mock_read):
         # Checks that the function querying a database is correctly called
-        self.assertIs(mock_query, dbutils.query_to_file)
+        self.assertIs(mock_query, dbutils.run_query)
         self.assertIs(mock_read, utils.read_text)
         # Direct query
         args = ["chado", "query", "-H", "-d", ";", "-o", "testfile", "-q", "testquery", "testdb"]
@@ -252,7 +252,7 @@ class TestTasks(unittest.TestCase):
         # Checks that the function providing database statistics is correctly called
         self.assertIs(mock_load, queries.load_query)
         self.assertIs(mock_set, queries.set_query_conditions)
-        self.assertIs(mock_query, dbutils.query_to_file)
+        self.assertIs(mock_query, dbutils.run_query)
 
         args = ["chado", "extract", "stats", "--start_date", "teststartdate", "--end_date", "testenddate",
                 "-a", "testorganism", "testdb"]
@@ -283,7 +283,7 @@ class TestTasks(unittest.TestCase):
         # Checks that the function extracting organisms is correctly called
         self.assertIs(mock_load, queries.load_query)
         self.assertIs(mock_set, queries.set_query_conditions)
-        self.assertIs(mock_query, dbutils.query_to_file)
+        self.assertIs(mock_query, dbutils.run_query)
 
         args = ["chado", "extract", "organisms", "testdb"]
         parsed_args = chado_tools.parse_arguments(args)
@@ -304,7 +304,7 @@ class TestTasks(unittest.TestCase):
         # Checks that the function extracting CV terms is correctly called
         self.assertIs(mock_load, queries.load_query)
         self.assertIs(mock_set, queries.set_query_conditions)
-        self.assertIs(mock_query, dbutils.query_to_file)
+        self.assertIs(mock_query, dbutils.run_query)
 
         args = ["chado", "extract", "cvterms", "--database", "testdatabase", "--vocabulary", "testvocabulary", "testdb"]
         parsed_args = chado_tools.parse_arguments(args)
@@ -322,7 +322,7 @@ class TestTasks(unittest.TestCase):
         # Checks that the function extracting GeneDB products is correctly called
         self.assertIs(mock_load, queries.load_query)
         self.assertIs(mock_set, queries.set_query_conditions)
-        self.assertIs(mock_query, dbutils.query_to_file)
+        self.assertIs(mock_query, dbutils.run_query)
 
         args = ["chado", "extract", "genedb_products", "-a", "testorganism", "testdb"]
         parsed_args = chado_tools.parse_arguments(args)

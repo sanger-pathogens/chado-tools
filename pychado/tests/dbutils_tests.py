@@ -145,7 +145,7 @@ class TestConnection(unittest.TestCase):
 
         # Export the entire table to a file and check that the result is as expected
         temp_file = os.path.join(os.getcwd(), "tmp.csv")
-        dbutils.query_to_file(uri, "SELECT name, clade, legs, extinct FROM species ORDER BY legs ASC", temp_file,
+        dbutils.run_query(uri, "SELECT name, clade, legs, extinct FROM species ORDER BY legs ASC", temp_file,
                               ";", True)
         self.assertTrue(os.path.exists(temp_file))
         output_file = os.path.join(self.data_dir, "dbutils_species_table.csv")

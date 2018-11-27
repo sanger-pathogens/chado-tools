@@ -137,9 +137,8 @@ def connect_to_database(uri: str) -> None:
     print("Connection to database closed.")
 
 
-def query_to_file(uri: str, query, filename: str, delimiter: str, header: bool) -> None:
-    """Connects to a database, runs a single query, and writes the result into a CSV file"""
-    # Query database and convert result to rows
+def run_query(uri: str, query, header: bool) -> list:
+    """Connects to a database and runs a single query"""
     conn = open_connection(uri)
     if isinstance(query, sqlalchemy.sql.expression.TextClause):
         result = conn.execute(query)
@@ -153,11 +152,4 @@ def query_to_file(uri: str, query, filename: str, delimiter: str, header: bool) 
         rows.append(row)
     result.close()
     close_connection(conn)
-
-    # Write table to file
-    file = utils.open_file_write(filename)
-    for row in rows:
-        file.write(utils.list_to_string(row, delimiter) + "\n")
-    utils.close(file)
-    if filename:
-        print("Data exported to " + filename)
+    return rows

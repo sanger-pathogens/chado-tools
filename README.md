@@ -1,15 +1,36 @@
 # chado-tools
 
-Python3 command line script providing various tools for accessing CHADO databases
+Python3 command line script providing various tools for accessing CHADO databases.
 
-[![Build Status](https://travis-ci.org/sanger-pathogens/chado-tools.svg?branch=master)](https://travis-ci.org/sanger-pathogens/chado-tools)
+[![Build Status](https://travis-ci.org/sanger-pathogens/chado-tools.svg?branch=master)](https://travis-ci.org/sanger-pathogens/chado-tools)   
+[![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-brightgreen.svg)](https://github.com/sanger-pathogens/chado-tools/blob/master/LICENSE)   
+[![install with bioconda](https://img.shields.io/badge/install%20with-bioconda-brightgreen.svg?style=flat-square)](http://bioconda.github.io/recipes/chado-tools/README.html)   
+[![Container ready](https://img.shields.io/badge/container-ready-brightgreen.svg)](https://quay.io/repository/biocontainers/chado-tools)   
+[![codecov](https://codecov.io/gh/sanger-pathogens/chado-tools/branch/master/graph/badge.svg)](https://codecov.io/gh/sanger-pathogens/chado-tools)
 
-## Prerequisites
+## Contents
+  * [Installation](#installation)
+    * [Required dependencies](#required-dependencies)
+    * [From source](#from-source)
+    * [Using pip](#using-pip)
+    * [Using Bioconda](#using-bioconda)
+  * [Usage](#usage)
+    * [Available commands](#available-commands)
+    * [Examples](#examples)
+    * [Note](#note)
+  * [License](#license)
+  * [Feedback/Issues](#feedbackissues)
+
+## Installation
+
+There are a number of ways to install chado-tools and details are provided below. If you encounter an issue when installing chado-tools please contact your local system administrator. If you encounter a bug please log it [here](https://github.com/sanger-pathogens/chado-tools/issues) or email us at path-help@sanger.ac.uk.
+
+### Required dependencies
 
 * Python 3.6 or higher
 * PostgreSQL 9.6 or higher
 
-## Installation from source
+### From source
 
 Download the latest release from this github repository, or clone the repository to obtain the most recent updates.
 
@@ -23,17 +44,19 @@ If the tests all pass, install:
 
     python3 setup.py install
 
-## Alternative installations
+### Using pip
 
 You can install the program from the *Python Package Index (PyPI)* using the command
 
     pip install chado-tools
-    
+
+Now change the default connection parameters by running `chado init`. You can always reset them to the original state by running `chado reset`.
+
+### Using Bioconda
+
 The program is also available as *Bioconda* package. Install it with the command
 
     conda install -c bioconda chado-tools
-
-Now change the default connection parameters by running `chado init`. You can always reset them to the original state by running `chado reset`.
 
 ## Usage
 
@@ -46,7 +69,7 @@ The usage is:
 * To display the version of the program, type `chado -v` or `chado --version`.
 * Use `chado <command> -h` or `chado <command> --help` to get a detailed description and the usage of that command.
 
-## Available commands
+### Available commands
 
 ------------------------------------------------------------------------------------------------
 | Command               | Description                                                          |
@@ -62,7 +85,7 @@ The usage is:
 | admin                 | perform admin tasks, such as creating or dumping a CHADO database    |
 ------------------------------------------------------------------------------------------------
 
-## Examples
+### Examples
 
 Create a new CHADO database called `eukaryotes` according to the current GMOD schema:
 
@@ -81,8 +104,13 @@ Query the database to check the meaning of a certain `cvterm_id`:
 
     chado query -q "SELECT name FROM cvterm WHERE cvterm_id = 25" eukaryotes
 
-
-## Note
+### Note
 
 Unless explicitly specified by the flag `-c`, all commands employ the [default connection settings](pychado/data/defaultDatabase.yml).
 You can change these by running `chado init`.
+
+## License
+chado-tools is free software, licensed under [GPLv3](https://github.com/sanger-pathogens/chado-tools/blob/master/LICENSE).
+
+## Feedback/Issues
+Please report any issues to the [issues page](https://github.com/sanger-pathogens/chado-tools/issues) or email path-help@sanger.ac.uk.

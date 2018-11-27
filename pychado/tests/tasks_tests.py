@@ -1,6 +1,6 @@
 import unittest.mock
 from .. import chado_tools, tasks, queries, dbutils, utils, ddl
-from ..io import direct, ontology
+from ..io import direct, essentials, ontology, fasta, gff, gaf
 
 
 class TestTasks(unittest.TestCase):
@@ -126,14 +126,14 @@ class TestTasks(unittest.TestCase):
     @unittest.mock.patch('pychado.ddl.PublicSchemaSetupClient')
     @unittest.mock.patch('pychado.utils.download_file')
     @unittest.mock.patch('pychado.dbutils.setup_database')
-    def test_setup(self, mock_setup, mock_download, mock_create_public_schema, mock_create_audit_schema,
-                   mock_create_backup_schema):
+    def test_setup(self, mock_setup, mock_download, mock_public_schema_client, mock_audit_schema_client,
+                   mock_backup_schema_client):
         # Checks that the function setting up a database schema is correctly called
         self.assertIs(mock_setup, dbutils.setup_database)
         self.assertIs(mock_download, utils.download_file)
-        self.assertIs(mock_create_public_schema, ddl.PublicSchemaSetupClient)
-        self.assertIs(mock_create_audit_schema, ddl.AuditSchemaSetupClient)
-        self.assertIs(mock_create_backup_schema, ddl.AuditBackupSchemaSetupClient)
+        self.assertIs(mock_public_schema_client, ddl.PublicSchemaSetupClient)
+        self.assertIs(mock_audit_schema_client, ddl.AuditSchemaSetupClient)
+        self.assertIs(mock_backup_schema_client, ddl.AuditBackupSchemaSetupClient)
 
         args = ["chado", "admin", "setup", "-f", "testschema", "testdb"]
         parsed_args = chado_tools.parse_arguments(args)
@@ -149,38 +149,38 @@ class TestTasks(unittest.TestCase):
         mock_download.assert_called()
         mock_setup.assert_called_with(self.uri, "downloaded_schema")
 
-        mock_create_public_schema.reset_mock()
-        mock_create_audit_schema.reset_mock()
-        mock_create_backup_schema.reset_mock()
+        mock_public_schema_client.reset_mock()
+        mock_audit_schema_client.reset_mock()
+        mock_backup_schema_client.reset_mock()
         args = ["chado", "admin", "setup", "-s", "basic", "testdb"]
         parsed_args = chado_tools.parse_arguments(args)
         tasks.run_setup_command(parsed_args, self.uri)
-        mock_create_public_schema.assert_called_with(self.uri)
-        mock_create_audit_schema.assert_not_called()
-        mock_create_backup_schema.assert_not_called()
-        self.assertIn(unittest.mock.call().create(), mock_create_public_schema.mock_calls)
+        mock_public_schema_client.assert_called_with(self.uri)
+        mock_backup_schema_client.assert_not_called()
+        mock_audit_schema_client.assert_not_called()
+        self.assertIn(unittest.mock.call().create(), mock_public_schema_client.mock_calls)
 
-        mock_create_public_schema.reset_mock()
-        mock_create_audit_schema.reset_mock()
-        mock_create_backup_schema.reset_mock()
+        mock_public_schema_client.reset_mock()
+        mock_audit_schema_client.reset_mock()
+        mock_backup_schema_client.reset_mock()
         args = ["chado", "admin", "setup", "-s", "audit", "testdb"]
         parsed_args = chado_tools.parse_arguments(args)
         tasks.run_setup_command(parsed_args, self.uri)
-        mock_create_public_schema.assert_not_called()
-        mock_create_audit_schema.assert_called_with(self.uri)
-        mock_create_backup_schema.assert_not_called()
-        self.assertIn(unittest.mock.call().create(), mock_create_audit_schema.mock_calls)
+        mock_public_schema_client.assert_not_called()
+        mock_audit_schema_client.assert_called_with(self.uri)
+        mock_backup_schema_client.assert_not_called()
+        self.assertIn(unittest.mock.call().create(), mock_audit_schema_client.mock_calls)
 
-        mock_create_public_schema.reset_mock()
-        mock_create_audit_schema.reset_mock()
-        mock_create_backup_schema.reset_mock()
+        mock_public_schema_client.reset_mock()
+        mock_audit_schema_client.reset_mock()
+        mock_backup_schema_client.reset_mock()
         args = ["chado", "admin", "setup", "-s", "audit_backup", "testdb"]
         parsed_args = chado_tools.parse_arguments(args)
         tasks.run_setup_command(parsed_args, self.uri)
-        mock_create_public_schema.assert_not_called()
-        mock_create_audit_schema.assert_not_called()
-        mock_create_backup_schema.assert_called_with(self.uri)
-        self.assertIn(unittest.mock.call().create(), mock_create_backup_schema.mock_calls)
+        mock_public_schema_client.assert_not_called()
+        mock_audit_schema_client.assert_not_called()
+        mock_backup_schema_client.assert_called_with(self.uri)
+        self.assertIn(unittest.mock.call().create(), mock_backup_schema_client.mock_calls)
 
     @unittest.mock.patch('pychado.tasks.run_grant_revoke_command')
     def test_run_grant(self, mock_run):
@@ -197,26 +197,26 @@ class TestTasks(unittest.TestCase):
         mock_run.assert_called_with(parsed_args, self.uri, False)
 
     @unittest.mock.patch('pychado.ddl.RolesClient')
-    def test_grant(self, mock_grant):
+    def test_grant(self, mock_client):
         # Checks that the function granting database access is correctly called
-        self.assertIs(mock_grant, ddl.RolesClient)
+        self.assertIs(mock_client, ddl.RolesClient)
         args = ["chado", "admin", "grant", "-r", "testrole", "-s", "testschema", "-w", "testdb"]
         parsed_args = chado_tools.parse_arguments(args)
         tasks.run_grant_revoke_command(parsed_args, self.uri, True)
-        mock_grant.assert_called_with(self.uri)
+        mock_client.assert_called_with(self.uri)
         self.assertIn(unittest.mock.call().grant_or_revoke("testrole", "testschema", True, True),
-                      mock_grant.mock_calls)
+                      mock_client.mock_calls)
 
     @unittest.mock.patch('pychado.ddl.RolesClient')
-    def test_revoke(self, mock_grant):
+    def test_revoke(self, mock_client):
         # Checks that the function revoking database access is correctly called
-        self.assertIs(mock_grant, ddl.RolesClient)
+        self.assertIs(mock_client, ddl.RolesClient)
         args = ["chado", "admin", "revoke", "-r", "testrole", "-s", "testschema", "testdb"]
         parsed_args = chado_tools.parse_arguments(args)
         tasks.run_grant_revoke_command(parsed_args, self.uri, False)
-        mock_grant.assert_called_with(self.uri)
+        mock_client.assert_called_with(self.uri)
         self.assertIn(unittest.mock.call().grant_or_revoke("testrole", "testschema", False, False),
-                      mock_grant.mock_calls)
+                      mock_client.mock_calls)
 
     @unittest.mock.patch('pychado.utils.read_text')
     @unittest.mock.patch('pychado.dbutils.query_to_file')
@@ -351,66 +351,113 @@ class TestTasks(unittest.TestCase):
         tasks.run_command_with_arguments(args[1], args[2], parsed_args, self.uri)
         mock_run.assert_called_with("organism", parsed_args, self.uri)
 
-    @unittest.mock.patch('pychado.io.direct.DirectIOClient.insert_organism')
-    def test_insert_organism(self, mock_insert):
+    @unittest.mock.patch('pychado.io.direct.DirectIOClient')
+    def test_insert_organism(self, mock_client):
         # Checks that the function inserting organisms is correctly called
-        self.assertIs(mock_insert, direct.DirectIOClient.insert_organism)
+        self.assertIs(mock_client, direct.DirectIOClient)
         args = ["chado", "insert", "organism", "-g", "testgenus", "-s", "testspecies", "-a", "testorganism", "testdb"]
         parsed_args = chado_tools.parse_arguments(args)
 
         tasks.run_insert_command(args[2], parsed_args, self.uri)
-        mock_insert.assert_called_with("testgenus", "testspecies", "testorganism", None, None, None)
+        mock_client.assert_called_with(self.uri)
+        self.assertIn(unittest.mock.call().insert_organism("testgenus", "testspecies", "testorganism",
+                                                           None, None, None), mock_client.mock_calls)
 
-        mock_insert.reset_mock()
+        mock_client.reset_mock()
         tasks.run_insert_command("inexistent_specifier", parsed_args, self.uri)
-        mock_insert.assert_not_called()
+        self.assertEqual([unittest.mock.call(self.uri)], mock_client.mock_calls)
 
-    @unittest.mock.patch('pychado.io.direct.DirectIOClient.delete_organism')
-    def test_delete_organism(self, mock_delete):
+    @unittest.mock.patch('pychado.io.direct.DirectIOClient')
+    def test_delete_organism(self, mock_client):
         # Checks that the function inserting organisms is correctly called
-        self.assertIs(mock_delete, direct.DirectIOClient.delete_organism)
+        self.assertIs(mock_client, direct.DirectIOClient)
         args = ["chado", "delete", "organism", "-a", "testorganism", "testdb"]
         parsed_args = chado_tools.parse_arguments(args)
 
         tasks.run_delete_command(args[2], parsed_args, self.uri)
-        mock_delete.assert_called_with("testorganism")
+        mock_client.assert_called_with(self.uri)
+        self.assertIn(unittest.mock.call().delete_organism("testorganism"), mock_client.mock_calls)
 
-        mock_delete.reset_mock()
+        mock_client.reset_mock()
         tasks.run_delete_command("inexistent_specifier", parsed_args, self.uri)
-        mock_delete.assert_not_called()
+        self.assertEqual([unittest.mock.call(self.uri)], mock_client.mock_calls)
 
     @unittest.mock.patch('pychado.tasks.run_import_command')
     def test_run_import(self, mock_run):
         # Checks that database imports are correctly run
         self.assertIs(mock_run, tasks.run_import_command)
-        args = ["chado", "import", "ontology", "-f", "testfile", "-A", "testauthority", "-F", "owl", "testdb"]
+        args = ["chado", "import", "essentials", "testdb"]
         parsed_args = chado_tools.parse_arguments(args)
         tasks.run_command_with_arguments(args[1], args[2], parsed_args, self.uri)
-        mock_run.assert_called_with("ontology", parsed_args, self.uri)
+        mock_run.assert_called_with("essentials", parsed_args, self.uri)
+
+    @unittest.mock.patch('pychado.io.essentials.EssentialsClient')
+    def test_import_essentials(self, mock_client):
+        # Checks that the function importing essentials into the database is correctly called
+        self.assertIs(mock_client, essentials.EssentialsClient)
+        args = ["chado", "import", "essentials", "testdb"]
+        parsed_args = chado_tools.parse_arguments(args)
+        tasks.run_import_command(args[2], parsed_args, self.uri)
+        mock_client.assert_called_with(self.uri, False)
+        self.assertIn(unittest.mock.call().load(), mock_client.mock_calls)
+
+        mock_client.reset_mock()
+        tasks.run_import_command("inexistent_specifier", parsed_args, self.uri)
+        mock_client.assert_not_called()
 
     @unittest.mock.patch('pychado.utils.download_file')
-    @unittest.mock.patch('pychado.io.ontology.OntologyClient.load')
-    def test_import_ontology(self, mock_import, mock_download):
+    @unittest.mock.patch('pychado.io.ontology.OntologyClient')
+    def test_import_ontology(self, mock_client, mock_download):
         # Checks that the function importing an ontology into the database is correctly called
-        self.assertIs(mock_import, ontology.OntologyClient.load)
+        self.assertIs(mock_client, ontology.OntologyClient)
         self.assertIs(mock_download, utils.download_file)
         args = ["chado", "import", "ontology", "-f", "testfile", "-A", "testauthority", "-F", "owl", "testdb"]
         parsed_args = chado_tools.parse_arguments(args)
         tasks.run_import_command(args[2], parsed_args, self.uri)
         mock_download.assert_not_called()
-        mock_import.assert_called_with("testfile", "owl", "testauthority")
+        mock_client.assert_called_with(self.uri, False)
+        self.assertIn(unittest.mock.call().load("testfile", "owl", "testauthority"), mock_client.mock_calls)
 
-        mock_download.reset_mock()
+        mock_client.reset_mock()
         mock_download.return_value = "downloaded_file"
-        args = ["chado", "import", "ontology", "-u", "testurl", "-A", "testauthority", "testdb"]
+        args = ["chado", "import", "ontology", "-V", "-u", "testurl", "-A", "testauthority", "testdb"]
         parsed_args = chado_tools.parse_arguments(args)
         tasks.run_import_command(args[2], parsed_args, self.uri)
         mock_download.assert_called_with("testurl")
-        mock_import.assert_called_with("downloaded_file", "obo", "testauthority")
+        mock_client.assert_called_with(self.uri, True)
+        self.assertIn(unittest.mock.call().load("downloaded_file", "obo", "testauthority"), mock_client.mock_calls)
 
-        mock_import.reset_mock()
-        tasks.run_import_command("inexistent_specifier", parsed_args, self.uri)
-        mock_import.assert_not_called()
+    @unittest.mock.patch('pychado.io.gff.GFFImportClient')
+    def test_import_gff(self, mock_client):
+        # Checks that the function importing a GFF file into the database is correctly called
+        self.assertIs(mock_client, gff.GFFImportClient)
+        args = ["chado", "import", "gff", "-f", "testfile", "-a", "testorganism", "--fasta", "testfasta",
+                "-t", "contig", "--fresh_load", "--force", "--full_genome", "testdb"]
+        parsed_args = chado_tools.parse_arguments(args)
+        tasks.run_import_command(args[2], parsed_args, self.uri)
+        mock_client.assert_called_with(self.uri, False)
+        self.assertIn(unittest.mock.call().load("testfile", "testorganism", "testfasta", "contig", True, True, True),
+                      mock_client.mock_calls)
+
+    @unittest.mock.patch('pychado.io.fasta.FastaImportClient')
+    def test_import_fasta(self, mock_client):
+        # Checks that the function importing a FASTA file into the database is correctly called
+        self.assertIs(mock_client, fasta.FastaImportClient)
+        args = ["chado", "import", "fasta", "-f", "testfile", "-a", "testorganism", "-t", "contig", "testdb"]
+        parsed_args = chado_tools.parse_arguments(args)
+        tasks.run_import_command(args[2], parsed_args, self.uri)
+        mock_client.assert_called_with(self.uri, False)
+        self.assertIn(unittest.mock.call().load("testfile", "testorganism", "contig"), mock_client.mock_calls)
+
+    @unittest.mock.patch('pychado.io.gaf.GAFImportClient')
+    def test_import_gaf(self, mock_client):
+        # Checks that the function importing a GAF file into the database is correctly called
+        self.assertIs(mock_client, gaf.GAFImportClient)
+        args = ["chado", "import", "gaf", "-f", "testfile", "-a", "testorganism", "testdb"]
+        parsed_args = chado_tools.parse_arguments(args)
+        tasks.run_import_command(args[2], parsed_args, self.uri)
+        mock_client.assert_called_with(self.uri, False)
+        self.assertIn(unittest.mock.call().load("testfile", "testorganism"), mock_client.mock_calls)
 
 
 if __name__ == '__main__':

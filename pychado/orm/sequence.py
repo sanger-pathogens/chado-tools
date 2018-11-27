@@ -42,7 +42,7 @@ class Feature(base.PublicBase):
     type = sqlalchemy.orm.relationship(cv.CvTerm, foreign_keys=type_id, backref="feature_type")
 
     # Initialisation
-    def __init__(self, dbxref_id, organism_id, type_id, uniquename, name=None, residues=None, seqlen=None,
+    def __init__(self, organism_id, type_id, uniquename, dbxref_id=None, name=None, residues=None, seqlen=None,
                  md5checksum=None, is_analysis=False, is_obsolete=False, timeaccessioned=sqlalchemy.sql.functions.now(),
                  timelastmodified=sqlalchemy.sql.functions.now(), feature_id=None):
         for key, value in locals().items():
@@ -84,7 +84,7 @@ class FeatureCvTerm(base.PublicBase):
     pub = sqlalchemy.orm.relationship(pub.Pub, foreign_keys=pub_id, backref="feature_cvterm_pub")
 
     # Initialisation
-    def __init__(self, feature_id, cvterm_id, pub_id, is_not=False, rank=0, feature_cvterm_id=None):
+    def __init__(self, feature_id, cvterm_id, pub_id, is_not=None, rank=0, feature_cvterm_id=None):
         for key, value in locals().items():
             if key != self:
                 setattr(self, key, value)
@@ -162,6 +162,38 @@ class FeatureCvTermProp(base.PublicBase):
         return "<sequence.FeatureCvTermProp(feature_cvtermprop_id={0}, feature_cvterm_id={1}, type_id={2}, " \
                "value='{3}', rank={4})>".format(self.feature_cvtermprop_id, self.feature_cvterm_id, self.type_id,
                                                 self.value, self.rank)
+
+
+class FeatureCvTermPub(base.PublicBase):
+    """Class for the CHADO 'feature_cvterm_pub' table"""
+    # Columns
+    feature_cvterm_pub_id = sqlalchemy.Column(sqlalchemy.BIGINT, nullable=False, primary_key=True, autoincrement=True)
+    feature_cvterm_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(
+        FeatureCvTerm.feature_cvterm_id, onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
+    pub_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(
+        pub.Pub.pub_id, onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
+
+    # Constraints
+    __tablename__ = "feature_cvterm_pub"
+    __table_args__ = (sqlalchemy.UniqueConstraint(feature_cvterm_id, pub_id, name="feature_cvterm_pub_c1"),
+                      sqlalchemy.Index("feature_cvterm_pub_idx1", feature_cvterm_id),
+                      sqlalchemy.Index("feature_cvterm_pub_idx2", pub_id))
+
+    # Relationships
+    feature_cvterm = sqlalchemy.orm.relationship(FeatureCvTerm, foreign_keys=feature_cvterm_id,
+                                                 backref="feature_cvterm_pub_feature_cvterm")
+    pub = sqlalchemy.orm.relationship(pub.Pub, foreign_keys=pub_id, backref="feature_cvterm_pub_pub")
+
+    # Initialisation
+    def __init__(self, feature_cvterm_id, pub_id, feature_cvterm_pub_id=None):
+        for key, value in locals().items():
+            if key != self:
+                setattr(self, key, value)
+
+    # Representation
+    def __repr__(self):
+        return "<sequence.FeatureCvTermPub(feature_cvterm_pub_id={0}, feature_cvterm_id={1}, pub_id={2})>".\
+            format(self.feature_cvterm_pub_id, self.feature_cvterm_id, self.pub_id)
 
 
 class FeatureDbxRef(base.PublicBase):

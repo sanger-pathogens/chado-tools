@@ -149,6 +149,16 @@ def filter_objects(entries: list, **kwargs) -> list:
     return filtered_entries
 
 
+def copy_attribute(old_object, new_object, attribute: str) -> bool:
+    """Copies the value of a given attribute from one object to another"""
+    new_value = getattr(new_object, attribute, None)
+    old_value = getattr(old_object, attribute, None)
+    if type(old_object) == type(new_object) and new_value is not None and old_value != new_value:
+        setattr(old_object, attribute, new_value)
+        return True
+    return False
+
+
 def list_to_dict(entries: list, key: str) -> dict:
     """Converts a list of objects of any type into a dictionary, using a specified object parameter as key"""
     dictionary = {}
@@ -166,6 +176,16 @@ def random_string(n: int) -> str:
 def random_integer(n: int) -> int:
     """Generates a random integer in the range [0, n]"""
     return random.randint(0, n)
+
+
+def random_float() -> float:
+    """Generates a random positive float number between 0 and 1"""
+    n1 = random_integer(1000) + 1
+    n2 = random_integer(1000) + 1
+    if n2 > n1:
+        return float(n1)/float(n2)
+    else:
+        return float(n2)/float(n1)
 
 
 def current_date() -> str:

@@ -6,4 +6,8 @@ services: postgresql
 before_script:
   - psql -c "CREATE USER chado_user WITH SUPERUSER PASSWORD 'chado_pw';" -U postgres
   - createdb -U postgres -O chado_user chado_user
-script: "python setup.py test"
+  - pip install codecov
+script:
+  - coverage run setup.py test
+after_success:
+  - codecov

@@ -1,5 +1,4 @@
 import unittest.mock
-import sqlalchemy.event
 import sqlalchemy.schema
 from .. import dbutils, utils, ddl
 

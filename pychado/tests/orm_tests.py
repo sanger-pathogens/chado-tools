@@ -3,7 +3,7 @@ import sqlalchemy.exc
 import sqlalchemy.schema
 from .. import dbutils, utils
 from ..io import iobase
-from ..orm import base, general, cv, organism, pub, sequence, audit
+from ..orm import base, general, cv, organism, pub, sequence, companalysis, audit
 
 
 class TestPublic(unittest.TestCase):
@@ -899,6 +899,46 @@ class TestPublic(unittest.TestCase):
         with self.assertRaises(sqlalchemy.exc.IntegrityError):
             self.client.add_and_flush(obj)
 
+    # Test suite for the Chado 'feature_cvterm_pub' table
+    def add_feature_cvterm_pub_object(self) -> sequence.FeatureCvTermPub:
+        # Insert a random entry into the 'feature_cvterm_pub' table
+        feature_cvterm_obj = self.add_feature_cvterm_object()
+        pub_obj = self.add_pub_object()
+        feature_cvterm_pub_obj = sequence.FeatureCvTermPub(feature_cvterm_id=feature_cvterm_obj.feature_cvterm_id,
+                                                           pub_id=pub_obj.pub_id)
+        self.client.add_and_flush(feature_cvterm_pub_obj)
+        return feature_cvterm_pub_obj
+
+    def test_feature_cvterm_pub(self):
+        # Test adding a new 'feature_cvterm_pub' object to the database
+        existing_obj = self.add_feature_cvterm_pub_object()
+        self.assertIsNotNone(existing_obj.feature_cvterm_pub_id)
+        self.assertEqual(existing_obj.__tablename__, 'feature_cvterm_pub')
+
+    def test_feature_cvterm_pub_feature_cvterm_id_fkey(self):
+        # Test foreign key constraint on 'feature_cvterm_pub.feature_cvterm_id'
+        existing_obj = self.add_feature_cvterm_pub_object()
+        obj = sequence.FeatureCvTermPub(feature_cvterm_id=(existing_obj.feature_cvterm_id+100),
+                                        pub_id=existing_obj.pub_id)
+        with self.assertRaises(sqlalchemy.exc.IntegrityError):
+            self.client.add_and_flush(obj)
+
+    def test_feature_cvterm_pub_pub_id_fkey(self):
+        # Test foreign key constraint on 'feature_cvterm_pub.pub_id'
+        existing_obj = self.add_feature_cvterm_pub_object()
+        obj = sequence.FeatureCvTermPub(feature_cvterm_id=existing_obj.feature_cvterm_id,
+                                        pub_id=(existing_obj.pub_id+100))
+        with self.assertRaises(sqlalchemy.exc.IntegrityError):
+            self.client.add_and_flush(obj)
+
+    def test_feature_cvterm_pub_c1(self):
+        # Test unique constraint on 'feature_cvterm_pub.feature_cvterm_id', 'feature_cvterm_pub.pub_id'
+        existing_obj = self.add_feature_cvterm_pub_object()
+        obj = sequence.FeatureCvTermPub(feature_cvterm_id=existing_obj.feature_cvterm_id,
+                                        pub_id=existing_obj.pub_id)
+        with self.assertRaises(sqlalchemy.exc.IntegrityError):
+            self.client.add_and_flush(obj)
+
     # Test suite for the Chado 'feature_dbxref' table
     def add_feature_dbxref_object(self) -> sequence.FeatureDbxRef:
         # Insert a random entry into the 'feature_dbxref' table
@@ -1448,7 +1488,111 @@ class TestPublic(unittest.TestCase):
         with self.assertRaises(sqlalchemy.exc.IntegrityError):
             self.client.add_and_flush(obj)
 
-            
+    # Test suite for the Chado 'analysis' table
+    def add_analysis_object(self) -> companalysis.Analysis:
+        # Insert a random entry into the 'analysis' table
+        analysis_obj = companalysis.Analysis(program=utils.random_string(10), programversion=utils.random_string(10),
+                                             name=utils.random_string(10), description=utils.random_string(10),
+                                             algorithm=utils.random_string(10), sourcename=utils.random_string(10),
+                                             sourceversion=utils.random_string(10), sourceuri=utils.random_string(10))
+        self.client.add_and_flush(analysis_obj)
+        return analysis_obj
+
+    def test_analysis(self):
+        # Test adding a new 'analysis' object to the database
+        existing_obj = self.add_analysis_object()
+        self.assertIsNotNone(existing_obj.analysis_id)
+        self.assertEqual(existing_obj.__tablename__, 'analysis')
+
+    def test_analysis_c1(self):
+        # Test unique constraint on 'analysis.program', 'analysis.programversion', 'analysis.sourcename'
+        existing_obj = self.add_analysis_object()
+        obj = companalysis.Analysis(program=existing_obj.program, programversion=existing_obj.programversion,
+                                    sourcename=existing_obj.sourcename)
+        with self.assertRaises(sqlalchemy.exc.IntegrityError):
+            self.client.add_and_flush(obj)
+
+    # Test suite for the Chado 'analysisfeature' table
+    def add_analysisfeature_object(self) -> companalysis.AnalysisFeature:
+        # Insert a random entry into the 'analysisfeature' table
+        analysis_obj = self.add_analysis_object()
+        feature_obj = self.add_feature_object()
+        analysisfeature_obj = companalysis.AnalysisFeature(
+            feature_id=feature_obj.feature_id, analysis_id=analysis_obj.analysis_id, rawscore=utils.random_float(),
+            normscore=utils.random_float(), significance=utils.random_float(), identity=utils.random_float())
+        self.client.add_and_flush(analysisfeature_obj)
+        return analysisfeature_obj
+
+    def test_analysisfeature(self):
+        # Test adding a new 'analysisfeature' object to the database
+        existing_obj = self.add_analysisfeature_object()
+        self.assertIsNotNone(existing_obj.analysisfeature_id)
+        self.assertEqual(existing_obj.__tablename__, 'analysisfeature')
+
+    def test_analysisfeature_feature_id_fkey(self):
+        # Test foreign key constraint on 'analysisfeature.feature_id'
+        existing_obj = self.add_analysisfeature_object()
+        obj = companalysis.AnalysisFeature(feature_id=(existing_obj.feature_id+100),
+                                           analysis_id=existing_obj.analysis_id)
+        with self.assertRaises(sqlalchemy.exc.IntegrityError):
+            self.client.add_and_flush(obj)
+
+    def test_analysisfeature_analysis_id_fkey(self):
+        # Test foreign key constraint on 'analysisfeature.analysis_id'
+        existing_obj = self.add_analysisfeature_object()
+        obj = companalysis.AnalysisFeature(feature_id=existing_obj.feature_id,
+                                           analysis_id=(existing_obj.analysis_id+100))
+        with self.assertRaises(sqlalchemy.exc.IntegrityError):
+            self.client.add_and_flush(obj)
+
+    def test_analysisfeature_c1(self):
+        # Test unique constraint on 'analysisfeature.feature_id', 'analysisfeature.analysis_id'
+        existing_obj = self.add_analysisfeature_object()
+        obj = companalysis.AnalysisFeature(feature_id=existing_obj.feature_id, analysis_id=existing_obj.analysis_id)
+        with self.assertRaises(sqlalchemy.exc.IntegrityError):
+            self.client.add_and_flush(obj)
+
+    # Test suite for the Chado 'analysisprop' table
+    def add_analysisprop_object(self) -> companalysis.AnalysisProp:
+        # Insert a random entry into the 'analysisprop' table
+        analysis_obj = self.add_analysis_object()
+        type_obj = self.add_cvterm_object()
+        analysisprop_obj = companalysis.AnalysisProp(analysis_id=analysis_obj.analysis_id, type_id=type_obj.cvterm_id,
+                                                     value=utils.random_string(10))
+        self.client.add_and_flush(analysisprop_obj)
+        return analysisprop_obj
+
+    def test_analysisprop(self):
+        # Test adding a new 'analysisprop' object to the database
+        existing_obj = self.add_analysisprop_object()
+        self.assertIsNotNone(existing_obj.analysisprop_id)
+        self.assertEqual(existing_obj.__tablename__, 'analysisprop')
+
+    def test_analysisprop_analysis_id_fkey(self):
+        # Test foreign key constraint on 'analysisprop.analysis_id'
+        existing_obj = self.add_analysisprop_object()
+        obj = companalysis.AnalysisProp(analysis_id=(existing_obj.analysis_id+100), type_id=existing_obj.type_id,
+                                        value=utils.random_string(10))
+        with self.assertRaises(sqlalchemy.exc.IntegrityError):
+            self.client.add_and_flush(obj)
+
+    def test_analysisprop_type_id_fkey(self):
+        # Test foreign key constraint on 'analysisprop.type_id'
+        existing_obj = self.add_analysisprop_object()
+        obj = companalysis.AnalysisProp(analysis_id=existing_obj.analysis_id, type_id=(existing_obj.type_id+100),
+                                        value=utils.random_string(10))
+        with self.assertRaises(sqlalchemy.exc.IntegrityError):
+            self.client.add_and_flush(obj)
+
+    def test_analysisprop_c1(self):
+        # Test unique constraint on 'analysisprop.analysis_id', 'analysisprop.type_id', 'analysisprop.value'
+        existing_obj = self.add_analysisprop_object()
+        obj = companalysis.AnalysisProp(analysis_id=existing_obj.analysis_id, type_id=existing_obj.type_id,
+                                        value=existing_obj.value)
+        with self.assertRaises(sqlalchemy.exc.IntegrityError):
+            self.client.add_and_flush(obj)
+
+
 class TestAudit(unittest.TestCase):
     """Base class for testing the setup of the master table defined in the 'audit' schema of the ORM"""
 

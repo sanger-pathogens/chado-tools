@@ -78,6 +78,7 @@ The usage is:
 | reset                 | reset the default connection parameters to factory settings          |
 | connect               | connect to a CHADO database for an interactive session               |
 | query                 | query a CHADO database and export the result into a text file        |
+| execute               | execute a function defined in a CHADO database                       |
 | extract               | run a pre-compiled query against the CHADO database                  |
 | insert                | insert a new entity of a specified type into the CHADO database      |
 | delete                | delete an entity of a specified type from the CHADO database         |

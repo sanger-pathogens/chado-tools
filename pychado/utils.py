@@ -91,10 +91,18 @@ def write_text(filename: str, content: str) -> None:
     close(file)
 
 
+def write_csv(filename: str, delimiter: str, content: list) -> None:
+    """Function writing data arranged in a table into a CSV file"""
+    file = open_file_write(filename)
+    for row in content:
+        file.write(list_to_string(row, delimiter) + "\n")
+    close(file)
+
+
 def parse_yaml(filename: str) -> dict:
     """Function parsing a YAML file"""
     stream = open_file_read(filename)
-    data = dict(yaml.load(stream))
+    data = yaml.load(stream)
     for key, value in data.items():
         if value is not None:
             data[key] = str(value).strip()

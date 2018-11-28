@@ -122,8 +122,8 @@ class SetupTests(unittest.TestCase):
 
     def test_create_trigger_function(self):
         # Tests the syntax of trigger function creation
-        wrapper = self.client.create_trigger_function("trigger_name", "trigger_def")
-        self.assertEqual(wrapper, "CREATE OR REPLACE FUNCTION trigger_name()\n"
+        wrapper = self.client.create_trigger_function("trigger_schema", "trigger_name", "trigger_def")
+        self.assertEqual(wrapper, "CREATE OR REPLACE FUNCTION trigger_schema.trigger_name()\n"
                                   "RETURNS trigger\n"
                                   "LANGUAGE plpgsql\n"
                                   "AS $function$\n"
@@ -134,19 +134,20 @@ class SetupTests(unittest.TestCase):
 
     def test_create_generic_trigger(self):
         # Tests the syntax of trigger creation
-        trigger = self.client.create_generic_trigger("testtrigger", "trigger_function", "testtable")
-        self.assertEqual(trigger, "CREATE TRIGGER testtrigger AFTER INSERT OR UPDATE OR DELETE ON testtable "
-                                  "FOR EACH ROW EXECUTE PROCEDURE trigger_function()")
+        trigger = self.client.create_generic_trigger("testtrigger", "function_schema", "trigger_function",
+                                                     "testschema", "testtable")
+        self.assertEqual(trigger, "CREATE TRIGGER testtrigger AFTER INSERT OR UPDATE OR DELETE ON testschema.testtable "
+                                  "FOR EACH ROW EXECUTE PROCEDURE function_schema.trigger_function()")
 
     def test_generic_audit_function(self):
         # Tests the syntax of an audit function
-        fct = self.client.generic_audit_function("testtable", ["col1", "col2"])
+        fct = self.client.generic_audit_function("testschema", "testtable", ["col1", "col2"])
         self.assertEqual(fct, "IF TG_OP = 'INSERT' OR TG_OP = 'UPDATE' THEN\n"
-                              "\tINSERT INTO testtable(type, col1, col2) "
+                              "\tINSERT INTO testschema.testtable(type, col1, col2) "
                               "VALUES (CAST(TG_OP AS operation_type), NEW.col1, NEW.col2);\n"
                               "\tRETURN NEW;\n"
                               "ELSE\n"
-                              "\tINSERT INTO testtable(type, col1, col2) "
+                              "\tINSERT INTO testschema.testtable(type, col1, col2) "
                               "VALUES (CAST(TG_OP AS operation_type), OLD.col1, OLD.col2);\n"
                               "\tRETURN OLD;\n"
                               "END IF")
@@ -181,14 +182,23 @@ class SetupTests(unittest.TestCase):
     def test_trigger_exists(self):
         # Tests the function that checks if a trigger exists
         sqlalchemy.schema.DDL("CREATE TABLE testtable(id INTEGER, data VARCHAR(255))").execute(self.client.engine)
-        res = self.client.trigger_exists("testtrigger")
+        res = self.client.trigger_exists("public", "testtrigger")
         self.assertFalse(res)
-        fct = self.client.create_trigger_function("testfct", "SELECT 1+1")
+        fct = self.client.create_trigger_function("public", "testfct", "SELECT 1+1")
         sqlalchemy.schema.DDL(fct).execute(self.client.engine)
         sqlalchemy.schema.DDL("CREATE TRIGGER testtrigger AFTER INSERT ON testtable EXECUTE PROCEDURE testfct()")\
             .execute(self.client.engine)
-        res = self.client.trigger_exists("testtrigger")
+        res = self.client.trigger_exists("public", "testtrigger")
         self.assertTrue(res)
+
+    def test_function_exists(self):
+        # Tests the function that checks if a database function exists
+        res = self.client.function_exists("pg_catalog", "now")
+        self.assertTrue(res)
+        res = self.client.function_exists("pg_catalog", "inexistent_function")
+        self.assertFalse(res)
+        res = self.client.function_exists("inexistent_schema", "now")
+        self.assertFalse(res)
 
     def test_role_exists(self):
         # Tests the function that checks if a role exists
@@ -265,9 +275,9 @@ class SetupTests(unittest.TestCase):
         mock_trigger.return_value = "trigger_wrapper"
         mock_exists.return_value = True
         self.client.create_audit_triggers([testtable])
-        mock_function.assert_called_with("audit.testtable", ["idcolumn", "datacolumn"])
-        mock_wrapper.assert_called_with("audit.public_testtable_proc", "function_definition")
-        mock_trigger.assert_called_with("testtable_audit_tr", "audit.public_testtable_proc", "testtable")
+        mock_function.assert_called_with("audit", "testtable", ["idcolumn", "datacolumn"])
+        mock_wrapper.assert_called_with("audit", "public_testtable_proc", "function_definition")
+        mock_trigger.assert_called_with("testtable_audit_tr", "audit", "public_testtable_proc", "public", "testtable")
         mock_execute.assert_called_with("function_wrapper")
 
         mock_execute.reset_mock()
@@ -291,6 +301,53 @@ class SetupTests(unittest.TestCase):
                 self.assertFalse(column.primary_key)
             elif column.name == "audit_id":
                 self.assertTrue(column.primary_key)
+
+
+class BackupSetupTests(unittest.TestCase):
+
+    connection_parameters = utils.parse_yaml(dbutils.default_configuration_file())
+    connection_uri = dbutils.random_database_uri(connection_parameters)
+
+    @classmethod
+    def setUpClass(cls):
+        # Creates a database and establishes a connection
+        dbutils.create_database(cls.connection_uri)
+        cls.client = ddl.AuditBackupSchemaSetupClient(cls.connection_uri)
+        cls.public_metadata = sqlalchemy.schema.MetaData(schema='public')
+
+    @classmethod
+    def tearDownClass(cls):
+        # Drops the database
+        dbutils.drop_database(cls.connection_uri, True)
+
+    @unittest.mock.patch("sqlalchemy.engine.Connection.execute")
+    @unittest.mock.patch("pychado.ddl.AuditBackupSchemaSetupClient.function_exists")
+    def test_execute_backup_function(self, mock_exists: unittest.mock.Mock, mock_execute: unittest.mock.Mock):
+        # Tests the function that executes the backup of the audit schema
+        self.assertIs(mock_exists, self.client.function_exists)
+        self.assertIs(mock_execute, self.client.connection.execute)
+
+        mock_exists.return_value = False
+        self.client.execute_backup_function("testdate")
+        mock_execute.assert_not_called()
+
+        mock_exists.return_value = True
+        self.client.execute_backup_function("testdate")
+        self.assertIn(unittest.mock.call().scalar(), mock_execute.mock_calls)
+
+    def test_backup_function_wrapper(self):
+        # Tests the syntax of the backup function
+        fct = self.client.backup_function_wrapper("testname", ["var integer"], "testdefinition")
+        self.assertEqual(fct, "CREATE OR REPLACE FUNCTION testname(text)\n"
+                              "RETURNS bigint\n"
+                              "LANGUAGE plpgsql\n"
+                              "AS $function$\n"
+                              "DECLARE\n"
+                              "var integer;\n"
+                              "BEGIN\n"
+                              "testdefinition;\n"
+                              "END;\n"
+                              "$function$")
 
 
 if __name__ == '__main__':

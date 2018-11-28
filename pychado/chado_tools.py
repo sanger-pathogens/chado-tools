@@ -58,6 +58,7 @@ def wrapper_commands() -> dict:
         "insert": "insert a new entity of a specified type into the CHADO database",
         "delete": "delete an entity of a specified type from the CHADO database",
         "import": "import entities of a specified type into the CHADO database",
+        "execute": "execute a function defined in a CHADO database",
         "admin": "perform administrative tasks, such as creating or dumping a CHADO database"
     }
 
@@ -107,6 +108,13 @@ def import_commands() -> dict:
         "fasta": "import sequences from a FASTA file into the CHADO database",
         "gff": "import genomic data from a GFF3 file into the CHADO database",
         "gaf": "import gene annotation data from a GAF file into the CHADO database"
+    }
+
+
+def execute_commands() -> dict:
+    """Lists the available sub-commands of the 'chado execute' command with corresponding descriptions"""
+    return {
+        "audit_backup": "backs up the audit tables to a separate schema"
     }
 
 
@@ -166,6 +174,8 @@ def add_arguments_by_command(command: str, parser: argparse.ArgumentParser):
         add_admin_arguments(parser)
     elif command == "query":
         add_query_arguments(parser)
+    elif command == "execute":
+        add_execute_arguments(parser)
     elif command == "extract":
         add_extract_arguments(parser)
     elif command == "insert":
@@ -222,7 +232,7 @@ def add_restore_arguments(parser: argparse.ArgumentParser):
 def add_setup_arguments(parser: argparse.ArgumentParser):
     """Defines formal arguments for the 'chado admin setup' sub-command"""
     group = parser.add_mutually_exclusive_group()
-    group.add_argument("-s", "--schema", choices={"gmod", "basic", "audit"}, default="gmod",
+    group.add_argument("-s", "--schema", choices={"gmod", "basic", "audit", "audit_backup"}, default="gmod",
                        help="Database schema (default: GMOD schema 1.31)")
     group.add_argument("-f", "--schema_file", default="", help="File with database schema")
 
@@ -246,6 +256,31 @@ def add_query_arguments(parser: argparse.ArgumentParser):
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("-f", "--input_file", default="", help="file containing an SQL query")
     group.add_argument("-q", "--query", default="", help="SQL query")
+
+
+def add_execute_arguments(parser: argparse.ArgumentParser):
+    """Defines formal arguments for the 'chado execute' sub-command"""
+    parser.epilog = "For detailed usage information type '" + parser.prog + " <command> -h'"
+    subparsers = parser.add_subparsers()
+    for command, description in execute_commands().items():
+        # Create subparser and add general and specific formal arguments
+        sub = subparsers.add_parser(command, description=description, help=description)
+        add_general_arguments(sub)
+        add_execute_arguments_by_command(command, sub)
+
+
+def add_execute_arguments_by_command(command: str, parser: argparse.ArgumentParser):
+    """Defines formal arguments for a specified sub-command of 'chado execute'"""
+    if command == "audit_backup":
+        add_execute_backup_arguments(parser)
+    else:
+        print("Command '" + parser.prog + "' is not available.")
+
+
+def add_execute_backup_arguments(parser: argparse.ArgumentParser):
+    """Defines formal arguments for the 'chado execute audit_backup' sub-command"""
+    parser.add_argument("--date", required=True, help="date for maximum age of logs to remain in main audit tables, "
+                                                      "format 'YYYYMMDD'")
 
 
 def add_extract_arguments(parser: argparse.ArgumentParser):

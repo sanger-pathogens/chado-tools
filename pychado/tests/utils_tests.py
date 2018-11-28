@@ -4,6 +4,8 @@ import unittest
 import subprocess
 import string
 import io
+import filecmp
+import tempfile
 from contextlib import redirect_stdout
 from .. import utils
 
@@ -40,7 +42,7 @@ class TestUtils(unittest.TestCase):
     def test_write_read_text(self):
         # tests reading and writing text from/to file
         text = utils.random_string(100)
-        filename = "tmp.txt"
+        filename = tempfile.mkstemp()[1]
         utils.write_text(filename, text)
         self.assertTrue(os.path.exists(os.path.abspath(filename)))
         read_text = utils.read_text(filename)
@@ -60,6 +62,20 @@ class TestUtils(unittest.TestCase):
             utils.open_file_write(os.path.join('not_a_directory', 'this_file_is_not_here_so_throw_error'))
         with self.assertRaises(FileNotFoundError):
             utils.open_file_write(os.path.join('not_a_directory', 'this_file_is_not_here_so_throw_error.gz'))
+
+    def test_write_csv(self):
+        # checks that data are correctly written into a CSV file
+        data = [["name", "clade", "legs", "extinct"],
+                ["leech", "annelid", "0", "f"],
+                ["human", "mammal", "2", "f"],
+                ["diplodocus", "reptile", "4", "t"],
+                ["bumblebee", "insect", "6", "f"]]
+        filename = tempfile.mkstemp()[1]
+        self.assertTrue(os.path.exists(os.path.abspath(filename)))
+        utils.write_csv(filename, ";", data)
+        self.assertTrue(filecmp.cmp(filename, os.path.join(self.data_dir, "dbutils_species_table.csv")))
+        os.remove(filename)
+        self.assertFalse(os.path.exists(os.path.abspath(filename)))
 
     def test_yaml_parser(self):
         # checks if a yaml file is parsed correctly

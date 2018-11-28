@@ -1,3 +1,4 @@
+import copy
 from typing import Union, List
 import sqlalchemy.sql
 import sqlalchemy.orm.attributes
@@ -59,12 +60,20 @@ class DDLClient(ChadoClient):
             inheritance_condition.bindparams(parent=parent_table, child=child_table)).select()
         return self.connection.execute(inherits_query).scalar()
 
-    def trigger_exists(self, trigger_name: str) -> bool:
+    def trigger_exists(self, schema: str, trigger_name: str) -> bool:
         """Checks if a trigger with a given name exists in a database"""
         triggers_table = sqlalchemy.text("information_schema.triggers")
-        triggers_condition = sqlalchemy.text("trigger_name=:trigger_name")
+        triggers_condition = sqlalchemy.text("trigger_schema=:schema AND trigger_name=:trigger_name")
         exists_query = sqlalchemy.exists().select_from(triggers_table).where(
-            triggers_condition.bindparams(trigger_name=trigger_name)).select()
+            triggers_condition.bindparams(schema=schema, trigger_name=trigger_name)).select()
+        return self.connection.execute(exists_query).scalar()
+
+    def function_exists(self, schema: str, function_name: str) -> bool:
+        """Checks if a given function exists in a database"""
+        functions_table = sqlalchemy.text("information_schema.routines")
+        functions_condition = sqlalchemy.text("routine_schema=:schema AND routine_name=:function")
+        exists_query = sqlalchemy.exists().select_from(functions_table).where(
+            functions_condition.bindparams(schema=schema, function=function_name)).select()
         return self.connection.execute(exists_query).scalar()
 
     def role_exists(self, role_name: str) -> bool:
@@ -81,9 +90,11 @@ class DDLClient(ChadoClient):
             for statement in statements:
                 ddl = sqlalchemy.schema.DDL(statement)
                 ddl.execute(self.engine)
+                print(statement)
         else:
             ddl = sqlalchemy.schema.DDL(statements)
             ddl.execute(self.engine)
+            print(statements)
 
     def create(self):
         """Basis function defined for completeness of the API"""
@@ -199,17 +210,18 @@ class SchemaSetupClient(DDLClient):
                 self.execute_ddl(inherit_command)
 
     @staticmethod
-    def create_trigger_function(name: str, definition: str) -> str:
-        return "CREATE OR REPLACE FUNCTION " + name + "()\n" \
+    def create_trigger_function(function_schema: str, function_name: str, definition: str) -> str:
+        return "CREATE OR REPLACE FUNCTION " + function_schema + "." + function_name + "()\n" \
                + "RETURNS trigger\nLANGUAGE plpgsql\nAS $function$\nBEGIN\n" \
                + definition + ";" \
                + "\nEND;\n$function$"
 
     @staticmethod
-    def create_generic_trigger(trigger_name: str, function_name: str, table: str) -> str:
+    def create_generic_trigger(trigger_name: str, function_schema: str, function_name: str, table_schema: str,
+                               table_name: str) -> str:
         return "CREATE TRIGGER " + trigger_name \
-               + " AFTER INSERT OR UPDATE OR DELETE ON " + table \
-               + " FOR EACH ROW EXECUTE PROCEDURE " + function_name + "()"
+               + " AFTER INSERT OR UPDATE OR DELETE ON " + table_schema + "." + table_name \
+               + " FOR EACH ROW EXECUTE PROCEDURE " + function_schema + "." + function_name + "()"
 
 
 class PublicSchemaSetupClient(SchemaSetupClient):
@@ -236,15 +248,12 @@ class AuditSchemaSetupClient(SchemaSetupClient):
     def create(self):
         """Main function for filling the schema with life"""
 
-        # Make sure all required tables in the public schema exist
-        public_client = PublicSchemaSetupClient(self.uri)
-        public_client.create()
-        data_tables = public_client.metadata.sorted_tables
-
         # Create the schema
         self.create_schema()
 
         # Create the tables
+        public_client = PublicSchemaSetupClient(self.uri)
+        data_tables = public_client.metadata.sorted_tables
         audit_tables = self.create_audit_tables(data_tables)
         audit_tablenames = [table.name for table in audit_tables]
         self.metadata.create_all(self.engine, tables=([self.master_table] + audit_tables))
@@ -300,39 +309,126 @@ class AuditSchemaSetupClient(SchemaSetupClient):
         # Loop over all audit tables
         for table in audit_tables:
 
-            # Get table name
-            full_table_name = self.schema + "." + table.name
-
             # Retrieve columns of this table; exclude columns inherited from parent table
             column_names = [col.name for col in table.columns]
             data_column_names = [name for name in column_names if name not in parent_column_names]
 
             # Define trigger function
-            function_name = self.schema + ".public_" + table.name + "_proc"
-            function_definition = self.generic_audit_function(full_table_name, data_column_names)
-            function_creator = self.create_trigger_function(function_name, function_definition)
+            function_name = "public_" + table.name + "_proc"
+            function_definition = self.generic_audit_function(self.schema, table.name, data_column_names)
+            function_creator = self.create_trigger_function(self.schema, function_name, function_definition)
 
-            # Create/replace trigger function
-            self.execute_ddl(function_creator)
+            # Create trigger function, if it doesn't exist yet
+            if not self.function_exists(self.schema, function_name):
+                self.execute_ddl(function_creator)
 
             # Define trigger
             trigger_name = table.name + "_audit_tr"
-            trigger_creator = self.create_generic_trigger(trigger_name, function_name, table.name)
+            trigger_creator = self.create_generic_trigger(trigger_name, self.schema, function_name,
+                                                          "public", table.name)
 
             # Create trigger, if is doesn't exist yet
-            if not self.trigger_exists(trigger_name):
+            if not self.trigger_exists("public", trigger_name):
                 self.execute_ddl(trigger_creator)
 
     @staticmethod
-    def generic_audit_function(table: str, columns: list) -> str:
+    def generic_audit_function(schema: str, table: str, columns: list) -> str:
         return "IF TG_OP = 'INSERT' OR TG_OP = 'UPDATE' THEN\n" \
-               + "\tINSERT INTO " + table + "(type, " + utils.list_to_string(columns, ", ") + ")" \
+               + "\tINSERT INTO " + schema + "." + table + "(type, " + utils.list_to_string(columns, ", ") + ")" \
                + " VALUES (CAST(TG_OP AS " + base.operation_type.name + "), " \
                + utils.list_to_string(columns, ", ", "NEW") + ");\n" \
                + "\tRETURN NEW;\n" \
                + "ELSE\n" \
-               + "\tINSERT INTO " + table + "(type, " + utils.list_to_string(columns, ", ") + ")" \
+               + "\tINSERT INTO " + schema + "." + table + "(type, " + utils.list_to_string(columns, ", ") + ")" \
                + " VALUES (CAST(TG_OP AS " + base.operation_type.name + "), " \
                + utils.list_to_string(columns, ", ", "OLD") + ");\n" \
                + "\tRETURN OLD;\n" \
                + "END IF"
+
+
+class AuditBackupSchemaSetupClient(AuditSchemaSetupClient):
+
+    def __init__(self, uri: str):
+        """Constructor"""
+        super().__init__(uri)
+        self.schema = "audit_backup"
+        self.metadata = copy.deepcopy(self.base.metadata)
+        self.metadata.schema = self.schema
+        self.backup_master_table = self.master_table.tometadata(self.metadata, schema=self.schema)
+
+    def create(self):
+        """Main function for filling the schema with life"""
+
+        # Create the schema
+        self.create_schema()
+
+        # Create the tables
+        public_client = PublicSchemaSetupClient(self.uri)
+        data_tables = public_client.metadata.sorted_tables
+        audit_tables = self.create_audit_tables(data_tables)
+        audit_tablenames = [table.name for table in audit_tables]
+        self.metadata.create_all(self.engine, tables=([self.backup_master_table] + audit_tables))
+        print("Created missing tables in schema '" + self.schema + "'.")
+
+        # Set up inheritance
+        self.setup_inheritance(self.backup_master_table.name, audit_tablenames)
+        print("Set up table inheritance in schema '" + self.schema + "'.")
+
+        # Create back-up function
+        self.create_backup_function()
+        print("Created a back_up function in schema '" + self.schema + "'.")
+
+    def execute_backup_function(self, date: str):
+        """Executes the function that backs up the audit tables"""
+        if self.function_exists(self.schema, self.backup_function_name()):
+            transaction = self.connection.begin()
+            res = self.connection.execute(sqlalchemy.func.audit_backup.backup_proc(date)).scalar()
+            transaction.commit()
+            print("Moved " + str(res) + " database entries to schema " + self.schema)
+        else:
+            print("Function '" + self.schema + "." + self.backup_function_name() + "' does not exist")
+
+    def create_backup_function(self):
+        """Creates a function for moving audit tracks from the audit schema to the audit_backup schema"""
+        if not self.function_exists(self.schema, self.backup_function_name()):
+            function_name = self.schema + "." + self.backup_function_name()
+            declarations = self.backup_function_declarations()
+            definition = self.backup_function()
+            backup_creator = self.backup_function_wrapper(function_name, declarations, definition)
+            self.execute_ddl(backup_creator)
+
+    @staticmethod
+    def backup_function_name() -> str:
+        return "backup_proc"
+
+    @staticmethod
+    def backup_function_wrapper(name: str, declarations: List[str], definition: str) -> str:
+        return "CREATE OR REPLACE FUNCTION " + name + "(text)\n" \
+               + "RETURNS bigint\nLANGUAGE plpgsql\nAS $function$\nDECLARE\n" \
+               + ";\n".join(declarations) + ";\n" \
+               + "BEGIN\n" \
+               + definition + ";\n" \
+               + "END;\n$function$"
+
+    @staticmethod
+    def backup_function_declarations() -> List[str]:
+        return ["all_rows BIGINT", "table_rows BIGINT", "tabname RECORD"]
+
+    @staticmethod
+    def backup_function() -> str:
+        return "\ttable_rows:=0;\n" \
+               "\tall_rows:=0;\n" \
+               "\tFOR tabname IN (SELECT table_name FROM information_schema.tables " \
+               "WHERE table_schema = 'audit' AND table_name != 'audit') LOOP\n" \
+               "\tEXECUTE\n" \
+               "\t'INSERT INTO audit_backup.' || quote_ident(tabname.table_name) || " \
+               "' (SELECT * FROM audit.' || quote_ident(tabname.table_name) || " \
+               "' WHERE time < CAST($1 AS timestamp))'\n" \
+               "\tUSING $1;\n" \
+               "\tGET DIAGNOSTICS table_rows = ROW_COUNT;\n" \
+               "\tall_rows:=all_rows+table_rows;\n" \
+               "\tEXECUTE\n" \
+               "\t'DELETE FROM audit.' || quote_ident(tabname.table_name) || ' WHERE time < CAST($1 AS timestamp)'\n" \
+               "\tUSING $1;\n" \
+               "\tEND LOOP;\n" \
+               "\tRETURN all_rows"

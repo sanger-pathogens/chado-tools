@@ -76,9 +76,10 @@ def run_command_with_arguments(command: str, sub_command: str, arguments, connec
         run_grant_revoke_command(arguments, connection_uri, False)
     elif command == "query":
         # Query a PostgreSQL database and export the result to a text file
-        query = (arguments.query or utils.read_text(arguments.input_file))
-        dbutils.query_to_file(connection_uri, query, arguments.output_file, arguments.delimiter,
-                              arguments.include_header)
+        run_query_command(arguments, connection_uri)
+    elif command == "execute":
+        # Run a function defined in a PostgreSQL database
+        run_execute_command(sub_command, arguments, connection_uri)
     elif command == "extract":
         # Run a pre-compiled query against the CHADO database
         run_select_command(sub_command, arguments, connection_uri)
@@ -96,7 +97,7 @@ def run_command_with_arguments(command: str, sub_command: str, arguments, connec
 
 
 def run_setup_command(arguments, uri: str) -> None:
-    # Sets up a PostgreSQL database according to a schema
+    """Sets up a PostgreSQL database according to a schema"""
     if arguments.schema_file or arguments.schema == "gmod":
         schema_file = arguments.schema_file
         if not schema_file:
@@ -107,13 +108,15 @@ def run_setup_command(arguments, uri: str) -> None:
             client = ddl.PublicSchemaSetupClient(uri)
         elif arguments.schema == "audit":
             client = ddl.AuditSchemaSetupClient(uri)
+        elif arguments.schema == "audit_backup":
+            client = ddl.AuditBackupSchemaSetupClient(uri)
         else:
             client = ddl.DDLClient(uri)
         client.create()
 
 
 def run_grant_revoke_command(arguments, uri: str, grant_access: bool) -> None:
-    # Grant/revoke access to objects in a PostgreSQL database
+    """Grant/revoke access to objects in a PostgreSQL database"""
     client = ddl.RolesClient(uri)
     if grant_access:
         client.grant_or_revoke(arguments.role, arguments.schema, arguments.write, True)
@@ -121,8 +124,26 @@ def run_grant_revoke_command(arguments, uri: str, grant_access: bool) -> None:
         client.grant_or_revoke(arguments.role, arguments.schema, False, False)
 
 
+def run_query_command(arguments, uri: str) -> None:
+    """Query a PostgreSQL database and export the result to a text file"""
+    query = (arguments.query or utils.read_text(arguments.input_file))
+    result = dbutils.run_query(uri, query, arguments.include_header)
+    utils.write_csv(arguments.output_file, arguments.delimiter, result)
+    if arguments.output_file:
+        print("Data exported to " + arguments.output_file)
+
+
+def run_execute_command(specifier: str, arguments, uri: str) -> None:
+    """Run a function defined in the database"""
+    if specifier == "audit_backup":
+        client = ddl.AuditBackupSchemaSetupClient(uri)
+        client.execute_backup_function(arguments.date)
+    else:
+        print("Functionality 'execute " + specifier + "' is not yet implemented.")
+
+
 def run_select_command(specifier: str, arguments, uri: str) -> None:
-    # Run a pre-compiled query against a database
+    """Run a pre-compiled query against a database"""
     template = queries.load_query(specifier)
     if specifier == "organisms":
         query = queries.set_query_conditions(template)
@@ -136,11 +157,14 @@ def run_select_command(specifier: str, arguments, uri: str) -> None:
     else:
         print("Functionality 'extract " + specifier + "' is not yet implemented.")
         query = queries.set_query_conditions("")
-    dbutils.query_to_file(uri, query, arguments.output_file, arguments.delimiter, arguments.include_header)
+    result = dbutils.run_query(uri, query, arguments.include_header)
+    utils.write_csv(arguments.output_file, arguments.delimiter, result)
+    if arguments.output_file:
+        print("Data exported to " + arguments.output_file)
 
 
 def run_insert_command(specifier: str, arguments, uri: str) -> None:
-    # Insert a new entity of a specified type into a database
+    """Insert a new entity of a specified type into a database"""
     client = direct.DirectIOClient(uri)
     if specifier == "organism":
         client.insert_organism(arguments.genus, arguments.species, arguments.abbreviation, arguments.common_name,
@@ -150,7 +174,7 @@ def run_insert_command(specifier: str, arguments, uri: str) -> None:
 
 
 def run_delete_command(specifier: str, arguments, uri: str) -> None:
-    # Delete an entity of a specified type from a database
+    """Delete an entity of a specified type from a database"""
     client = direct.DirectIOClient(uri)
     if specifier == "organism":
         client.delete_organism(arguments.organism)

@@ -218,23 +218,58 @@ class TestTasks(unittest.TestCase):
         self.assertIn(unittest.mock.call().grant_or_revoke("testrole", "testschema", False, False),
                       mock_client.mock_calls)
 
+    @unittest.mock.patch('pychado.tasks.run_query_command')
+    def test_run_query(self, mock_run):
+        # Checks that database queries are correctly run
+        self.assertIs(mock_run, tasks.run_query_command)
+        args = ["chado", "query", "-H", "-d", ";", "-o", "testfile", "-q", "testquery", "testdb"]
+        parsed_args = chado_tools.parse_arguments(args)
+        tasks.run_command_with_arguments(args[1], args[2], parsed_args, self.uri)
+        mock_run.assert_called_with(parsed_args, self.uri)
+
+    @unittest.mock.patch('pychado.utils.write_csv')
+    @unittest.mock.patch('pychado.dbutils.run_query')
     @unittest.mock.patch('pychado.utils.read_text')
-    @unittest.mock.patch('pychado.dbutils.query_to_file')
-    def test_query(self, mock_query, mock_read):
+    def test_query(self, mock_read, mock_query, mock_write):
         # Checks that the function querying a database is correctly called
-        self.assertIs(mock_query, dbutils.run_query)
         self.assertIs(mock_read, utils.read_text)
+        self.assertIs(mock_query, dbutils.run_query)
+        self.assertIs(mock_write, utils.write_csv)
+
         # Direct query
         args = ["chado", "query", "-H", "-d", ";", "-o", "testfile", "-q", "testquery", "testdb"]
         parsed_args = chado_tools.parse_arguments(args)
-        tasks.run_command_with_arguments(args[1], "", parsed_args, self.uri)
-        mock_query.assert_called_with(self.uri, "testquery", "testfile", ";", True)
+        mock_query.return_value = ['a', 'b', 'c']
+        tasks.run_query_command(parsed_args, self.uri)
+        mock_query.assert_called_with(self.uri, "testquery", True)
+        mock_write.assert_called_with("testfile", ";", ['a', 'b', 'c'])
+
         # Query extracted from file
-        args = ["chado", "query", "-d", ";", "-o", "testfile", "-f", "testqueryfile", "testdb"]
+        args = ["chado", "query", "-d", "\t", "-o", "otherfile", "-f", "testqueryfile", "testdb"]
         parsed_args = chado_tools.parse_arguments(args)
         mock_read.return_value = "query_from_file"
-        tasks.run_command_with_arguments(args[1], "", parsed_args, self.uri)
-        mock_query.assert_called_with(self.uri, "query_from_file", "testfile", ";", False)
+        tasks.run_query_command(parsed_args, self.uri)
+        mock_query.assert_called_with(self.uri, "query_from_file", False)
+        mock_write.assert_called_with("otherfile", "\t", ['a', 'b', 'c'])
+
+    @unittest.mock.patch('pychado.tasks.run_execute_command')
+    def test_run_execute(self, mock_run):
+        # Checks that calls to database functions are correctly run
+        self.assertIs(mock_run, tasks.run_execute_command)
+        args = ["chado", "execute", "audit_backup", "--date", "testdate", "testdb"]
+        parsed_args = chado_tools.parse_arguments(args)
+        tasks.run_command_with_arguments(args[1], args[2], parsed_args, self.uri)
+        mock_run.assert_called_with("audit_backup", parsed_args, self.uri)
+
+    @unittest.mock.patch('pychado.ddl.AuditBackupSchemaSetupClient')
+    def test_execute_audit_backup(self, mock_backup_schema_client):
+        # Checks that the function calling the backup process of the audit schema is correctly called
+        self.assertIs(mock_backup_schema_client, ddl.AuditBackupSchemaSetupClient)
+        args = ["chado", "execute", "audit_backup", "--date", "testdate", "testdb"]
+        parsed_args = chado_tools.parse_arguments(args)
+        tasks.run_execute_command(args[2], parsed_args, self.uri)
+        mock_backup_schema_client.assert_called_with(self.uri)
+        self.assertIn(unittest.mock.call().execute_backup_function("testdate"), mock_backup_schema_client.mock_calls)
 
     @unittest.mock.patch('pychado.tasks.run_select_command')
     def test_run_select(self, mock_run):
@@ -245,93 +280,116 @@ class TestTasks(unittest.TestCase):
         tasks.run_command_with_arguments(args[1], args[2], parsed_args, self.uri)
         mock_run.assert_called_with("organisms", parsed_args, self.uri)
 
-    @unittest.mock.patch('pychado.dbutils.query_to_file')
+    @unittest.mock.patch('pychado.utils.write_csv')
+    @unittest.mock.patch('pychado.dbutils.run_query')
     @unittest.mock.patch('pychado.queries.set_query_conditions')
     @unittest.mock.patch('pychado.queries.load_query')
-    def test_extract_stats(self, mock_load, mock_set, mock_query):
+    def test_extract_stats(self, mock_load, mock_set, mock_query, mock_write):
         # Checks that the function providing database statistics is correctly called
         self.assertIs(mock_load, queries.load_query)
         self.assertIs(mock_set, queries.set_query_conditions)
         self.assertIs(mock_query, dbutils.run_query)
+        self.assertIs(mock_write, utils.write_csv)
 
         args = ["chado", "extract", "stats", "--start_date", "teststartdate", "--end_date", "testenddate",
                 "-a", "testorganism", "testdb"]
         parsed_args = chado_tools.parse_arguments(args)
         mock_load.return_value = "testquery"
         mock_set.return_value = "testquery_with_params"
+        mock_query.return_value = ['a', 'b', 'c']
+
         tasks.run_select_command(args[2], parsed_args, self.uri)
         mock_load.assert_called_with("stats")
         mock_set.assert_called_with("testquery", organism="testorganism", start_date="teststartdate",
                                     end_date="testenddate")
-        mock_query.assert_called_with(self.uri, "testquery_with_params", "", "\t", False)
+        mock_query.assert_called_with(self.uri, "testquery_with_params", False)
+        mock_write.assert_called_with("", "\t", ['a', 'b', 'c'])
 
         args = ["chado", "extract", "stats", "-H", "-d", ";", "-o", "testfile", "--start_date", "teststartdate",
                 "testdb"]
         parsed_args = chado_tools.parse_arguments(args)
         mock_load.return_value = "testquery"
         mock_set.return_value = "testquery_with_params"
+        mock_query.return_value = ['a', 'b', 'c']
+
         tasks.run_select_command(args[2], parsed_args, self.uri)
         mock_load.assert_called_with("stats")
         mock_set.assert_called_with("testquery", organism=None, start_date="teststartdate",
                                     end_date=utils.current_date())
-        mock_query.assert_called_with(self.uri, "testquery_with_params", "testfile", ";", True)
+        mock_query.assert_called_with(self.uri, "testquery_with_params", True)
+        mock_write.assert_called_with("testfile", ";", ['a', 'b', 'c'])
 
-    @unittest.mock.patch('pychado.dbutils.query_to_file')
+    @unittest.mock.patch('pychado.utils.write_csv')
+    @unittest.mock.patch('pychado.dbutils.run_query')
     @unittest.mock.patch('pychado.queries.set_query_conditions')
     @unittest.mock.patch('pychado.queries.load_query')
-    def test_extract_organisms(self, mock_load, mock_set, mock_query):
+    def test_extract_organisms(self, mock_load, mock_set, mock_query, mock_write):
         # Checks that the function extracting organisms is correctly called
         self.assertIs(mock_load, queries.load_query)
         self.assertIs(mock_set, queries.set_query_conditions)
         self.assertIs(mock_query, dbutils.run_query)
+        self.assertIs(mock_write, utils.write_csv)
 
         args = ["chado", "extract", "organisms", "testdb"]
         parsed_args = chado_tools.parse_arguments(args)
         mock_load.return_value = "testquery"
         mock_set.return_value = "testquery_with_params"
+        mock_query.return_value = ['a', 'b', 'c']
+
         tasks.run_select_command(args[2], parsed_args, self.uri)
         mock_load.assert_called_with("organisms")
         mock_set.assert_called_with("testquery")
-        mock_query.assert_called_with(self.uri, "testquery_with_params", "", "\t", False)
+        mock_query.assert_called_with(self.uri, "testquery_with_params", False)
+        mock_write.assert_called_with("", "\t", ['a', 'b', 'c'])
 
         tasks.run_select_command("inexistent_specifier", parsed_args, self.uri)
         mock_set.assert_called_with("")
 
-    @unittest.mock.patch('pychado.dbutils.query_to_file')
+    @unittest.mock.patch('pychado.utils.write_csv')
+    @unittest.mock.patch('pychado.dbutils.run_query')
     @unittest.mock.patch('pychado.queries.set_query_conditions')
     @unittest.mock.patch('pychado.queries.load_query')
-    def test_extract_cvterms(self, mock_load, mock_set, mock_query):
+    def test_extract_cvterms(self, mock_load, mock_set, mock_query, mock_write):
         # Checks that the function extracting CV terms is correctly called
         self.assertIs(mock_load, queries.load_query)
         self.assertIs(mock_set, queries.set_query_conditions)
         self.assertIs(mock_query, dbutils.run_query)
+        self.assertIs(mock_write, utils.write_csv)
 
         args = ["chado", "extract", "cvterms", "--database", "testdatabase", "--vocabulary", "testvocabulary", "testdb"]
         parsed_args = chado_tools.parse_arguments(args)
         mock_load.return_value = "testquery"
         mock_set.return_value = "testquery_with_params"
+        mock_query.return_value = ['a', 'b', 'c']
+
         tasks.run_select_command(args[2], parsed_args, self.uri)
         mock_load.assert_called_with("cvterms")
         mock_set.assert_called_with("testquery", vocabulary="testvocabulary", database="testdatabase")
-        mock_query.assert_called_with(self.uri, "testquery_with_params", "", "\t", False)
+        mock_query.assert_called_with(self.uri, "testquery_with_params", False)
+        mock_write.assert_called_with("", "\t", ['a', 'b', 'c'])
 
-    @unittest.mock.patch('pychado.dbutils.query_to_file')
+    @unittest.mock.patch('pychado.utils.write_csv')
+    @unittest.mock.patch('pychado.dbutils.run_query')
     @unittest.mock.patch('pychado.queries.set_query_conditions')
     @unittest.mock.patch('pychado.queries.load_query')
-    def test_extract_genedb_products(self, mock_load, mock_set, mock_query):
+    def test_extract_genedb_products(self, mock_load, mock_set, mock_query, mock_write):
         # Checks that the function extracting GeneDB products is correctly called
         self.assertIs(mock_load, queries.load_query)
         self.assertIs(mock_set, queries.set_query_conditions)
         self.assertIs(mock_query, dbutils.run_query)
+        self.assertIs(mock_write, utils.write_csv)
 
         args = ["chado", "extract", "genedb_products", "-a", "testorganism", "testdb"]
         parsed_args = chado_tools.parse_arguments(args)
         mock_load.return_value = "testquery"
         mock_set.return_value = "testquery_with_params"
+        mock_query.return_value = ['a', 'b', 'c']
+
         tasks.run_select_command(args[2], parsed_args, self.uri)
         mock_load.assert_called_with("genedb_products")
         mock_set.assert_called_with("testquery", organism="testorganism")
-        mock_query.assert_called_with(self.uri, "testquery_with_params", "", "\t", False)
+        mock_query.assert_called_with(self.uri, "testquery_with_params", False)
+        mock_write.assert_called_with("", "\t", ['a', 'b', 'c'])
 
     @unittest.mock.patch('pychado.tasks.run_insert_command')
     def test_run_insert(self, mock_run):

@@ -1,7 +1,6 @@
 import os
 import unittest.mock
 import urllib.error
-import filecmp
 import getpass
 import sqlalchemy_utils
 from .. import dbutils, utils
@@ -143,22 +142,17 @@ class TestConnection(unittest.TestCase):
         result_proxy.close()
         dbutils.close_connection(conn)
 
-        # Export the entire table to a file and check that the result is as expected
-        temp_file = os.path.join(os.getcwd(), "tmp.csv")
-        dbutils.run_query(uri, "SELECT name, clade, legs, extinct FROM species ORDER BY legs ASC", temp_file,
-                              ";", True)
-        self.assertTrue(os.path.exists(temp_file))
-        output_file = os.path.join(self.data_dir, "dbutils_species_table.csv")
-        self.assertTrue(os.path.exists(output_file))
-        self.assertTrue(filecmp.cmp(temp_file, output_file))
+        # Export the entire table and check that the result is as expected
+        result = dbutils.run_query(uri, "SELECT name, clade, legs, extinct FROM species ORDER BY legs ASC", True)
+        self.assertEqual(result[0][0], "name")
+        self.assertEqual(result[1][0], "leech")
+        self.assertEqual(len(result), 5)
 
         # Drop the database, remove the archive file and check that everything is gone
         dbutils.drop_database(uri, True)
         self.assertFalse(dbutils.exists(uri))
         os.remove(archive_file)
-        os.remove(temp_file)
         self.assertFalse(os.path.exists(archive_file))
-        self.assertFalse(os.path.exists(temp_file))
 
 
 class TestDownload(unittest.TestCase):

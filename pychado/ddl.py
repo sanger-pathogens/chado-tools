@@ -389,7 +389,7 @@ class AuditBackupSchemaSetupClient(AuditSchemaSetupClient):
     def create_backup_function(self):
         """Creates a function for moving audit tracks from the audit schema to the audit_backup schema"""
         function_name = self.schema + "." + self.backup_function_name()
-        declarations = self.backup_declarations()
+        declarations = self.backup_function_declarations()
         definition = self.backup_function()
         backup_creator = self.backup_function_wrapper(function_name, declarations, definition)
         self.execute_ddl(backup_creator)
@@ -408,7 +408,7 @@ class AuditBackupSchemaSetupClient(AuditSchemaSetupClient):
                + "END;\n$function$"
 
     @staticmethod
-    def backup_declarations() -> List[str]:
+    def backup_function_declarations() -> List[str]:
         return ["all_rows BIGINT", "table_rows BIGINT", "tabname RECORD"]
 
     @staticmethod

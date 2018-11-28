@@ -190,6 +190,15 @@ class SetupTests(unittest.TestCase):
         res = self.client.trigger_exists("testtrigger")
         self.assertTrue(res)
 
+    def test_function_exists(self):
+        # Tests the function that checks if a database function exists
+        res = self.client.function_exists("pg_catalog", "now")
+        self.assertTrue(res)
+        res = self.client.function_exists("pg_catalog", "inexistent_function")
+        self.assertFalse(res)
+        res = self.client.function_exists("inexistent_schema", "now")
+        self.assertFalse(res)
+
     def test_role_exists(self):
         # Tests the function that checks if a role exists
         res = self.client.role_exists("postgres")
@@ -309,6 +318,21 @@ class BackupSetupTests(unittest.TestCase):
     def tearDownClass(cls):
         # Drops the database
         dbutils.drop_database(cls.connection_uri, True)
+
+    @unittest.mock.patch("sqlalchemy.engine.Connection.execute")
+    @unittest.mock.patch("pychado.ddl.AuditBackupSchemaSetupClient.function_exists")
+    def test_execute_backup_function(self, mock_exists: unittest.mock.Mock, mock_execute: unittest.mock.Mock):
+        # Tests the function that executes the backup of the audit schema
+        self.assertIs(mock_exists, self.client.function_exists)
+        self.assertIs(mock_execute, self.client.connection.execute)
+
+        mock_exists.return_value = False
+        self.client.execute_backup_function("testdate")
+        mock_execute.assert_not_called()
+
+        mock_exists.return_value = True
+        self.client.execute_backup_function("testdate")
+        self.assertIn(unittest.mock.call().scalar(), mock_execute.mock_calls)
 
     def test_backup_function_wrapper(self):
         # Tests the syntax of the backup function

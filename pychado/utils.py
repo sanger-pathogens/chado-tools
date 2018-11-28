@@ -102,7 +102,7 @@ def write_csv(filename: str, delimiter: str, content: list) -> None:
 def parse_yaml(filename: str) -> dict:
     """Function parsing a YAML file"""
     stream = open_file_read(filename)
-    data = dict(yaml.load(stream))
+    data = yaml.load(stream)
     for key, value in data.items():
         if value is not None:
             data[key] = str(value).strip()

@@ -76,13 +76,6 @@ def admin_commands() -> dict:
     }
 
 
-def execute_commands() -> dict:
-    """Lists the available sub-commands of the 'chado execute' command with corresponding descriptions"""
-    return {
-        "audit_backup": "backs up the audit schema"
-    }
-
-
 def extract_commands() -> dict:
     """Lists the available sub-commands of the 'chado extract' command with corresponding descriptions"""
     return {
@@ -115,6 +108,13 @@ def import_commands() -> dict:
         "fasta": "import sequences from a FASTA file into the CHADO database",
         "gff": "import genomic data from a GFF3 file into the CHADO database",
         "gaf": "import gene annotation data from a GAF file into the CHADO database"
+    }
+
+
+def execute_commands() -> dict:
+    """Lists the available sub-commands of the 'chado execute' command with corresponding descriptions"""
+    return {
+        "audit_backup": "backs up the audit tables to a separate schema"
     }
 
 

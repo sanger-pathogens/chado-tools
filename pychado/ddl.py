@@ -60,12 +60,12 @@ class DDLClient(ChadoClient):
             inheritance_condition.bindparams(parent=parent_table, child=child_table)).select()
         return self.connection.execute(inherits_query).scalar()
 
-    def trigger_exists(self, trigger_name: str) -> bool:
+    def trigger_exists(self, schema: str, trigger_name: str) -> bool:
         """Checks if a trigger with a given name exists in a database"""
         triggers_table = sqlalchemy.text("information_schema.triggers")
-        triggers_condition = sqlalchemy.text("trigger_name=:trigger_name")
+        triggers_condition = sqlalchemy.text("trigger_schema=:schema AND trigger_name=:trigger_name")
         exists_query = sqlalchemy.exists().select_from(triggers_table).where(
-            triggers_condition.bindparams(trigger_name=trigger_name)).select()
+            triggers_condition.bindparams(schema=schema, trigger_name=trigger_name)).select()
         return self.connection.execute(exists_query).scalar()
 
     def function_exists(self, schema: str, function_name: str) -> bool:
@@ -90,9 +90,11 @@ class DDLClient(ChadoClient):
             for statement in statements:
                 ddl = sqlalchemy.schema.DDL(statement)
                 ddl.execute(self.engine)
+                print(statement)
         else:
             ddl = sqlalchemy.schema.DDL(statements)
             ddl.execute(self.engine)
+            print(statements)
 
     def create(self):
         """Basis function defined for completeness of the API"""
@@ -208,17 +210,18 @@ class SchemaSetupClient(DDLClient):
                 self.execute_ddl(inherit_command)
 
     @staticmethod
-    def create_trigger_function(name: str, definition: str) -> str:
-        return "CREATE OR REPLACE FUNCTION " + name + "()\n" \
+    def create_trigger_function(function_schema: str, function_name: str, definition: str) -> str:
+        return "CREATE OR REPLACE FUNCTION " + function_schema + "." + function_name + "()\n" \
                + "RETURNS trigger\nLANGUAGE plpgsql\nAS $function$\nBEGIN\n" \
                + definition + ";" \
                + "\nEND;\n$function$"
 
     @staticmethod
-    def create_generic_trigger(trigger_name: str, function_name: str, table: str) -> str:
+    def create_generic_trigger(trigger_name: str, function_schema: str, function_name: str, table_schema: str,
+                               table_name: str) -> str:
         return "CREATE TRIGGER " + trigger_name \
-               + " AFTER INSERT OR UPDATE OR DELETE ON " + table \
-               + " FOR EACH ROW EXECUTE PROCEDURE " + function_name + "()"
+               + " AFTER INSERT OR UPDATE OR DELETE ON " + table_schema + "." + table_name \
+               + " FOR EACH ROW EXECUTE PROCEDURE " + function_schema + "." + function_name + "()"
 
 
 class PublicSchemaSetupClient(SchemaSetupClient):
@@ -306,38 +309,37 @@ class AuditSchemaSetupClient(SchemaSetupClient):
         # Loop over all audit tables
         for table in audit_tables:
 
-            # Get table name
-            full_table_name = self.schema + "." + table.name
-
             # Retrieve columns of this table; exclude columns inherited from parent table
             column_names = [col.name for col in table.columns]
             data_column_names = [name for name in column_names if name not in parent_column_names]
 
             # Define trigger function
-            function_name = self.schema + ".public_" + table.name + "_proc"
-            function_definition = self.generic_audit_function(full_table_name, data_column_names)
-            function_creator = self.create_trigger_function(function_name, function_definition)
+            function_name = "public_" + table.name + "_proc"
+            function_definition = self.generic_audit_function(self.schema, table.name, data_column_names)
+            function_creator = self.create_trigger_function(self.schema, function_name, function_definition)
 
-            # Create/replace trigger function
-            self.execute_ddl(function_creator)
+            # Create trigger function, if it doesn't exist yet
+            if not self.function_exists(self.schema, function_name):
+                self.execute_ddl(function_creator)
 
             # Define trigger
             trigger_name = table.name + "_audit_tr"
-            trigger_creator = self.create_generic_trigger(trigger_name, function_name, table.name)
+            trigger_creator = self.create_generic_trigger(trigger_name, self.schema, function_name,
+                                                          "public", table.name)
 
             # Create trigger, if is doesn't exist yet
-            if not self.trigger_exists(trigger_name):
+            if not self.trigger_exists("public", trigger_name):
                 self.execute_ddl(trigger_creator)
 
     @staticmethod
-    def generic_audit_function(table: str, columns: list) -> str:
+    def generic_audit_function(schema: str, table: str, columns: list) -> str:
         return "IF TG_OP = 'INSERT' OR TG_OP = 'UPDATE' THEN\n" \
-               + "\tINSERT INTO " + table + "(type, " + utils.list_to_string(columns, ", ") + ")" \
+               + "\tINSERT INTO " + schema + "." + table + "(type, " + utils.list_to_string(columns, ", ") + ")" \
                + " VALUES (CAST(TG_OP AS " + base.operation_type.name + "), " \
                + utils.list_to_string(columns, ", ", "NEW") + ");\n" \
                + "\tRETURN NEW;\n" \
                + "ELSE\n" \
-               + "\tINSERT INTO " + table + "(type, " + utils.list_to_string(columns, ", ") + ")" \
+               + "\tINSERT INTO " + schema + "." + table + "(type, " + utils.list_to_string(columns, ", ") + ")" \
                + " VALUES (CAST(TG_OP AS " + base.operation_type.name + "), " \
                + utils.list_to_string(columns, ", ", "OLD") + ");\n" \
                + "\tRETURN OLD;\n" \

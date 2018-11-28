@@ -122,8 +122,8 @@ class SetupTests(unittest.TestCase):
 
     def test_create_trigger_function(self):
         # Tests the syntax of trigger function creation
-        wrapper = self.client.create_trigger_function("trigger_name", "trigger_def")
-        self.assertEqual(wrapper, "CREATE OR REPLACE FUNCTION trigger_name()\n"
+        wrapper = self.client.create_trigger_function("trigger_schema", "trigger_name", "trigger_def")
+        self.assertEqual(wrapper, "CREATE OR REPLACE FUNCTION trigger_schema.trigger_name()\n"
                                   "RETURNS trigger\n"
                                   "LANGUAGE plpgsql\n"
                                   "AS $function$\n"
@@ -134,19 +134,20 @@ class SetupTests(unittest.TestCase):
 
     def test_create_generic_trigger(self):
         # Tests the syntax of trigger creation
-        trigger = self.client.create_generic_trigger("testtrigger", "trigger_function", "testtable")
-        self.assertEqual(trigger, "CREATE TRIGGER testtrigger AFTER INSERT OR UPDATE OR DELETE ON testtable "
-                                  "FOR EACH ROW EXECUTE PROCEDURE trigger_function()")
+        trigger = self.client.create_generic_trigger("testtrigger", "function_schema", "trigger_function",
+                                                     "testschema", "testtable")
+        self.assertEqual(trigger, "CREATE TRIGGER testtrigger AFTER INSERT OR UPDATE OR DELETE ON testschema.testtable "
+                                  "FOR EACH ROW EXECUTE PROCEDURE function_schema.trigger_function()")
 
     def test_generic_audit_function(self):
         # Tests the syntax of an audit function
-        fct = self.client.generic_audit_function("testtable", ["col1", "col2"])
+        fct = self.client.generic_audit_function("testschema", "testtable", ["col1", "col2"])
         self.assertEqual(fct, "IF TG_OP = 'INSERT' OR TG_OP = 'UPDATE' THEN\n"
-                              "\tINSERT INTO testtable(type, col1, col2) "
+                              "\tINSERT INTO testschema.testtable(type, col1, col2) "
                               "VALUES (CAST(TG_OP AS operation_type), NEW.col1, NEW.col2);\n"
                               "\tRETURN NEW;\n"
                               "ELSE\n"
-                              "\tINSERT INTO testtable(type, col1, col2) "
+                              "\tINSERT INTO testschema.testtable(type, col1, col2) "
                               "VALUES (CAST(TG_OP AS operation_type), OLD.col1, OLD.col2);\n"
                               "\tRETURN OLD;\n"
                               "END IF")
@@ -181,13 +182,13 @@ class SetupTests(unittest.TestCase):
     def test_trigger_exists(self):
         # Tests the function that checks if a trigger exists
         sqlalchemy.schema.DDL("CREATE TABLE testtable(id INTEGER, data VARCHAR(255))").execute(self.client.engine)
-        res = self.client.trigger_exists("testtrigger")
+        res = self.client.trigger_exists("public", "testtrigger")
         self.assertFalse(res)
-        fct = self.client.create_trigger_function("testfct", "SELECT 1+1")
+        fct = self.client.create_trigger_function("public", "testfct", "SELECT 1+1")
         sqlalchemy.schema.DDL(fct).execute(self.client.engine)
         sqlalchemy.schema.DDL("CREATE TRIGGER testtrigger AFTER INSERT ON testtable EXECUTE PROCEDURE testfct()")\
             .execute(self.client.engine)
-        res = self.client.trigger_exists("testtrigger")
+        res = self.client.trigger_exists("public", "testtrigger")
         self.assertTrue(res)
 
     def test_function_exists(self):
@@ -274,9 +275,9 @@ class SetupTests(unittest.TestCase):
         mock_trigger.return_value = "trigger_wrapper"
         mock_exists.return_value = True
         self.client.create_audit_triggers([testtable])
-        mock_function.assert_called_with("audit.testtable", ["idcolumn", "datacolumn"])
-        mock_wrapper.assert_called_with("audit.public_testtable_proc", "function_definition")
-        mock_trigger.assert_called_with("testtable_audit_tr", "audit.public_testtable_proc", "testtable")
+        mock_function.assert_called_with("audit", "testtable", ["idcolumn", "datacolumn"])
+        mock_wrapper.assert_called_with("audit", "public_testtable_proc", "function_definition")
+        mock_trigger.assert_called_with("testtable_audit_tr", "audit", "public_testtable_proc", "public", "testtable")
         mock_execute.assert_called_with("function_wrapper")
 
         mock_execute.reset_mock()

@@ -93,7 +93,7 @@ class IOClient(ddl.ChadoClient):
     def query_parent_feature(self, child_name: str) -> sqlalchemy.orm.Query:
         """Creates a query to select the parent feature of a given feature"""
         subject_feature = sqlalchemy.orm.aliased(sequence.Feature, name="subject_feature")
-        object_feature  = sqlalchemy.orm.aliased(sequence.Feature, name="object_feature")
+        object_feature = sqlalchemy.orm.aliased(sequence.Feature, name="object_feature")
         return self.session.query(object_feature)\
             .select_from(sequence.FeatureRelationship)\
             .join(subject_feature, sequence.FeatureRelationship.subject)\
@@ -101,6 +101,7 @@ class IOClient(ddl.ChadoClient):
             .join(cv.CvTerm, sequence.FeatureRelationship.type)\
             .filter(cv.CvTerm.name == "part_of")\
             .filter(subject_feature.uniquename == child_name)
+
 
 class ImportClient(IOClient):
     """Base class for importing data into a CHADO database"""

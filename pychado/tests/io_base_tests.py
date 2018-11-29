@@ -128,7 +128,6 @@ class TestIOClient(unittest.TestCase):
         # Tests the function that creates a query against the feature_relationship table
         query = self.client.query_parent_feature("testname")
         compiled_query = str(query.statement.compile(compile_kwargs={"literal_binds": True}))
-
         self.assertIn("FROM public.feature_relationship JOIN public.feature AS subject_feature "
                       "ON subject_feature.feature_id = public.feature_relationship.subject_id "
                       "JOIN public.feature AS object_feature "
@@ -137,6 +136,7 @@ class TestIOClient(unittest.TestCase):
                       "ON public.cvterm.cvterm_id = public.feature_relationship.type_id", compiled_query)
         self.assertIn("public.cvterm.name = 'part_of'", compiled_query)
         self.assertIn("subject_feature.uniquename = 'testname'", compiled_query)
+
 
 class TestImportClient(unittest.TestCase):
     """Test functions for loading data into a CHADO database"""

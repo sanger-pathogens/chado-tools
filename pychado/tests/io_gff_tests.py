@@ -36,8 +36,8 @@ class TestGFF(unittest.TestCase):
         dbutils.drop_database(cls.connection_uri, True)
 
     def setUp(self):
-        # Creates a default GFF file entry
-        self.default_gff_entry = gffutils.Feature(
+        # Creates a default GFF record
+        self.default_gff_record = gffutils.Feature(
             id="testid", seqid="testseqid", source="testsource", featuretype="testtype", start=1, end=30, score="3.5",
             strand="+", frame="2", attributes={
                 "Name": ["testname"], "translation": ["MCRA"], "literature": ["PMID:12334"], "Alias": ["testalias"],
@@ -153,21 +153,72 @@ class TestGFF(unittest.TestCase):
         self.assertIn(unittest.mock.call.delete(), mock_query_object.method_calls)
         self.assertEqual(len(mock_query_object.mock_calls), 2)
 
+    @unittest.mock.patch("pychado.io.gff.GFFImportClient._check_if_attributes_are_recognized")
+    @unittest.mock.patch("pychado.io.gff.GFFImportClient._handle_protein")
+    @unittest.mock.patch("pychado.io.gff.GFFImportClient._handle_relationships")
+    @unittest.mock.patch("pychado.io.gff.GFFImportClient._handle_publications")
+    @unittest.mock.patch("pychado.io.gff.GFFImportClient._handle_ontology_terms")
+    @unittest.mock.patch("pychado.io.gff.GFFImportClient._handle_cross_references")
+    @unittest.mock.patch("pychado.io.gff.GFFImportClient._handle_properties")
+    @unittest.mock.patch("pychado.io.gff.GFFImportClient._handle_synonyms")
+    @unittest.mock.patch("pychado.io.gff.GFFImportClient._handle_location")
+    @unittest.mock.patch("pychado.io.gff.GFFImportClient._handle_child_feature")
+    def test_insert_gff_record_into_database(
+            self, mock_handle_child: unittest.mock.Mock, mock_handle_location: unittest.mock.Mock,
+            mock_handle_synonyms: unittest.mock.Mock, mock_handle_properties: unittest.mock.Mock,
+            mock_handle_cross_references: unittest.mock.Mock, mock_handle_ontology_terms: unittest.mock.Mock,
+            mock_handle_publications: unittest.mock.Mock, mock_handle_relationships: unittest.mock.Mock,
+            mock_handle_protein: unittest.mock.Mock, mock_check_recognized: unittest.mock.Mock):
+        # Tests the main function updating database tables according to the information in a GFF record
+        self.assertIs(mock_handle_child, self.client._handle_child_feature)
+        self.assertIs(mock_handle_location, self.client._handle_location)
+        self.assertIs(mock_handle_synonyms, self.client._handle_synonyms)
+        self.assertIs(mock_handle_properties, self.client._handle_properties)
+        self.assertIs(mock_handle_cross_references, self.client._handle_cross_references)
+        self.assertIs(mock_handle_ontology_terms, self.client._handle_ontology_terms)
+        self.assertIs(mock_handle_publications, self.client._handle_publications)
+        self.assertIs(mock_handle_relationships, self.client._handle_relationships)
+        self.assertIs(mock_handle_protein, self.client._handle_protein)
+        self.assertIs(mock_check_recognized, self.client._check_if_attributes_are_recognized)
+
+        organism_entry = organism.Organism(genus="", species="", abbreviation="testorganism", organism_id=1)
+        all_features = {}
+        mock_handle_child.return_value = None
+        self.client._insert_gff_record_into_database(self.default_gff_record, organism_entry, all_features)
+        mock_handle_child.assert_called_with(self.default_gff_record, organism_entry)
+        mock_handle_location.assert_not_called()
+        self.assertEqual(len(all_features), 0)
+
+        feature_entry = sequence.Feature(organism_id=11, type_id=200, uniquename="testname", feature_id=1)
+        mock_handle_child.return_value = feature_entry
+        self.client._insert_gff_record_into_database(self.default_gff_record, organism_entry, all_features)
+        mock_handle_child.assert_called_with(self.default_gff_record, organism_entry)
+        mock_handle_location.assert_called_with(self.default_gff_record, feature_entry)
+        mock_handle_synonyms.assert_called_with(self.default_gff_record, feature_entry)
+        mock_handle_properties.assert_called_with(self.default_gff_record, feature_entry)
+        mock_handle_cross_references.assert_called_with(self.default_gff_record, feature_entry)
+        mock_handle_ontology_terms.assert_called_with(self.default_gff_record, feature_entry)
+        mock_handle_publications.assert_called_with(self.default_gff_record, feature_entry)
+        mock_handle_relationships.assert_called_with(self.default_gff_record, feature_entry, all_features)
+        mock_handle_protein.assert_called_with(self.default_gff_record, feature_entry, organism_entry, all_features)
+        mock_check_recognized.assert_called_with(self.default_gff_record)
+        self.assertEqual(len(all_features), 1)
+
     @unittest.mock.patch("pychado.io.gff.GFFImportClient._handle_feature")
     @unittest.mock.patch("pychado.io.gff.GFFImportClient._create_feature")
     def test_handle_child_feature(self, mock_create: unittest.mock.Mock, mock_insert: unittest.mock.Mock):
-        # Tests the function transferring data from a GFF file entry to the 'feature' table
+        # Tests the function transferring data from a GFF record to the 'feature' table
         self.assertIs(mock_create, self.client._create_feature)
         self.assertIs(mock_insert, self.client._handle_feature)
         organism_entry = organism.Organism(genus="", species="", abbreviation="testorganism", organism_id=1)
-        feature_entry = self.client._handle_child_feature(self.default_gff_entry, organism_entry)
+        feature_entry = self.client._handle_child_feature(self.default_gff_record, organism_entry)
         self.assertIsNone(feature_entry)
         mock_create.assert_not_called()
 
-        self.default_gff_entry.featuretype = "gene"
+        self.default_gff_record.featuretype = "gene"
         mock_create.return_value = "AAA"
-        self.client._handle_child_feature(self.default_gff_entry, organism_entry)
-        mock_create.assert_called_with(self.default_gff_entry, 1, self.client._sequence_terms["gene"].cvterm_id)
+        self.client._handle_child_feature(self.default_gff_record, organism_entry)
+        mock_create.assert_called_with(self.default_gff_record, 1, self.client._sequence_terms["gene"].cvterm_id)
         mock_insert.assert_called_with("AAA", "testorganism")
 
     @unittest.mock.patch("pychado.io.gff.GFFImportClient._handle_featureloc")
@@ -175,7 +226,7 @@ class TestGFF(unittest.TestCase):
     @unittest.mock.patch("pychado.io.gff.GFFImportClient.query_first")
     def test_handle_location(self, mock_query: unittest.mock.Mock, mock_create: unittest.mock.Mock,
                              mock_insert: unittest.mock.Mock):
-        # Tests the function transferring data from a GFF file entry to the 'feature' table
+        # Tests the function transferring data from a GFF record to the 'feature' table
         self.assertIs(mock_query, self.client.query_first)
         self.assertIs(mock_create, self.client._create_featureloc)
         self.assertIs(mock_insert, self.client._handle_featureloc)
@@ -183,14 +234,14 @@ class TestGFF(unittest.TestCase):
         feature_entry = sequence.Feature(organism_id=11, type_id=200, uniquename="testname", feature_id=1)
         mock_query.return_value = sequence.Feature(organism_id=11, type_id=300, uniquename="chromname", feature_id=2)
 
-        featureloc_entry = self.client._handle_location(self.default_gff_entry, feature_entry)
+        featureloc_entry = self.client._handle_location(self.default_gff_record, feature_entry)
         mock_query.assert_called_with(sequence.Feature, organism_id=11, uniquename="testseqid")
-        mock_create.assert_called_with(self.default_gff_entry, 1, 2)
+        mock_create.assert_called_with(self.default_gff_record, 1, 2)
         mock_insert.assert_called()
         self.assertIsNotNone(featureloc_entry)
 
         mock_query.return_value = None
-        featureloc_entry = self.client._handle_location(self.default_gff_entry, feature_entry)
+        featureloc_entry = self.client._handle_location(self.default_gff_record, feature_entry)
         self.assertIsNone(featureloc_entry)
 
     @unittest.mock.patch("pychado.io.gff.GFFImportClient._delete_feature_synonym")
@@ -203,7 +254,7 @@ class TestGFF(unittest.TestCase):
                              mock_insert_synonym: unittest.mock.Mock, mock_feature_synonym: unittest.mock.Mock,
                              mock_insert_feature_synonym: unittest.mock.Mock,
                              mock_delete_feature_synonym: unittest.mock.Mock):
-        # Tests the function transferring data from a GFF file entry to the 'feature_synonym' table
+        # Tests the function transferring data from a GFF record to the 'feature_synonym' table
         self.assertIs(mock_query, self.client.query_feature_synonym_by_type)
         self.assertIs(mock_synonym, sequence.Synonym)
         self.assertIs(mock_insert_synonym, self.client._handle_synonym)
@@ -214,7 +265,7 @@ class TestGFF(unittest.TestCase):
         feature_entry = sequence.Feature(organism_id=11, type_id=200, uniquename="testname", feature_id=1)
         mock_insert_synonym.return_value = utils.EmptyObject(synonym_id=12)
 
-        all_synonyms = self.client._handle_synonyms(self.default_gff_entry, feature_entry)
+        all_synonyms = self.client._handle_synonyms(self.default_gff_record, feature_entry)
         mock_query.assert_called_with(1, ["alias", "synonym", "previous_systematic_id"])
         mock_synonym.assert_any_call(name="testalias", type_id=self.client._synonym_terms["alias"].cvterm_id,
                                      synonym_sgml="testalias")
@@ -234,7 +285,7 @@ class TestGFF(unittest.TestCase):
                                  mock_insert_pub: unittest.mock.Mock, mock_featurepub: unittest.mock.Mock,
                                  mock_insert_feature_pub: unittest.mock.Mock,
                                  mock_delete_feature_pub: unittest.mock.Mock):
-        # Tests the function transferring data from a GFF file entry to the 'feature_pub' table
+        # Tests the function transferring data from a GFF record to the 'feature_pub' table
         self.assertIs(mock_query, self.client.query_all)
         self.assertIs(mock_pub, pub.Pub)
         self.assertIs(mock_insert_pub, self.client._handle_pub)
@@ -245,7 +296,7 @@ class TestGFF(unittest.TestCase):
         feature_entry = sequence.Feature(organism_id=11, type_id=200, uniquename="testname", feature_id=12)
         mock_insert_pub.return_value = utils.EmptyObject(pub_id=32, uniquename="")
 
-        all_pubs = self.client._handle_publications(self.default_gff_entry, feature_entry)
+        all_pubs = self.client._handle_publications(self.default_gff_record, feature_entry)
         mock_query.assert_called_with(sequence.FeaturePub, feature_id=12)
         mock_pub.assert_any_call(uniquename="PMID:12334", type_id=self.client._default_pub.type_id)
         self.assertEqual(mock_insert_pub.call_count, 1)
@@ -261,7 +312,7 @@ class TestGFF(unittest.TestCase):
     def test_handle_relationships(self, mock_query: unittest.mock.Mock, mock_relationship: unittest.mock.Mock,
                                   mock_insert_relationship: unittest.mock.Mock,
                                   mock_delete_relationship: unittest.mock.Mock):
-        # Tests the function transferring data from a GFF file entry to the 'feature_relationship' table
+        # Tests the function transferring data from a GFF record to the 'feature_relationship' table
         self.assertIs(mock_query, self.client.query_feature_relationship_by_type)
         self.assertIs(mock_relationship, sequence.FeatureRelationship)
         self.assertIs(mock_insert_relationship, self.client._handle_feature_relationship)
@@ -269,9 +320,9 @@ class TestGFF(unittest.TestCase):
 
         subject_entry = sequence.Feature(organism_id=11, type_id=300, uniquename="testid", feature_id=33)
         object_entry = sequence.Feature(organism_id=11, type_id=400, uniquename="testparent", feature_id=44)
-        all_features = {subject_entry.uniquename: subject_entry, object_entry.uniquename: object_entry}
+        all_features = {object_entry.uniquename: object_entry}
 
-        all_relationships = self.client._handle_relationships(self.default_gff_entry, all_features)
+        all_relationships = self.client._handle_relationships(self.default_gff_record, subject_entry, all_features)
         mock_query.assert_called_with(33, ["part_of", "derives_from"])
         mock_relationship.assert_any_call(subject_id=33, object_id=44,
                                           type_id=self.client._relationship_terms["part_of"].cvterm_id)
@@ -285,14 +336,14 @@ class TestGFF(unittest.TestCase):
     @unittest.mock.patch("pychado.io.gff.GFFImportClient.query_featureprop_by_type")
     def test_handle_properties(self, mock_query: unittest.mock.Mock, mock_prop: unittest.mock.Mock,
                                mock_insert_prop: unittest.mock.Mock, mock_delete_prop: unittest.mock.Mock):
-        # Tests the function transferring data from a GFF file entry to the 'featureprop' table
+        # Tests the function transferring data from a GFF record to the 'featureprop' table
         self.assertIs(mock_query, self.client.query_featureprop_by_type)
         self.assertIs(mock_prop, sequence.FeatureProp)
         self.assertIs(mock_insert_prop, self.client._handle_featureprop)
         self.assertIs(mock_delete_prop, self.client._delete_featureprop)
 
         feature_entry = sequence.Feature(organism_id=11, type_id=200, uniquename="testname", feature_id=12)
-        all_properties = self.client._handle_properties(self.default_gff_entry, feature_entry)
+        all_properties = self.client._handle_properties(self.default_gff_record, feature_entry)
         mock_query.assert_called_with(12, ["comment", "description", "score", "source"])
         mock_prop.assert_any_call(feature_id=12, type_id=self.client._feature_property_terms["source"].cvterm_id,
                                   value="testsource")
@@ -317,7 +368,7 @@ class TestGFF(unittest.TestCase):
                               mock_insert_dbxref: unittest.mock.Mock, mock_feature_dbxref: unittest.mock.Mock,
                               mock_insert_feature_dbxref: unittest.mock.Mock,
                               mock_delete_feature_dbxref: unittest.mock.Mock):
-        # Tests the function transferring data from a GFF file entry to the 'feature_dbxref' table
+        # Tests the function transferring data from a GFF record to the 'feature_dbxref' table
         self.assertIs(mock_query, self.client.query_all)
         self.assertIs(mock_db, general.Db)
         self.assertIs(mock_insert_db, self.client._handle_db)
@@ -331,7 +382,7 @@ class TestGFF(unittest.TestCase):
         mock_insert_db.return_value = utils.EmptyObject(db_id=44, name="")
         mock_insert_dbxref.return_value = utils.EmptyObject(dbxref_id=55, accession="", version="")
 
-        all_crossrefs = self.client._handle_cross_references(self.default_gff_entry, feature_entry)
+        all_crossrefs = self.client._handle_cross_references(self.default_gff_record, feature_entry)
         mock_query.assert_called_with(sequence.FeatureDbxRef, feature_id=12)
         mock_db.assert_any_call(name="testdb")
         mock_dbxref.assert_any_call(db_id=44, accession="testaccession", version="")
@@ -351,7 +402,7 @@ class TestGFF(unittest.TestCase):
                                    mock_feature_cvterm: unittest.mock.Mock,
                                    mock_insert_feature_cvterm: unittest.mock.Mock,
                                    mock_delete_feature_cvterm: unittest.mock.Mock):
-        # Tests the function transferring data from a GFF file entry to the 'feature_cvterm' table
+        # Tests the function transferring data from a GFF record to the 'feature_cvterm' table
         self.assertIs(mock_query, self.client.query_feature_cvterm_by_ontology)
         self.assertIs(mock_query_first, self.client.query_first)
         self.assertIs(mock_feature_cvterm, sequence.FeatureCvTerm)
@@ -363,7 +414,7 @@ class TestGFF(unittest.TestCase):
                                         utils.EmptyObject(dbxref_id=44),
                                         utils.EmptyObject(cvterm_id=55, name="")]
 
-        all_ontology_terms = self.client._handle_ontology_terms(self.default_gff_entry, feature_entry)
+        all_ontology_terms = self.client._handle_ontology_terms(self.default_gff_record, feature_entry)
         mock_query.assert_called_with(12, ["GO"])
         mock_query_first.assert_any_call(general.Db, name="GO")
         mock_query_first.assert_any_call(general.DbxRef, db_id=33, accession="7890")
@@ -373,6 +424,52 @@ class TestGFF(unittest.TestCase):
         self.assertEqual(mock_insert_feature_cvterm.call_count, 1)
         mock_delete_feature_cvterm.assert_called()
         self.assertEqual(len(all_ontology_terms), 1)
+
+    @unittest.mock.patch("pychado.io.gff.GFFImportClient._insert_gff_record_into_database")
+    @unittest.mock.patch("gffutils.Feature")
+    @unittest.mock.patch("pychado.io.gff.GFFImportClient.query_first")
+    @unittest.mock.patch("pychado.io.gff.GFFImportClient.query_parent_feature")
+    def test_handle_protein(self, mock_query: unittest.mock.Mock, mock_query_first: unittest.mock.Mock,
+                            mock_record: unittest.mock.Mock, mock_insert: unittest.mock.Mock):
+        # Tests the function creating a new GFF record for a polypeptide and inserting it into the database
+        self.assertIs(mock_query, self.client.query_parent_feature)
+        self.assertIs(mock_query_first, self.client.query_first)
+        self.assertIs(mock_record, gffutils.Feature)
+        self.assertIs(mock_insert, self.client._insert_gff_record_into_database)
+
+        feature_entry = sequence.Feature(organism_id=11, type_id=200, uniquename="testname", feature_id=12)
+        organism_entry = organism.Organism(genus="", species="", abbreviation="testorganism", organism_id=1)
+        all_features = {}
+
+        # No attribute "protein_source_id"
+        self.client._handle_protein(self.default_gff_record, feature_entry, organism_entry, all_features)
+        mock_query.assert_not_called()
+        mock_query_first.assert_not_called()
+        mock_record.assert_not_called()
+        mock_insert.assert_not_called()
+
+        # Attribute "protein_source_id" present; GFF record is mRNA
+        self.default_gff_record.featuretype = "mRNA"
+        self.default_gff_record.attributes["protein_source_id"] = "testid"
+        mock_query_first.return_value = sequence.FeatureLoc(feature_id=1, srcfeature_id=2, fmin=300, fmax=400, strand=1)
+        self.client._handle_protein(self.default_gff_record, feature_entry, organism_entry, all_features)
+        mock_query.assert_not_called()
+        mock_query_first.assert_called_with(sequence.FeatureLoc, feature_id=12)
+        mock_record.assert_called_with(seqid="testseqid", source="testsource", start=301, end=400, strand="+",
+                                       featuretype="polypeptide", id="testid", attributes={"Derives_from": "testname"})
+        mock_insert.assert_called()
+
+        # Attribute "protein_source_id" present; GFF record is not mRNA
+        self.default_gff_record.featuretype = "CDS"
+        mock_query_object = mock_query.return_value
+        mock_query_object.configure_mock(**{"first.return_value": sequence.Feature(
+            organism_id=11, type_id=200, uniquename="othername", feature_id=13)})
+        self.client._handle_protein(self.default_gff_record, feature_entry, organism_entry, all_features)
+        mock_query.assert_called_with("testname")
+        mock_query_first.assert_called_with(sequence.FeatureLoc, feature_id=13)
+        mock_record.assert_called_with(seqid="testseqid", source="testsource", start=301, end=400, strand="+",
+                                       featuretype="polypeptide", id="testid", attributes={"Derives_from": "othername"})
+        mock_insert.assert_called()
 
     @unittest.mock.patch("pychado.io.gff.GFFImportClient._mark_feature_as_obsolete")
     @unittest.mock.patch("pychado.io.gff.GFFImportClient._load_feature_names")
@@ -389,8 +486,8 @@ class TestGFF(unittest.TestCase):
         self.assertEqual(mock_mark.call_count, 2)
 
     def test_check_attributes(self):
-        # Tests the function that checks if all attributes of a GFF file entry are recognized
-        feature = self.default_gff_entry
+        # Tests the function that checks if all attributes of a GFF record are recognized
+        feature = self.default_gff_record
         recognized = self.client._check_if_attributes_are_recognized(feature)
         self.assertTrue(recognized)
         feature.attributes["other_attribute"] = "other_value"
@@ -399,7 +496,7 @@ class TestGFF(unittest.TestCase):
 
     def test_create_feature(self):
         # Tests the function that creates an entry for the 'feature' table
-        feature = self.client._create_feature(self.default_gff_entry, 3, 5)
+        feature = self.client._create_feature(self.default_gff_record, 3, 5)
         self.assertEqual(feature.organism_id, 3)
         self.assertEqual(feature.type_id, 5)
         self.assertEqual(feature.uniquename, "testid")
@@ -409,7 +506,7 @@ class TestGFF(unittest.TestCase):
 
     def test_create_featureloc(self):
         # Tests the function that creates an entry for the 'featureloc' table
-        featureloc = self.client._create_featureloc(self.default_gff_entry, 3, 5)
+        featureloc = self.client._create_featureloc(self.default_gff_record, 3, 5)
         self.assertEqual(featureloc.feature_id, 3)
         self.assertEqual(featureloc.srcfeature_id, 5)
         self.assertEqual(featureloc.fmin, 0)
@@ -418,7 +515,7 @@ class TestGFF(unittest.TestCase):
         self.assertEqual(featureloc.phase, 2)
 
     def test_extract_name(self):
-        # Tests the function that extracts the name from a GFF file entry
+        # Tests the function that extracts the name from a GFF record
         feature = gffutils.Feature()
         name = self.client._extract_name(feature)
         self.assertIsNone(name)
@@ -430,7 +527,7 @@ class TestGFF(unittest.TestCase):
         self.assertEqual(name, "othername")
 
     def test_extract_size(self):
-        # Tests the function that extracts the sequence length from a GFF file entry
+        # Tests the function that extracts the sequence length from a GFF record
         feature = gffutils.Feature()
         size = self.client._extract_size(feature)
         self.assertIsNone(size)
@@ -439,7 +536,7 @@ class TestGFF(unittest.TestCase):
         self.assertEqual(size, 587)
 
     def test_extract_synonyms(self):
-        # Tests the function that extracts the synonyms from a GFF file entry
+        # Tests the function that extracts the synonyms from a GFF record
         feature = gffutils.Feature(attributes={"Alias": "testalias", "previous_systematic_id": ["testsynonym"]})
         synonyms = self.client._extract_synonyms(feature)
         self.assertEqual(len(synonyms), 2)
@@ -447,7 +544,7 @@ class TestGFF(unittest.TestCase):
         self.assertEqual(synonyms["previous_systematic_id"], ["testsynonym"])
 
     def test_extract_residues(self):
-        # Tests the function that extracts an amino acid sequence from a GFF file entry
+        # Tests the function that extracts an amino acid sequence from a GFF record
         feature = gffutils.Feature()
         residues = self.client._extract_residues(feature)
         self.assertIsNone(residues)
@@ -459,7 +556,7 @@ class TestGFF(unittest.TestCase):
         self.assertEqual(residues, "CTTG")
 
     def test_extract_relationships(self):
-        # Tests the function that extracts feature relationships from a GFF file entry
+        # Tests the function that extracts feature relationships from a GFF record
         feature = gffutils.Feature(attributes={"Parent": "parentterm", "Derives_from": ["otherterm"],
                                                "other_key": "other_value"})
         relationships = self.client._extract_relationships(feature)
@@ -468,7 +565,7 @@ class TestGFF(unittest.TestCase):
         self.assertEqual(relationships["derives_from"], ["otherterm"])
 
     def test_extract_properties(self):
-        # Tests the function that extracts feature properties from a GFF file entry
+        # Tests the function that extracts feature properties from a GFF record
         feature = gffutils.Feature(source="testsource", score="2.54",
                                    attributes={"Parent": "parentterm", "comment": ["first_value", "second_value"]})
         properties = self.client._extract_properties(feature)
@@ -478,25 +575,34 @@ class TestGFF(unittest.TestCase):
         self.assertEqual(properties["comment"], ["first_value", "second_value"])
 
     def test_extract_crossrefs(self):
-        # Tests the function that extracts database cross references from a GFF file entry
+        # Tests the function that extracts database cross references from a GFF record
         feature = gffutils.Feature(attributes={"Dbxref": "Wikipedia:gene", "Ontology_term": ["GO:12345", "GO:67890"]})
         crossrefs = self.client._extract_crossrefs(feature)
         self.assertEqual(len(crossrefs), 1)
         self.assertIn("Wikipedia:gene", crossrefs)
 
     def test_extract_ontology_terms(self):
-        # Tests the function that extracts ontology terms from a GFF file entry
+        # Tests the function that extracts ontology terms from a GFF record
         feature = gffutils.Feature(attributes={"Dbxref": "Wikipedia:gene", "Ontology_term": ["GO:12345", "GO:67890"]})
         ontology_terms = self.client._extract_ontology_terms(feature)
         self.assertEqual(len(ontology_terms), 2)
         self.assertIn("GO:67890", ontology_terms)
 
     def test_extract_publications(self):
-        # Tests the function that extracts publications from a GFF file entry
+        # Tests the function that extracts publications from a GFF record
         feature = gffutils.Feature(attributes={"literature": "PMID:12345"})
         publications = self.client._extract_publications(feature)
         self.assertEqual(len(publications), 1)
         self.assertIn("PMID:12345", publications)
+
+    def test_extract_protein_source_id(self):
+        # Tests the function that extracts the ID of a polypeptide from a GFF record
+        feature = gffutils.Feature()
+        protein_id = self.client._extract_protein_source_id(feature)
+        self.assertIsNone(protein_id)
+        feature.attributes = {"protein_source_id": "testid"}
+        protein_id = self.client._extract_protein_source_id(feature)
+        self.assertEqual(protein_id, "testid")
 
     def test_extract_sequence_names(self):
         # Tests the function that extracts sequence names from a GFF file
@@ -520,6 +626,18 @@ class TestGFF(unittest.TestCase):
         gff_strand = "something_elsa"
         chado_strand = gff.convert_strand(gff_strand)
         self.assertIsNone(chado_strand)
+
+    def test_back_convert_strand(self):
+        # Tests the function converting the 'strand' attribute from integer notation to string notation
+        chado_strand = 1
+        gff_strand = gff.back_convert_strand(chado_strand)
+        self.assertEqual(gff_strand, "+")
+        chado_strand = -5
+        gff_strand = gff.back_convert_strand(chado_strand)
+        self.assertEqual(gff_strand, "-")
+        chado_strand = None
+        gff_strand = gff.back_convert_strand(chado_strand)
+        self.assertIsNone(gff_strand)
 
     def test_convert_frame(self):
         # Tests the function converting the 'frame' attribute from string notation to integer notation

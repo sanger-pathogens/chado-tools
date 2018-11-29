@@ -115,7 +115,7 @@ class RolesClient(DDLClient):
         if specific_schema:
             schemata = [specific_schema]
         else:
-            schemata = ["public", "audit", "graph"]
+            schemata = ["public", "audit", "audit_backup", "graph"]
 
         # Loop over all schemata
         for schema in schemata:
@@ -150,7 +150,7 @@ class RolesClient(DDLClient):
             statements.append(" ".join(["GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA", x_schema, "TO", x_role]))
             statements.append(" ".join(["GRANT USAGE ON ALL SEQUENCES IN SCHEMA", x_schema, "TO", x_role]))
             statements.append(" ".join(["GRANT INSERT ON ALL TABLES IN SCHEMA", x_schema, "TO", x_role]))
-            if schema != "audit":
+            if not schema.startswith("audit"):
                 statements.append(" ".join(["GRANT UPDATE ON ALL TABLES IN SCHEMA", x_schema, "TO", x_role]))
                 statements.append(" ".join(["GRANT DELETE ON ALL TABLES IN SCHEMA", x_schema, "TO", x_role]))
         return statements

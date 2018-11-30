@@ -490,3 +490,4 @@ def add_export_fasta_arguments(parser: argparse.ArgumentParser):
                         help="abbreviation/short name of the organism")
     parser.add_argument("-t", "--sequence_type", choices={"dna", "protein"},
                         default="dna", help="type of the sequences to be exported (default: dna)")
+    parser.add_argument("-r", "--release", help="name of the FASTA release")

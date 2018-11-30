@@ -102,6 +102,24 @@ class IOClient(ddl.ChadoClient):
             .filter(cv.CvTerm.name == "part_of")\
             .filter(subject_feature.uniquename == child_name)
 
+    def query_top_level_features(self, organism_name: str) -> sqlalchemy.orm.Query:
+        """Creates a query to select top level features (chromosomes etc) of a given organism"""
+        return self.session.query(sequence.Feature) \
+            .select_from(sequence.FeatureProp) \
+            .join(sequence.Feature, sequence.FeatureProp.feature) \
+            .join(organism.Organism, sequence.Feature.organism) \
+            .join(cv.CvTerm, sequence.FeatureProp.type) \
+            .filter(organism.Organism.abbreviation == organism_name) \
+            .filter(cv.CvTerm.name == "top_level_seq")
+
+    def query_features_by_organism_and_type(self, organism_name: str, feature_type: str) -> sqlalchemy.orm.Query:
+        """Creates a query to select features of a given organism and type"""
+        return self.session.query(sequence.Feature)\
+            .join(organism.Organism, sequence.Feature.organism)\
+            .join(cv.CvTerm, sequence.Feature.type)\
+            .filter(organism.Organism.abbreviation == organism_name)\
+            .filter(cv.CvTerm.name == feature_type)
+
     def _load_cvterm(self, term: str) -> cv.CvTerm:
         """Loads a specific CV term"""
         cvterm_entry = self.query_first(cv.CvTerm, name=term)

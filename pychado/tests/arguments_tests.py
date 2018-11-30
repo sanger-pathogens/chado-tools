@@ -327,11 +327,13 @@ class TestArguments(unittest.TestCase):
 
     def test_export_fasta_args(self):
         # Tests if the command line arguments for the subcommand 'chado export fasta' are parsed correctly
-        args = ["chado", "export", "fasta", "-f", "testfile", "-a", "testorganism", "-t", "protein", "testdb"]
+        args = ["chado", "export", "fasta", "-f", "testfile", "-a", "testorganism", "-t", "protein",
+                "-r", "testrelease", "testdb"]
         parsed_args = vars(chado_tools.parse_arguments(args))
         self.assertEqual(parsed_args["output_file"], "testfile")
         self.assertEqual(parsed_args["organism"], "testorganism")
         self.assertEqual(parsed_args["sequence_type"], "protein")
+        self.assertEqual(parsed_args["release"], "testrelease")
         self.assertEqual(parsed_args["dbname"], "testdb")
 
 

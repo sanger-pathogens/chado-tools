@@ -128,14 +128,36 @@ class TestIOClient(unittest.TestCase):
         # Tests the function that creates a query against the feature_relationship table
         query = self.client.query_parent_feature("testname")
         compiled_query = str(query.statement.compile(compile_kwargs={"literal_binds": True}))
-        self.assertIn("FROM public.feature_relationship JOIN public.feature AS subject_feature "
+        self.assertIn("FROM public.feature_relationship "
+                      "JOIN public.feature AS subject_feature "
                       "ON subject_feature.feature_id = public.feature_relationship.subject_id "
                       "JOIN public.feature AS object_feature "
                       "ON object_feature.feature_id = public.feature_relationship.object_id "
-                      "JOIN public.cvterm "
-                      "ON public.cvterm.cvterm_id = public.feature_relationship.type_id", compiled_query)
+                      "JOIN public.cvterm ON public.cvterm.cvterm_id = public.feature_relationship.type_id",
+                      compiled_query)
         self.assertIn("public.cvterm.name = 'part_of'", compiled_query)
         self.assertIn("subject_feature.uniquename = 'testname'", compiled_query)
+
+    def test_query_top_level_features(self):
+        # Tests the function that creates a query against the feature table
+        query = self.client.query_top_level_features("testorganism")
+        compiled_query = str(query.statement.compile(compile_kwargs={"literal_binds": True}))
+        self.assertIn("FROM public.featureprop "
+                      "JOIN public.feature ON public.feature.feature_id = public.featureprop.feature_id "
+                      "JOIN public.organism ON public.organism.organism_id = public.feature.organism_id "
+                      "JOIN public.cvterm ON public.cvterm.cvterm_id = public.featureprop.type_id ", compiled_query)
+        self.assertIn("public.organism.abbreviation = 'testorganism'", compiled_query)
+        self.assertIn("public.cvterm.name = 'top_level_seq'", compiled_query)
+
+    def test_query_feature_by_organism_and_type(self):
+        # Tests the function that creates a query against the feature table
+        query = self.client.query_features_by_organism_and_type("testorganism", "testtype")
+        compiled_query = str(query.statement.compile(compile_kwargs={"literal_binds": True}))
+        self.assertIn("FROM public.feature "
+                      "JOIN public.organism ON public.organism.organism_id = public.feature.organism_id "
+                      "JOIN public.cvterm ON public.cvterm.cvterm_id = public.feature.type_id ", compiled_query)
+        self.assertIn("public.organism.abbreviation = 'testorganism'", compiled_query)
+        self.assertIn("public.cvterm.name = 'testtype'", compiled_query)
 
 
 class TestImportClient(unittest.TestCase):

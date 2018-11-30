@@ -217,6 +217,6 @@ def run_export_command(specifier: str, arguments, uri: str) -> None:
     """Exports data from a database to a file"""
     if specifier == "fasta":
         client = fasta.FastaExportClient(uri, arguments.verbose)
-        client.export(arguments.output_file, arguments.organism, arguments.sequence_type)
+        client.export(arguments.output_file, arguments.organism, arguments.sequence_type, arguments.release)
     else:
         print("Functionality 'export " + specifier + "' is not yet implemented.")

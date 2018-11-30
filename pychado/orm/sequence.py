@@ -536,7 +536,7 @@ class FeatureLoc(base.PublicBase):
     srcfeature = sqlalchemy.orm.relationship(Feature, foreign_keys=feature_id, backref="featureloc_srcfeature")
 
     # Initialisation
-    def __init__(self, feature_id, srcfeature_id, fmin=0, is_fmin_partial=False, fmax=0, is_fmax_partial=False,
+    def __init__(self, feature_id, srcfeature_id, fmin=None, is_fmin_partial=False, fmax=None, is_fmax_partial=False,
                  strand=None, phase=None, residue_info=None, locgroup=0, rank=0, featureloc_id=None):
         for key, value in locals().items():
             if key != self:

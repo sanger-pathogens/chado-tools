@@ -90,8 +90,11 @@ def run_command_with_arguments(command: str, sub_command: str, arguments, connec
         # Delete an entity of a specified type from the CHADO database
         run_delete_command(sub_command, arguments, connection_uri)
     elif command == "import":
-        # Import entities of a specified type into the CHADO database
+        # Import data from file into the CHADO database
         run_import_command(sub_command, arguments, connection_uri)
+    elif command == "export":
+        # Export data from the CHADO database to file
+        run_export_command(sub_command, arguments, connection_uri)
     else:
         print("Functionality '" + command + "' is not yet implemented.")
 
@@ -191,20 +194,29 @@ def run_import_command(specifier: str, arguments, uri: str) -> None:
         file = utils.download_file(arguments.input_url)
 
     if specifier == "essentials":
-        loader = essentials.EssentialsClient(uri, arguments.verbose)
-        loader.load()
+        client = essentials.EssentialsClient(uri, arguments.verbose)
+        client.load()
     elif specifier == "ontology":
-        loader = ontology.OntologyClient(uri, arguments.verbose)
-        loader.load(file, arguments.format, arguments.database_authority)
+        client = ontology.OntologyClient(uri, arguments.verbose)
+        client.load(file, arguments.format, arguments.database_authority)
     elif specifier == "gff":
-        loader = gff.GFFImportClient(uri, arguments.verbose)
-        loader.load(file, arguments.organism, arguments.fasta, arguments.sequence_type, arguments.fresh_load,
+        client = gff.GFFImportClient(uri, arguments.verbose)
+        client.load(file, arguments.organism, arguments.fasta, arguments.sequence_type, arguments.fresh_load,
                     arguments.force, arguments.full_genome)
     elif specifier == "fasta":
-        loader = fasta.FastaImportClient(uri, arguments.verbose)
-        loader.load(file, arguments.organism, arguments.sequence_type)
+        client = fasta.FastaImportClient(uri, arguments.verbose)
+        client.load(file, arguments.organism, arguments.sequence_type)
     elif specifier == "gaf":
-        loader = gaf.GAFImportClient(uri, arguments.verbose)
-        loader.load(file, arguments.organism)
+        client = gaf.GAFImportClient(uri, arguments.verbose)
+        client.load(file, arguments.organism)
     else:
         print("Functionality 'import " + specifier + "' is not yet implemented.")
+
+
+def run_export_command(specifier: str, arguments, uri: str) -> None:
+    """Exports data from a database to a file"""
+    if specifier == "fasta":
+        client = fasta.FastaExportClient(uri, arguments.verbose)
+        client.export(arguments.output_file, arguments.organism, arguments.sequence_type)
+    else:
+        print("Functionality 'export " + specifier + "' is not yet implemented.")

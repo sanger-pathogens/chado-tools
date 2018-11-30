@@ -57,7 +57,8 @@ def wrapper_commands() -> dict:
         "extract": "run a pre-compiled query against the CHADO database",
         "insert": "insert a new entity of a specified type into the CHADO database",
         "delete": "delete an entity of a specified type from the CHADO database",
-        "import": "import entities of a specified type into the CHADO database",
+        "import": "import data from file into the CHADO database",
+        "export": "export data from the CHADO database to file",
         "execute": "execute a function defined in a CHADO database",
         "admin": "perform administrative tasks, such as creating or dumping a CHADO database"
     }
@@ -111,6 +112,13 @@ def import_commands() -> dict:
     }
 
 
+def export_commands() -> dict:
+    """Lists the available sub-commands of the 'chado export' command with corresponding descriptions"""
+    return {
+        "fasta": "export genome/protein sequences from the CHADO database to a FASTA file"
+    }
+
+
 def execute_commands() -> dict:
     """Lists the available sub-commands of the 'chado execute' command with corresponding descriptions"""
     return {
@@ -158,7 +166,7 @@ def add_general_arguments(parser: argparse.ArgumentParser):
     parser.add_argument("dbname", help="name of the database")
 
 
-def add_general_export_arguments(parser: argparse.ArgumentParser):
+def add_general_extract_arguments(parser: argparse.ArgumentParser):
     """Defines general formal arguments for all sub-commands that export data from a database"""
     parser.add_argument("-H", "--include_header", action="store_true", help="include header in output (default: False)")
     parser.add_argument("-d", "--delimiter", default="\t",
@@ -184,6 +192,8 @@ def add_arguments_by_command(command: str, parser: argparse.ArgumentParser):
         add_delete_arguments(parser)
     elif command == "import":
         add_import_arguments(parser)
+    elif command == "export":
+        add_export_arguments(parser)
     else:
         print("Command '" + parser.prog + "' is not available.")
 
@@ -252,7 +262,7 @@ def add_revoke_arguments(parser: argparse.ArgumentParser):
 
 def add_query_arguments(parser: argparse.ArgumentParser):
     """Defines formal arguments for the 'chado query' sub-command"""
-    add_general_export_arguments(parser)
+    add_general_extract_arguments(parser)
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("-f", "--input_file", default="", help="file containing an SQL query")
     group.add_argument("-q", "--query", default="", help="SQL query")
@@ -291,7 +301,7 @@ def add_extract_arguments(parser: argparse.ArgumentParser):
         # Create subparser and add general and specific formal arguments
         sub = subparsers.add_parser(command, description=description, help=description)
         add_general_arguments(sub)
-        add_general_export_arguments(sub)
+        add_general_extract_arguments(sub)
         add_extract_arguments_by_command(command, sub)
 
 
@@ -439,7 +449,7 @@ def add_import_gff_arguments(parser: argparse.ArgumentParser):
 
 
 def add_import_fasta_arguments(parser: argparse.ArgumentParser):
-    """Defines formal arguments for the 'chado import gff' sub-command"""
+    """Defines formal arguments for the 'chado import fasta' sub-command"""
     parser.add_argument("-f", "--input_file", required=True, help="FASTA input file")
     parser.add_argument("-a", "--abbreviation", required=True, dest="organism",
                         help="abbreviation/short name of the organism")
@@ -452,3 +462,31 @@ def add_import_gaf_arguments(parser: argparse.ArgumentParser):
     parser.add_argument("-f", "--input_file", required=True, help="GFF3 input file")
     parser.add_argument("-a", "--abbreviation", required=True, dest="organism",
                         help="abbreviation/short name of the organism")
+
+
+def add_export_arguments(parser: argparse.ArgumentParser):
+    """Defines formal arguments for the 'chado export' sub-command"""
+    parser.epilog = "For detailed usage information type '" + parser.prog + " <command> -h'"
+    subparsers = parser.add_subparsers()
+    for command, description in export_commands().items():
+        # Create subparser and add general and specific formal arguments
+        sub = subparsers.add_parser(command, description=description, help=description)
+        add_general_arguments(sub)
+        add_export_arguments_by_command(command, sub)
+
+
+def add_export_arguments_by_command(command: str, parser: argparse.ArgumentParser):
+    """Defines formal arguments for a specified sub-command of 'chado export'"""
+    if command == "fasta":
+        add_export_fasta_arguments(parser)
+    else:
+        print("Command '" + parser.prog + "' is not available.")
+
+
+def add_export_fasta_arguments(parser: argparse.ArgumentParser):
+    """Defines formal arguments for the 'chado export fasta' sub-command"""
+    parser.add_argument("-f", "--output_file", required=True, help="FASTA output file")
+    parser.add_argument("-a", "--abbreviation", required=True, dest="organism",
+                        help="abbreviation/short name of the organism")
+    parser.add_argument("-t", "--sequence_type", choices={"dna", "protein"},
+                        default="dna", help="type of the sequences to be exported (default: dna)")

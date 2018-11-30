@@ -82,7 +82,8 @@ The usage is:
 | extract               | run a pre-compiled query against the CHADO database                  |
 | insert                | insert a new entity of a specified type into the CHADO database      |
 | delete                | delete an entity of a specified type from the CHADO database         |
-| import                | import entities of a specified type into the CHADO database          |
+| import                | import data from file into the CHADO database                        |
+| export                | export data from the CHADO database to file                          |
 | admin                 | perform admin tasks, such as creating or dumping a CHADO database    |
 ------------------------------------------------------------------------------------------------
 

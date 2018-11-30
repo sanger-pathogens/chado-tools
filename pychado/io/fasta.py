@@ -85,3 +85,14 @@ class FastaImportClient(iobase.ImportClient):
             if key.strip() == "SO":
                 return value.strip()
         return None
+
+
+class FastaExportClient(iobase.ExportClient):
+    """Class for exporting genomic data from Chado to FASTA files"""
+
+    def export(self, filename: str, organism_name: str, sequence_type: str):
+
+        # Load dependencies
+        default_organism = self._load_organism(organism_name)
+
+        print(default_organism.genus, default_organism.species, filename, sequence_type)

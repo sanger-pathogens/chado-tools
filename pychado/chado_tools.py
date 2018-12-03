@@ -115,7 +115,8 @@ def import_commands() -> dict:
 def export_commands() -> dict:
     """Lists the available sub-commands of the 'chado export' command with corresponding descriptions"""
     return {
-        "fasta": "export genome/protein sequences from the CHADO database to a FASTA file"
+        "fasta": "export genome/protein sequences from the CHADO database to a FASTA file",
+        "gff": "export genomic data from the CHADO database to a GFF3 file"
     }
 
 
@@ -479,6 +480,8 @@ def add_export_arguments_by_command(command: str, parser: argparse.ArgumentParse
     """Defines formal arguments for a specified sub-command of 'chado export'"""
     if command == "fasta":
         add_export_fasta_arguments(parser)
+    elif command == "gff":
+        add_export_gff_arguments(parser)
     else:
         print("Command '" + parser.prog + "' is not available.")
 
@@ -488,6 +491,15 @@ def add_export_fasta_arguments(parser: argparse.ArgumentParser):
     parser.add_argument("-f", "--output_file", required=True, help="FASTA output file")
     parser.add_argument("-a", "--abbreviation", required=True, dest="organism",
                         help="abbreviation/short name of the organism")
-    parser.add_argument("-t", "--sequence_type", choices={"dna", "protein"},
-                        default="dna", help="type of the sequences to be exported (default: dna)")
+    parser.add_argument("-t", "--sequence_type", required=True, choices={"contigs", "genes", "proteins"},
+                        help="type of the sequences to be exported")
     parser.add_argument("-r", "--release", help="name of the FASTA release")
+
+
+def add_export_gff_arguments(parser: argparse.ArgumentParser):
+    """Defines formal arguments for the 'chado export gff' sub-command"""
+    parser.add_argument("-f", "--output_file", required=True, help="GFF output file")
+    parser.add_argument("-a", "--abbreviation", required=True, dest="organism",
+                        help="abbreviation/short name of the organism")
+    parser.add_argument("--export_fasta", action="store_true", help="export FASTA sequences along with annotations")
+    parser.add_argument("--fasta_file", help="FASTA output file with sequences (default: paste to end of GFF file)")

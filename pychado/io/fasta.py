@@ -3,6 +3,7 @@ import urllib.parse
 from typing import Union, List
 from Bio import SeqIO, Seq
 from . import iobase
+from .. import utils
 from ..orm import cv, organism, sequence
 
 
@@ -94,43 +95,84 @@ class FastaExportClient(iobase.ExportClient):
     def export(self, filename: str, organism_name: str, sequence_type: str, release: str):
         """Exports sequences from Chado to a FASTA file"""
 
-        # Load dependencies
+        # Load dependencies and features of interest
         organism_entry = self._load_organism(organism_name)
+        feature_entries = self._extract_features_by_type(organism_name, sequence_type)
+        srcfeature_entries = self._extract_srcfeatures_by_type(organism_name, sequence_type)
         records = []
 
-        # Load sequences and loop over them
-        for feature_entry in self._query_sequences_by_type(organism_name, sequence_type):
+        # Loop over all features of interest
+        for feature_entry in feature_entries:
 
             # Get feature type
             type_entry = self.query_first(cv.CvTerm, cvterm_id=feature_entry.type_id)
 
             # Create FASTA record
-            record = self._create_fasta_record(feature_entry, organism_entry, type_entry, release)
-            if record:
+            residues = self._extract_residues_by_type(feature_entry, srcfeature_entries, sequence_type)
+            if residues:
+                record = self._create_fasta_record(feature_entry, organism_entry, type_entry, residues, release)
                 records.append(record)
 
         # Write all FASTA records to file
         SeqIO.write(records, filename, "fasta")
 
     def _create_fasta_record(self, feature_entry: sequence.Feature, organism_entry: organism.Organism,
-                             type_entry: cv.CvTerm, release: str) -> Union[None, SeqIO.SeqRecord]:
+                             type_entry: cv.CvTerm, residues: str, release: str) -> Union[None, SeqIO.SeqRecord]:
         """Creates a FASTA record"""
-        if not feature_entry.residues:
-            return None
-
         attributes = self._create_fasta_attributes(organism_entry, type_entry, release)
-        residues = Seq.Seq(feature_entry.residues)
-        record = SeqIO.SeqRecord(residues, id=feature_entry.uniquename, name=feature_entry.uniquename,
+        record = SeqIO.SeqRecord(Seq.Seq(residues), id=feature_entry.uniquename, name=feature_entry.uniquename,
                                  description=attributes)
         return record
 
-    def _query_sequences_by_type(self, organism_name: str, sequence_type: str) -> List[sequence.Feature]:
+    def _extract_srcfeatures_by_type(self, organism_name: str, sequence_type: str) -> List[sequence.Feature]:
         """Extract features from the database"""
-        if sequence_type == "protein":
-            query = self.query_features_by_organism_and_type(organism_name, "polypeptide")
+        srcfeature_entries = []
+        if sequence_type == "genes":
+            srcfeature_entries = self.query_srcfeatures(organism_name).all()
+        return srcfeature_entries
+
+    def _extract_features_by_type(self, organism_name: str, sequence_type: str) -> List[sequence.Feature]:
+        """Extract features from the database"""
+        if sequence_type == "proteins":
+            query = self.query_features_by_organism_and_type(organism_name, ["polypeptide"])
+        elif sequence_type == "genes":
+            query = self.query_features_by_organism_and_type(organism_name, ["gene", "pseudogene"])
         else:
             query = self.query_top_level_features(organism_name)
         return query.all()
+
+    def _extract_residues_by_type(self, feature_entry: sequence.Feature, srcfeature_entries: List[sequence.Feature],
+                                  sequence_type: str) -> Union[None, str]:
+        """Extracts the sequence of nucleotides/amino acids of a feature"""
+        if sequence_type == "genes":
+            residues = self._extract_nucleotide_sequence(feature_entry, srcfeature_entries)
+        else:
+            residues = feature_entry.residues
+        return residues
+
+    def _extract_nucleotide_sequence(self, feature_entry: sequence.Feature, srcfeature_entries: List[sequence.Feature]
+                                     ) -> Union[None, str]:
+        """Extracts the nucleotide sequence of a (gene) feature"""
+
+        # Get the entry from the 'featureloc' table
+        featureloc_entry = self.query_first(sequence.FeatureLoc,
+                                            feature_id=feature_entry.feature_id)        # type: sequence.FeatureLoc
+        if not featureloc_entry:
+            return None
+
+        # Get the entry from the 'feature' table
+        matching_entries = utils.filter_objects(
+            srcfeature_entries, feature_id=featureloc_entry.srcfeature_id)              # type: List[sequence.Feature]
+        if not matching_entries:
+            return None
+
+        # Extract the nucleotide sequence
+        matching_entry = matching_entries[0]
+        if len(matching_entry.residues) >= featureloc_entry.fmax + 1:
+            residues = matching_entry.residues[featureloc_entry.fmin:featureloc_entry.fmax].upper()
+        else:
+            residues = None
+        return residues
 
     def _create_fasta_attributes(self, organism_entry: organism.Organism, type_entry: cv.CvTerm, release: str) -> str:
         """Creates a header line for a FASTA sequence with several attributes"""

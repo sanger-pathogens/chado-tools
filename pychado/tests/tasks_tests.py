@@ -521,7 +521,7 @@ class TestTasks(unittest.TestCase):
     def test_run_export(self, mock_run):
         # Checks that database exports are correctly run
         self.assertIs(mock_run, tasks.run_export_command)
-        args = ["chado", "export", "fasta", "-f", "testfile", "-a", "testorganism", "-t", "protein", "testdb"]
+        args = ["chado", "export", "fasta", "-f", "testfile", "-a", "testorganism", "-t", "proteins", "testdb"]
         parsed_args = chado_tools.parse_arguments(args)
         tasks.run_command_with_arguments(args[1], args[2], parsed_args, self.uri)
         mock_run.assert_called_with("fasta", parsed_args, self.uri)
@@ -530,12 +530,24 @@ class TestTasks(unittest.TestCase):
     def test_export_fasta(self, mock_client):
         # Checks that the function exporting sequences from the database to a FASTA file is correctly called
         self.assertIs(mock_client, fasta.FastaExportClient)
-        args = ["chado", "export", "fasta", "-f", "testfile", "-a", "testorganism", "-t", "protein",
+        args = ["chado", "export", "fasta", "-f", "testfile", "-a", "testorganism", "-t", "proteins",
                 "-r", "testrelease", "testdb"]
         parsed_args = chado_tools.parse_arguments(args)
         tasks.run_export_command(args[2], parsed_args, self.uri)
         mock_client.assert_called_with(self.uri, False)
-        self.assertIn(unittest.mock.call().export("testfile", "testorganism", "protein", "testrelease"),
+        self.assertIn(unittest.mock.call().export("testfile", "testorganism", "proteins", "testrelease"),
+                      mock_client.mock_calls)
+
+    @unittest.mock.patch('pychado.io.gff.GFFExportClient')
+    def test_export_gff(self, mock_client):
+        # Checks that the function exporting genomic data from the database to a GFF file is correctly called
+        self.assertIs(mock_client, gff.GFFExportClient)
+        args = ["chado", "export", "gff", "-f", "testfile", "-a", "testorganism", "--export_fasta", "--fasta_file",
+                "testfasta", "testdb"]
+        parsed_args = chado_tools.parse_arguments(args)
+        tasks.run_export_command(args[2], parsed_args, self.uri)
+        mock_client.assert_called_with(self.uri, False)
+        self.assertIn(unittest.mock.call().export("testfile", "testorganism", True, "testfasta"),
                       mock_client.mock_calls)
 
 

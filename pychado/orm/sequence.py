@@ -533,7 +533,7 @@ class FeatureLoc(base.PublicBase):
 
     # Relationships
     feature = sqlalchemy.orm.relationship(Feature, foreign_keys=feature_id, backref="featureloc_feature")
-    srcfeature = sqlalchemy.orm.relationship(Feature, foreign_keys=feature_id, backref="featureloc_srcfeature")
+    srcfeature = sqlalchemy.orm.relationship(Feature, foreign_keys=srcfeature_id, backref="featureloc_srcfeature")
 
     # Initialisation
     def __init__(self, feature_id, srcfeature_id, fmin=None, is_fmin_partial=False, fmax=None, is_fmax_partial=False,

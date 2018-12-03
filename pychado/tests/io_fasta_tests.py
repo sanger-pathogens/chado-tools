@@ -115,6 +115,42 @@ class TestFastaExport(unittest.TestCase):
         # Drops the database
         dbutils.drop_database(cls.connection_uri, True)
 
+    @unittest.mock.patch("pychado.io.fasta.FastaExportClient._extract_nucleotide_sequence")
+    def test_extract_residues_by_type(self, mock_extract_nucleotides: unittest.mock.Mock):
+        # Tests the function that extracts the sequence of nucleotides/amino acids of a feature
+        self.assertIs(mock_extract_nucleotides, self.client._extract_nucleotide_sequence)
+        feature_entry = sequence.Feature(organism_id=1, type_id=2, uniquename="test", residues="CTGA", feature_id=33)
+
+        mock_extract_nucleotides.return_value = "AAGG"
+        residues = self.client._extract_residues_by_type(feature_entry, [], "genes")
+        mock_extract_nucleotides.assert_called_with(feature_entry, [])
+        self.assertEqual(residues, "AAGG")
+
+        mock_extract_nucleotides.reset_mock()
+        residues = self.client._extract_residues_by_type(feature_entry, [], "contigs")
+        mock_extract_nucleotides.assert_not_called()
+        self.assertEqual(residues, "CTGA")
+
+    @unittest.mock.patch("pychado.io.fasta.FastaExportClient.query_first")
+    def test_extract_nucleotide_sequences(self, mock_query: unittest.mock.Mock):
+        # Tests the function that extracts the nucleotide sequence of a feature from the database
+        self.assertIs(mock_query, self.client.query_first)
+        feature_entry = sequence.Feature(organism_id=1, type_id=2, uniquename="test", residues="CTGA", feature_id=33)
+
+        mock_query.return_value = sequence.FeatureLoc(feature_id=33, srcfeature_id=34, fmin=1, fmax=3)
+        residues = self.client._extract_nucleotide_sequence(feature_entry, [])
+        mock_query.assert_called_with(sequence.FeatureLoc, feature_id=33)
+        self.assertIsNone(residues)
+
+        srcfeature_entries = [sequence.Feature(organism_id=1, type_id=2, uniquename="test", residues="ACTGGTAA",
+                                               feature_id=34)]
+        residues = self.client._extract_nucleotide_sequence(feature_entry, srcfeature_entries)
+        self.assertEqual(residues, "CT")
+
+        mock_query.return_value = sequence.FeatureLoc(feature_id=33, srcfeature_id=34, fmin=1, fmax=300)
+        residues = self.client._extract_nucleotide_sequence(feature_entry, srcfeature_entries)
+        self.assertIsNone(residues)
+
     @unittest.mock.patch("Bio.SeqIO.SeqRecord")
     @unittest.mock.patch("Bio.Seq.Seq")
     @unittest.mock.patch("pychado.io.fasta.FastaExportClient._create_fasta_attributes")
@@ -125,33 +161,49 @@ class TestFastaExport(unittest.TestCase):
         self.assertIs(mock_sequence, Seq.Seq)
         self.assertIs(mock_record, SeqIO.SeqRecord)
 
-        feature_entry = sequence.Feature(organism_id=1, type_id=2, uniquename="test", residues="CTGA", feature_id=33)
+        feature_entry = sequence.Feature(organism_id=1, type_id=2, uniquename="test", feature_id=33)
         organism_entry = organism.Organism(genus="testgenus", species="testspecies", organism_id=44)
         type_entry = cv.CvTerm(name="contig", cv_id=1, dbxref_id=2, cvterm_id=55)
         mock_attributes.return_value = "desc"
         mock_sequence.return_value = "seq"
 
-        self.client._create_fasta_record(feature_entry, organism_entry, type_entry, "testrelease")
+        self.client._create_fasta_record(feature_entry, organism_entry, type_entry, "AGCT", "testrelease")
         mock_attributes.assert_called_with(organism_entry, type_entry, "testrelease")
-        mock_sequence.assert_called_with("CTGA")
+        mock_sequence.assert_called_with("AGCT")
         mock_record.assert_called_with("seq", id="test", name="test", description="desc")
+
+    @unittest.mock.patch("pychado.io.fasta.FastaExportClient.query_srcfeatures")
+    def test_extract_srcfeatures_by_type(self, mock_query: unittest.mock.Mock):
+        # Tests that the feature table is only queried for certain feature types
+        self.assertIs(mock_query, self.client.query_srcfeatures)
+        self.client._extract_srcfeatures_by_type("testorganism", "contigs")
+        mock_query.assert_not_called()
+        self.client._extract_srcfeatures_by_type("testorganism", "genes")
+        mock_query.assert_called_with("testorganism")
 
     @unittest.mock.patch("pychado.io.fasta.FastaExportClient.query_top_level_features")
     @unittest.mock.patch("pychado.io.fasta.FastaExportClient.query_features_by_organism_and_type")
-    def test_query_sequences_by_type(self, mock_query_proteins: unittest.mock.Mock, mock_query_dna: unittest.mock.Mock):
+    def test_extract_features_by_type(self, mock_query_by_type: unittest.mock.Mock,
+                                      mock_query_contigs: unittest.mock.Mock):
         # Tests that the feature table is correctly queried depending on the type of features of interest
-        self.assertIs(mock_query_proteins, self.client.query_features_by_organism_and_type)
-        self.assertIs(mock_query_dna, self.client.query_top_level_features)
+        self.assertIs(mock_query_by_type, self.client.query_features_by_organism_and_type)
+        self.assertIs(mock_query_contigs, self.client.query_top_level_features)
 
-        self.client._query_sequences_by_type("testorganism", "dna")
-        mock_query_proteins.assert_not_called()
-        mock_query_dna.assert_called_with("testorganism")
+        self.client._extract_features_by_type("testorganism", "contigs")
+        mock_query_by_type.assert_not_called()
+        mock_query_contigs.assert_called_with("testorganism")
 
-        mock_query_proteins.reset_mock()
-        mock_query_dna.reset_mock()
-        self.client._query_sequences_by_type("testorganism", "protein")
-        mock_query_proteins.assert_called_with("testorganism", "polypeptide")
-        mock_query_dna.assert_not_called()
+        mock_query_by_type.reset_mock()
+        mock_query_contigs.reset_mock()
+        self.client._extract_features_by_type("testorganism", "proteins")
+        mock_query_by_type.assert_called_with("testorganism", ["polypeptide"])
+        mock_query_contigs.assert_not_called()
+
+        mock_query_by_type.reset_mock()
+        mock_query_contigs.reset_mock()
+        self.client._extract_features_by_type("testorganism", "genes")
+        mock_query_by_type.assert_called_with("testorganism", ["gene", "pseudogene"])
+        mock_query_contigs.assert_not_called()
 
     @unittest.mock.patch("pychado.io.fasta.FastaExportClient._release_key_value_pair")
     @unittest.mock.patch("pychado.io.fasta.FastaExportClient._type_key_value_pair")

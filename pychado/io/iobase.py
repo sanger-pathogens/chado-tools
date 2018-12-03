@@ -102,6 +102,18 @@ class IOClient(ddl.ChadoClient):
             .filter(cv.CvTerm.name == "part_of")\
             .filter(subject_feature.uniquename == child_name)
 
+    def query_srcfeatures(self, organism_name: str) -> sqlalchemy.orm.Query:
+        """Creates a query to select the nucleotide sequences of a given organism"""
+        child_feature = sqlalchemy.orm.aliased(sequence.Feature, name="child_feature")
+        parent_feature = sqlalchemy.orm.aliased(sequence.Feature, name="parent_feature")
+        return self.session.query(parent_feature).select_from(sequence.FeatureLoc)\
+            .join(child_feature, sequence.FeatureLoc.feature)\
+            .join(parent_feature, sequence.FeatureLoc.srcfeature)\
+            .join(organism.Organism, child_feature.organism)\
+            .join(cv.CvTerm, child_feature.type)\
+            .filter(organism.Organism.abbreviation == organism_name)\
+            .filter(cv.CvTerm.name == "gene").distinct(parent_feature.feature_id)
+
     def query_top_level_features(self, organism_name: str) -> sqlalchemy.orm.Query:
         """Creates a query to select top level features (chromosomes etc) of a given organism"""
         return self.session.query(sequence.Feature) \
@@ -112,13 +124,13 @@ class IOClient(ddl.ChadoClient):
             .filter(organism.Organism.abbreviation == organism_name) \
             .filter(cv.CvTerm.name == "top_level_seq")
 
-    def query_features_by_organism_and_type(self, organism_name: str, feature_type: str) -> sqlalchemy.orm.Query:
+    def query_features_by_organism_and_type(self, organism_name: str, feature_types: List[str]) -> sqlalchemy.orm.Query:
         """Creates a query to select features of a given organism and type"""
         return self.session.query(sequence.Feature)\
             .join(organism.Organism, sequence.Feature.organism)\
             .join(cv.CvTerm, sequence.Feature.type)\
             .filter(organism.Organism.abbreviation == organism_name)\
-            .filter(cv.CvTerm.name == feature_type)
+            .filter(cv.CvTerm.name.in_(feature_types))
 
     def _load_cvterm(self, term: str) -> cv.CvTerm:
         """Loads a specific CV term"""

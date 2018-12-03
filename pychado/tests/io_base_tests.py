@@ -138,6 +138,20 @@ class TestIOClient(unittest.TestCase):
         self.assertIn("public.cvterm.name = 'part_of'", compiled_query)
         self.assertIn("subject_feature.uniquename = 'testname'", compiled_query)
 
+    def test_query_srcfeatures(self):
+        # Tests the function that creates a query against the featureloc table
+        query = self.client.query_srcfeatures("testorganism")
+        compiled_query = str(query.statement.compile(compile_kwargs={"literal_binds": True}))
+        self.assertIn("SELECT DISTINCT", compiled_query)
+        self.assertIn("FROM public.featureloc "
+                      "JOIN public.feature AS child_feature "
+                      "ON child_feature.feature_id = public.featureloc.feature_id "
+                      "JOIN public.feature AS parent_feature "
+                      "ON parent_feature.feature_id = public.featureloc.srcfeature_id "
+                      "JOIN public.organism ON public.organism.organism_id = child_feature.organism_id",
+                      compiled_query)
+        self.assertIn("public.organism.abbreviation = 'testorganism'", compiled_query)
+
     def test_query_top_level_features(self):
         # Tests the function that creates a query against the feature table
         query = self.client.query_top_level_features("testorganism")
@@ -151,13 +165,13 @@ class TestIOClient(unittest.TestCase):
 
     def test_query_feature_by_organism_and_type(self):
         # Tests the function that creates a query against the feature table
-        query = self.client.query_features_by_organism_and_type("testorganism", "testtype")
+        query = self.client.query_features_by_organism_and_type("testorganism", ["testtype"])
         compiled_query = str(query.statement.compile(compile_kwargs={"literal_binds": True}))
         self.assertIn("FROM public.feature "
                       "JOIN public.organism ON public.organism.organism_id = public.feature.organism_id "
                       "JOIN public.cvterm ON public.cvterm.cvterm_id = public.feature.type_id ", compiled_query)
         self.assertIn("public.organism.abbreviation = 'testorganism'", compiled_query)
-        self.assertIn("public.cvterm.name = 'testtype'", compiled_query)
+        self.assertIn("public.cvterm.name IN ('testtype')", compiled_query)
 
 
 class TestImportClient(unittest.TestCase):

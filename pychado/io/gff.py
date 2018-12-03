@@ -683,6 +683,17 @@ class GFFImportClient(iobase.ImportClient):
         return ["GO"]
 
 
+class GFFExportClient(iobase.ExportClient):
+    """Class for exporting genomic data from Chado to GFF files"""
+
+    def export(self, filename: str, organism_name: str, export_fasta: bool, fasta_filename: str):
+        """Exports sequences from Chado to a GFF file"""
+
+        # Load dependencies
+        organism_entry = self._load_organism(organism_name)
+        print(filename, organism_entry.genus, organism_entry.species, export_fasta, fasta_filename)
+
+
 def convert_strand(strand: str) -> Union[None, int]:
     """Converts the strand from string notation to integer notation"""
     if strand == '+':

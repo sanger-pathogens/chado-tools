@@ -1,6 +1,7 @@
 import os
-from typing import Union
-from Bio import SeqIO
+import urllib.parse
+from typing import Union, List
+from Bio import SeqIO, Seq
 from . import iobase
 from ..orm import cv, organism, sequence
 
@@ -82,6 +83,86 @@ class FastaImportClient(iobase.ImportClient):
         attributes = fasta_record.description.split('|')
         key_value_attributes = dict(attribute.split("=", 1) for attribute in attributes if "=" in attribute)
         for key, value in key_value_attributes.items():
-            if key.strip() == "SO":
+            if key.strip() in ["SO", "sequence_type"]:
                 return value.strip()
         return None
+
+
+class FastaExportClient(iobase.ExportClient):
+    """Class for exporting genomic data from Chado to FASTA files"""
+
+    def export(self, filename: str, organism_name: str, sequence_type: str, release: str):
+        """Exports sequences from Chado to a FASTA file"""
+
+        # Load dependencies
+        organism_entry = self._load_organism(organism_name)
+        records = []
+
+        # Load sequences and loop over them
+        for feature_entry in self._query_sequences_by_type(organism_name, sequence_type):
+
+            # Get feature type
+            type_entry = self.query_first(cv.CvTerm, cvterm_id=feature_entry.type_id)
+
+            # Create FASTA record
+            record = self._create_fasta_record(feature_entry, organism_entry, type_entry, release)
+            if record:
+                records.append(record)
+
+        # Write all FASTA records to file
+        SeqIO.write(records, filename, "fasta")
+
+    def _create_fasta_record(self, feature_entry: sequence.Feature, organism_entry: organism.Organism,
+                             type_entry: cv.CvTerm, release: str) -> Union[None, SeqIO.SeqRecord]:
+        """Creates a FASTA record"""
+        if not feature_entry.residues:
+            return None
+
+        attributes = self._create_fasta_attributes(organism_entry, type_entry, release)
+        residues = Seq.Seq(feature_entry.residues)
+        record = SeqIO.SeqRecord(residues, id=feature_entry.uniquename, name=feature_entry.uniquename,
+                                 description=attributes)
+        return record
+
+    def _query_sequences_by_type(self, organism_name: str, sequence_type: str) -> List[sequence.Feature]:
+        """Extract features from the database"""
+        if sequence_type == "protein":
+            query = self.query_features_by_organism_and_type(organism_name, "polypeptide")
+        else:
+            query = self.query_top_level_features(organism_name)
+        return query.all()
+
+    def _create_fasta_attributes(self, organism_entry: organism.Organism, type_entry: cv.CvTerm, release: str) -> str:
+        """Creates a header line for a FASTA sequence with several attributes"""
+        attributes_as_list = ["", self._organism_key_value_pair(organism_entry), self._type_key_value_pair(type_entry)]
+        if release:
+            attributes_as_list.append(self._release_key_value_pair(release))
+        attributes_as_string = " | ".join(attributes_as_list).strip()
+        return attributes_as_string
+
+    @staticmethod
+    def _organism_key_value_pair(organism_entry: organism.Organism):
+        """Creates a key-value pair for the FASTA header with the organism name"""
+        organism_key = "organism"
+        organism_name_as_list = [organism_entry.genus, organism_entry.species]
+        if organism_entry.infraspecific_name:
+            organism_name_as_list.append(organism_entry.infraspecific_name)
+        organism_name_as_string = urllib.parse.quote(" ".join(organism_name_as_list))
+        organism_pair = "=".join([organism_key, organism_name_as_string])
+        return organism_pair
+
+    @staticmethod
+    def _type_key_value_pair(type_entry: cv.CvTerm):
+        """Creates a key-value pair for the FASTA header with the type of the sequence"""
+        type_key = "sequence_type"
+        type_name = urllib.parse.quote(type_entry.name)
+        type_pair = "=".join([type_key, type_name])
+        return type_pair
+
+    @staticmethod
+    def _release_key_value_pair(release: str):
+        """Creates a key-value pair for the FASTA header with the name of the release"""
+        release_key = "release"
+        release_name = urllib.parse.quote(release)
+        release_pair = "=".join([release_key, release_name])
+        return release_pair

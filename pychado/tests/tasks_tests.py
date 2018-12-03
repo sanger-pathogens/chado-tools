@@ -517,6 +517,27 @@ class TestTasks(unittest.TestCase):
         mock_client.assert_called_with(self.uri, False)
         self.assertIn(unittest.mock.call().load("testfile", "testorganism"), mock_client.mock_calls)
 
+    @unittest.mock.patch('pychado.tasks.run_export_command')
+    def test_run_export(self, mock_run):
+        # Checks that database exports are correctly run
+        self.assertIs(mock_run, tasks.run_export_command)
+        args = ["chado", "export", "fasta", "-f", "testfile", "-a", "testorganism", "-t", "protein", "testdb"]
+        parsed_args = chado_tools.parse_arguments(args)
+        tasks.run_command_with_arguments(args[1], args[2], parsed_args, self.uri)
+        mock_run.assert_called_with("fasta", parsed_args, self.uri)
+
+    @unittest.mock.patch('pychado.io.fasta.FastaExportClient')
+    def test_export_fasta(self, mock_client):
+        # Checks that the function exporting sequences from the database to a FASTA file is correctly called
+        self.assertIs(mock_client, fasta.FastaExportClient)
+        args = ["chado", "export", "fasta", "-f", "testfile", "-a", "testorganism", "-t", "protein",
+                "-r", "testrelease", "testdb"]
+        parsed_args = chado_tools.parse_arguments(args)
+        tasks.run_export_command(args[2], parsed_args, self.uri)
+        mock_client.assert_called_with(self.uri, False)
+        self.assertIn(unittest.mock.call().export("testfile", "testorganism", "protein", "testrelease"),
+                      mock_client.mock_calls)
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=2, buffer=True)

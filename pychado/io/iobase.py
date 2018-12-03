@@ -102,19 +102,24 @@ class IOClient(ddl.ChadoClient):
             .filter(cv.CvTerm.name == "part_of")\
             .filter(subject_feature.uniquename == child_name)
 
+    def query_top_level_features(self, organism_name: str) -> sqlalchemy.orm.Query:
+        """Creates a query to select top level features (chromosomes etc) of a given organism"""
+        return self.session.query(sequence.Feature) \
+            .select_from(sequence.FeatureProp) \
+            .join(sequence.Feature, sequence.FeatureProp.feature) \
+            .join(organism.Organism, sequence.Feature.organism) \
+            .join(cv.CvTerm, sequence.FeatureProp.type) \
+            .filter(organism.Organism.abbreviation == organism_name) \
+            .filter(cv.CvTerm.name == "top_level_seq")
 
-class ImportClient(IOClient):
-    """Base class for importing data into a CHADO database"""
-    
-    def __init__(self, uri: str, verbose=False):
-        """Constructor"""
+    def query_features_by_organism_and_type(self, organism_name: str, feature_type: str) -> sqlalchemy.orm.Query:
+        """Creates a query to select features of a given organism and type"""
+        return self.session.query(sequence.Feature)\
+            .join(organism.Organism, sequence.Feature.organism)\
+            .join(cv.CvTerm, sequence.Feature.type)\
+            .filter(organism.Organism.abbreviation == organism_name)\
+            .filter(cv.CvTerm.name == feature_type)
 
-        # Connect to database
-        super().__init__(uri)
-
-        # Set up printer
-        self.printer = utils.VerbosePrinter(verbose)
-        
     def _load_cvterm(self, term: str) -> cv.CvTerm:
         """Loads a specific CV term"""
         cvterm_entry = self.query_first(cv.CvTerm, name=term)
@@ -155,6 +160,19 @@ class ImportClient(IOClient):
                 organism_id=organism_entry.organism_id):
             all_feature_names.append(feature_name)
         return all_feature_names
+
+
+class ImportClient(IOClient):
+    """Base class for importing data into a CHADO database"""
+
+    def __init__(self, uri: str, verbose=False):
+        """Constructor"""
+
+        # Connect to database
+        super().__init__(uri)
+
+        # Set up printer
+        self.printer = utils.VerbosePrinter(verbose)
 
     def _handle_db(self, new_entry: general.Db) -> general.Db:
         """Inserts or updates an entry in the 'db' table, and returns it"""
@@ -717,3 +735,16 @@ class ImportClient(IOClient):
             if utils.copy_attribute(existing_entry, new_entry, attribute):
                 updated = True
         return updated
+
+
+class ExportClient(IOClient):
+    """Base class for exporting data from a CHADO database"""
+
+    def __init__(self, uri: str, verbose=False):
+        """Constructor"""
+
+        # Connect to database
+        super().__init__(uri)
+
+        # Set up printer
+        self.printer = utils.VerbosePrinter(verbose)

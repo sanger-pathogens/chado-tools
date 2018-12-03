@@ -1,11 +1,11 @@
 import unittest.mock
-from Bio import SeqIO
+from Bio import SeqIO, Seq
 from .. import dbutils, utils
 from ..io import essentials, fasta
 from ..orm import base, cv, organism, sequence
 
 
-class TestFasta(unittest.TestCase):
+class TestFastaImport(unittest.TestCase):
     """Tests various functions used to load a FASTA file into a database"""
 
     connection_parameters = utils.parse_yaml(dbutils.default_configuration_file())
@@ -96,3 +96,110 @@ class TestFasta(unittest.TestCase):
         self.default_fasta_record.description = ""
         sequence_type = self.client._extract_type(self.default_fasta_record)
         self.assertIsNone(sequence_type)
+
+
+class TestFastaExport(unittest.TestCase):
+    """Tests various functions used to export a FASTA file from a database"""
+
+    connection_parameters = utils.parse_yaml(dbutils.default_configuration_file())
+    connection_uri = dbutils.random_database_uri(connection_parameters)
+
+    @classmethod
+    def setUpClass(cls):
+        # Creates a database and establishes a connection
+        dbutils.create_database(cls.connection_uri)
+        cls.client = fasta.FastaExportClient(cls.connection_uri)
+
+    @classmethod
+    def tearDownClass(cls):
+        # Drops the database
+        dbutils.drop_database(cls.connection_uri, True)
+
+    @unittest.mock.patch("Bio.SeqIO.SeqRecord")
+    @unittest.mock.patch("Bio.Seq.Seq")
+    @unittest.mock.patch("pychado.io.fasta.FastaExportClient._create_fasta_attributes")
+    def test_create_fasta_record(self, mock_attributes: unittest.mock.Mock, mock_sequence: unittest.mock.Mock,
+                                 mock_record: unittest.mock.Mock):
+        # Tests the function that creates a FASTA record
+        self.assertIs(mock_attributes, self.client._create_fasta_attributes)
+        self.assertIs(mock_sequence, Seq.Seq)
+        self.assertIs(mock_record, SeqIO.SeqRecord)
+
+        feature_entry = sequence.Feature(organism_id=1, type_id=2, uniquename="test", residues="CTGA", feature_id=33)
+        organism_entry = organism.Organism(genus="testgenus", species="testspecies", organism_id=44)
+        type_entry = cv.CvTerm(name="contig", cv_id=1, dbxref_id=2, cvterm_id=55)
+        mock_attributes.return_value = "desc"
+        mock_sequence.return_value = "seq"
+
+        self.client._create_fasta_record(feature_entry, organism_entry, type_entry, "testrelease")
+        mock_attributes.assert_called_with(organism_entry, type_entry, "testrelease")
+        mock_sequence.assert_called_with("CTGA")
+        mock_record.assert_called_with("seq", id="test", name="test", description="desc")
+
+    @unittest.mock.patch("pychado.io.fasta.FastaExportClient.query_top_level_features")
+    @unittest.mock.patch("pychado.io.fasta.FastaExportClient.query_features_by_organism_and_type")
+    def test_query_sequences_by_type(self, mock_query_proteins: unittest.mock.Mock, mock_query_dna: unittest.mock.Mock):
+        # Tests that the feature table is correctly queried depending on the type of features of interest
+        self.assertIs(mock_query_proteins, self.client.query_features_by_organism_and_type)
+        self.assertIs(mock_query_dna, self.client.query_top_level_features)
+
+        self.client._query_sequences_by_type("testorganism", "dna")
+        mock_query_proteins.assert_not_called()
+        mock_query_dna.assert_called_with("testorganism")
+
+        mock_query_proteins.reset_mock()
+        mock_query_dna.reset_mock()
+        self.client._query_sequences_by_type("testorganism", "protein")
+        mock_query_proteins.assert_called_with("testorganism", "polypeptide")
+        mock_query_dna.assert_not_called()
+
+    @unittest.mock.patch("pychado.io.fasta.FastaExportClient._release_key_value_pair")
+    @unittest.mock.patch("pychado.io.fasta.FastaExportClient._type_key_value_pair")
+    @unittest.mock.patch("pychado.io.fasta.FastaExportClient._organism_key_value_pair")
+    def test_create_fasta_attributes(self, mock_organism: unittest.mock.Mock, mock_type: unittest.mock.Mock,
+                                     mock_release: unittest.mock.Mock):
+        # Tests the correct creation of a header for a FASTA sequence
+        self.assertIs(mock_organism, self.client._organism_key_value_pair)
+        self.assertIs(mock_type, self.client._type_key_value_pair)
+        self.assertIs(mock_release, self.client._release_key_value_pair)
+
+        organism_entry = organism.Organism(genus="testgenus", species="testspecies", organism_id=33)
+        type_entry = cv.CvTerm(name="contig", cv_id=1, dbxref_id=2, cvterm_id=44)
+        mock_organism.return_value = "orgname"
+        mock_type.return_value = "typename"
+        mock_release.return_value = "relname"
+
+        attributes = self.client._create_fasta_attributes(organism_entry, type_entry, "")
+        mock_organism.assert_called_with(organism_entry)
+        mock_type.assert_called_with(type_entry)
+        mock_release.assert_not_called()
+        self.assertEqual(attributes, "| orgname | typename")
+
+        attributes = self.client._create_fasta_attributes(organism_entry, type_entry, "testrelease")
+        mock_release.assert_called_with("testrelease")
+        self.assertEqual(attributes, "| orgname | typename | relname")
+
+    def test_organism_key_value_pair(self):
+        # Tests the correct creation of a key-value pair for an organism name with proper escaping applied
+        organism_entry = organism.Organism(genus="testgenus", species="testspecies", organism_id=33)
+        pair = self.client._organism_key_value_pair(organism_entry)
+        self.assertEqual(pair, "organism=testgenus%20testspecies")
+        organism_entry.infraspecific_name = "teststrain"
+        pair = self.client._organism_key_value_pair(organism_entry)
+        self.assertEqual(pair, "organism=testgenus%20testspecies%20teststrain")
+
+    def test_type_key_value_pair(self):
+        # Tests the correct creation of a key-value pair for a feature type with proper escaping applied
+        type_entry = cv.CvTerm(name="contig", cv_id=1, dbxref_id=2, cvterm_id=44)
+        pair = self.client._type_key_value_pair(type_entry)
+        self.assertEqual(pair, "sequence_type=contig")
+        type_entry.name = "con tig"
+        pair = self.client._type_key_value_pair(type_entry)
+        self.assertEqual(pair, "sequence_type=con%20tig")
+
+    def test_release_key_value_pair(self):
+        # Tests the correct creation of a key-value pair for a release name with proper escaping applied
+        pair = self.client._release_key_value_pair("2019-01")
+        self.assertEqual(pair, "release=2019-01")
+        pair = self.client._release_key_value_pair("2019:01")
+        self.assertEqual(pair, "release=2019%3A01")

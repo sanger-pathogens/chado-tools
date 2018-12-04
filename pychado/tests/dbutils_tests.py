@@ -1,7 +1,10 @@
 import os
 import unittest.mock
 import urllib.error
+import tempfile
+import filecmp
 import getpass
+import sqlalchemy.engine
 import sqlalchemy_utils
 from .. import dbutils, utils
 
@@ -140,19 +143,90 @@ class TestConnection(unittest.TestCase):
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0]["name"], "diplodocus")
         result_proxy.close()
-        dbutils.close_connection(conn)
 
         # Export the entire table and check that the result is as expected
-        result = dbutils.run_query(uri, "SELECT name, clade, legs, extinct FROM species ORDER BY legs ASC", True)
-        self.assertEqual(result[0][0], "name")
-        self.assertEqual(result[1][0], "leech")
-        self.assertEqual(len(result), 5)
+        result = dbutils.run_query(conn, "SELECT name, clade, legs FROM species ORDER BY legs ASC").fetchall()
+        self.assertEqual(len(result), 4)
+        self.assertEqual(len(result[0]), 3)
+        self.assertEqual(result[0][0], "leech")
+        dbutils.close_connection(conn)
 
         # Drop the database, remove the archive file and check that everything is gone
         dbutils.drop_database(uri, True)
         self.assertFalse(dbutils.exists(uri))
         os.remove(archive_file)
         self.assertFalse(os.path.exists(archive_file))
+
+    @unittest.mock.patch('pychado.dbutils.print_query_result')
+    @unittest.mock.patch('pychado.dbutils.run_query')
+    @unittest.mock.patch('pychado.dbutils.close_connection')
+    @unittest.mock.patch('pychado.dbutils.open_connection')
+    def test_query_and_print(self, mock_open, mock_close, mock_query, mock_print):
+        # Tests that the wrapper function for database queries is correctly run
+        self.assertIs(mock_open, dbutils.open_connection)
+        self.assertIs(mock_close, dbutils.close_connection)
+        self.assertIs(mock_query, dbutils.run_query)
+        self.assertIs(mock_print, dbutils.print_query_result)
+
+        mock_connection_object = mock_open.return_value
+        mock_result_object = mock_query.return_value
+
+        dbutils.query_and_print("testuri", "testquery", "testfile", "json", True, ";")
+        mock_open.assert_called_with("testuri")
+        mock_query.assert_called_with(mock_connection_object, "testquery")
+        mock_print.assert_called_with(mock_result_object, "testfile", "json", True, ";")
+        self.assertIn(unittest.mock.call.close(), mock_result_object.mock_calls)
+        mock_close.assert_called_with(mock_connection_object)
+
+    @unittest.mock.patch('pychado.dbutils.print_query_result_csv')
+    @unittest.mock.patch('pychado.dbutils.print_query_result_json')
+    @unittest.mock.patch('pychado.utils.close')
+    @unittest.mock.patch('pychado.utils.open_file_write')
+    def test_print_query_result(self, mock_open, mock_close, mock_json, mock_csv):
+        # Tests the function printing database queries to file
+        self.assertIs(mock_open, utils.open_file_write)
+        self.assertIs(mock_close, utils.close)
+        self.assertIs(mock_json, dbutils.print_query_result_json)
+        self.assertIs(mock_csv, dbutils.print_query_result_csv)
+
+        result_object = unittest.mock.Mock(spec=sqlalchemy.engine.ResultProxy)
+        mock_file_object = mock_open.return_value
+
+        dbutils.print_query_result(result_object, "testfile", "json", True, ";")
+        mock_open.assert_called_with("testfile")
+        mock_json.assert_called_with(result_object, mock_file_object)
+        mock_csv.assert_not_called()
+        mock_close.assert_called_with(mock_file_object)
+
+        mock_json.reset_mock()
+        mock_csv.reset_mock()
+        dbutils.print_query_result(result_object, "testfile", "csv", True, ";")
+        mock_json.assert_not_called()
+        mock_csv.assert_called_with(result_object, mock_file_object, True, ";")
+
+    def test_print_json(self):
+        # Tests the function exporting a query result to a JSON file
+        result_object = unittest.mock.Mock(spec=sqlalchemy.engine.ResultProxy)
+        result_object.configure_mock(**{"keys.return_value": ["key1", "key2"],
+                                        "fetchone.side_effect": [["v1", "v2"], ["x1", "x2"], None]})
+        filename = tempfile.mkstemp()[1]
+        f = utils.open_file_write(filename)
+        dbutils.print_query_result_json(result_object, f)
+        utils.close(f)
+        self.assertTrue(filecmp.cmp(filename, os.path.join(self.data_dir, "dbutils_test_result.json")))
+        os.remove(filename)
+
+    def test_print_csv(self):
+        # Tests the function exporting a query result to a CSV file
+        result_object = unittest.mock.Mock(spec=sqlalchemy.engine.ResultProxy)
+        result_object.configure_mock(**{"keys.return_value": ["key1", "key2"],
+                                        "fetchone.side_effect": [["v1", "v2"], ["x1", "x2"], None]})
+        filename = tempfile.mkstemp()[1]
+        f = utils.open_file_write(filename)
+        dbutils.print_query_result_csv(result_object, f, True, ";")
+        utils.close(f)
+        self.assertTrue(filecmp.cmp(filename, os.path.join(self.data_dir, "dbutils_test_result.csv")))
+        os.remove(filename)
 
 
 class TestDownload(unittest.TestCase):

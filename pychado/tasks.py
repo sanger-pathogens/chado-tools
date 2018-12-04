@@ -130,8 +130,8 @@ def run_grant_revoke_command(arguments, uri: str, grant_access: bool) -> None:
 def run_query_command(arguments, uri: str) -> None:
     """Query a PostgreSQL database and export the result to a text file"""
     query = (arguments.query or utils.read_text(arguments.input_file))
-    result = dbutils.run_query(uri, query, arguments.include_header)
-    utils.write_csv(arguments.output_file, arguments.delimiter, result)
+    dbutils.query_and_print(uri, query, arguments.output_file, arguments.format, arguments.include_header,
+                            arguments.delimiter)
     if arguments.output_file:
         print("Data exported to " + arguments.output_file)
 
@@ -160,8 +160,8 @@ def run_select_command(specifier: str, arguments, uri: str) -> None:
     else:
         print("Functionality 'extract " + specifier + "' is not yet implemented.")
         query = queries.set_query_conditions("")
-    result = dbutils.run_query(uri, query, arguments.include_header)
-    utils.write_csv(arguments.output_file, arguments.delimiter, result)
+    dbutils.query_and_print(uri, query, arguments.output_file, arguments.format, arguments.include_header,
+                            arguments.delimiter)
     if arguments.output_file:
         print("Data exported to " + arguments.output_file)
 

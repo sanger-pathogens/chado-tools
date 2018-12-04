@@ -169,10 +169,13 @@ def add_general_arguments(parser: argparse.ArgumentParser):
 
 def add_general_extract_arguments(parser: argparse.ArgumentParser):
     """Defines general formal arguments for all sub-commands that export data from a database"""
-    parser.add_argument("-H", "--include_header", action="store_true", help="include header in output (default: False)")
+    parser.add_argument("-H", "--include_header", action="store_true",
+                        help="include header in CSV output (default: False)")
     parser.add_argument("-d", "--delimiter", default="\t",
-                        help="Character delimiting fields in output (default: tab)")
+                        help="Character delimiting fields in CSV output (default: tab)")
     parser.add_argument("-o", "--output_file", default="", help="file into which data are exported (default: stdout)")
+    parser.add_argument("-F", "--format", default="csv", choices={"csv", "json"},
+                        help="format of the file (default: csv)")
 
 
 def add_arguments_by_command(command: str, parser: argparse.ArgumentParser):

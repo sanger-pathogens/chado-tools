@@ -166,11 +166,12 @@ class TestArguments(unittest.TestCase):
 
     def test_query_args(self):
         # Tests if the command line arguments for the subcommand 'chado query' are parsed correctly
-        args = ["chado", "query", "-H", "-d", ";", "-o", "testfile", "-q", "testquery", "testdb"]
+        args = ["chado", "query", "-H", "-d", ";", "-o", "testfile", "-F", "json", "-q", "testquery", "testdb"]
         parsed_args = vars(chado_tools.parse_arguments(args))
         self.assertTrue(parsed_args["include_header"])
         self.assertEqual(parsed_args["delimiter"], ";")
         self.assertEqual(parsed_args["output_file"], "testfile")
+        self.assertEqual(parsed_args["format"], "json")
         self.assertEqual(parsed_args["query"], "testquery")
         self.assertEqual(parsed_args["input_file"], "")
         self.assertEqual(parsed_args["dbname"], "testdb")
@@ -181,6 +182,7 @@ class TestArguments(unittest.TestCase):
         self.assertFalse(parsed_args["include_header"])
         self.assertEqual(parsed_args["delimiter"], "\t")
         self.assertEqual(parsed_args["output_file"], "")
+        self.assertEqual(parsed_args["format"], "csv")
         self.assertEqual(parsed_args["query"], "")
         self.assertEqual(parsed_args["input_file"], "testqueryfile")
 
@@ -193,12 +195,13 @@ class TestArguments(unittest.TestCase):
 
     def test_extract_stats_args(self):
         # Tests if the command line arguments for the subcommand 'chado extract stats' are parsed correctly
-        args = ["chado", "extract", "stats", "-H", "-d", ";", "-o", "testfile", "-a", "testorganism",
+        args = ["chado", "extract", "stats", "-H", "-d", ";", "-o", "testfile", "-F", "json", "-a", "testorganism",
                 "--start_date", "testdate", "--end_date", "testdate2", "testdb"]
         parsed_args = vars(chado_tools.parse_arguments(args))
         self.assertTrue(parsed_args["include_header"])
         self.assertEqual(parsed_args["delimiter"], ";")
         self.assertEqual(parsed_args["output_file"], "testfile")
+        self.assertEqual(parsed_args["format"], "json")
         self.assertEqual(parsed_args["organism"], "testorganism")
         self.assertEqual(parsed_args["start_date"], "testdate")
         self.assertEqual(parsed_args["end_date"], "testdate2")
@@ -210,6 +213,7 @@ class TestArguments(unittest.TestCase):
         self.assertFalse(parsed_args["include_header"])
         self.assertEqual(parsed_args["delimiter"], "\t")
         self.assertEqual(parsed_args["output_file"], "")
+        self.assertEqual(parsed_args["format"], "csv")
         self.assertEqual(parsed_args["organism"], None)
         self.assertEqual(parsed_args["end_date"], "")
 
@@ -220,6 +224,7 @@ class TestArguments(unittest.TestCase):
         self.assertTrue(parsed_args["include_header"])
         self.assertEqual(parsed_args["delimiter"], ";")
         self.assertEqual(parsed_args["output_file"], "testfile")
+        self.assertEqual(parsed_args["format"], "csv")
         self.assertEqual(parsed_args["dbname"], "testdb")
 
     def test_extract_cvterms_args(self):
@@ -229,6 +234,7 @@ class TestArguments(unittest.TestCase):
         self.assertFalse(parsed_args["include_header"])
         self.assertEqual(parsed_args["delimiter"], "\t")
         self.assertEqual(parsed_args["output_file"], "")
+        self.assertEqual(parsed_args["format"], "csv")
         self.assertEqual(parsed_args["vocabulary"], "testcv")
         self.assertEqual(parsed_args["database"], "testdatabase")
         self.assertEqual(parsed_args["dbname"], "testdb")
@@ -241,6 +247,7 @@ class TestArguments(unittest.TestCase):
         self.assertTrue(parsed_args["include_header"])
         self.assertEqual(parsed_args["delimiter"], ";")
         self.assertEqual(parsed_args["output_file"], "testfile")
+        self.assertEqual(parsed_args["format"], "csv")
         self.assertEqual(parsed_args["organism"], "testorganism")
         self.assertEqual(parsed_args["dbname"], "testdb")
 

@@ -59,78 +59,126 @@ class IOClient(ddl.ChadoClient):
             entry = self.insert_into_table(table, **kwargs)
         return entry
 
-    def query_feature_relationship_by_type(self, subject_id: int, types: List[str]) -> sqlalchemy.orm.Query:
+    def query_feature_relationship_by_type(self, subject_id: int, type_ids: List[int]) -> sqlalchemy.orm.Query:
         """Creates a query to select entries with specific 'type_id' from the feature_relationship table"""
         return self.session.query(sequence.FeatureRelationship)\
             .join(cv.CvTerm, sequence.FeatureRelationship.type)\
             .filter(sequence.FeatureRelationship.subject_id == subject_id)\
-            .filter(cv.CvTerm.name.in_(types))
+            .filter(sequence.FeatureRelationship.type_id.in_(type_ids))
 
-    def query_featureprop_by_type(self, feature_id: int, types: List[str]) -> sqlalchemy.orm.Query:
+    def query_featureprop_by_type(self, feature_id: int, type_ids: List[int]) -> sqlalchemy.orm.Query:
         """Creates a query to select entries with specific 'type_id' from the featureprop table"""
         return self.session.query(sequence.FeatureProp)\
-            .join(cv.CvTerm, sequence.FeatureProp.type)\
             .filter(sequence.FeatureProp.feature_id == feature_id)\
-            .filter(cv.CvTerm.name.in_(types))
+            .filter(sequence.FeatureProp.type_id.in_(type_ids))
 
-    def query_feature_synonym_by_type(self, feature_id: int, types: List[str]) -> sqlalchemy.orm.Query:
+    def query_feature_synonym_by_type(self, feature_id: int, type_ids: List[int]) -> sqlalchemy.orm.Query:
         """Creates a query to select entries related to a specific 'synonym.type_id' from the feature_synonym table"""
         return self.session.query(sequence.FeatureSynonym)\
             .join(sequence.Synonym, sequence.FeatureSynonym.synonym)\
-            .join(cv.CvTerm, sequence.Synonym.type)\
             .filter(sequence.FeatureSynonym.feature_id == feature_id)\
-            .filter(cv.CvTerm.name.in_(types))
+            .filter(sequence.Synonym.type_id.in_(type_ids))
 
-    def query_feature_cvterm_by_ontology(self, feature_id: int, ontologies: List[str]) -> sqlalchemy.orm.Query:
-        """Creates a query to select entries related to a specific 'db.name' from the feature_cvterm table"""
+    def query_feature_cvterm_by_ontology(self, feature_id: int, ontology_ids: List[int]) -> sqlalchemy.orm.Query:
+        """Creates a query to select entries related to a specific 'dbxref.db_id' from the feature_cvterm table"""
         return self.session.query(sequence.FeatureCvTerm)\
+            .join(cv.CvTerm, sequence.FeatureCvTerm.cvterm)\
+            .join(general.DbxRef, cv.CvTerm.dbxref)\
+            .filter(sequence.FeatureCvTerm.feature_id == feature_id)\
+            .filter(general.DbxRef.db_id.in_(ontology_ids))
+
+    def query_parent_features(self, subject_id: int, type_ids: List[int]) -> sqlalchemy.orm.Query:
+        """Creates a query to select the parent feature(s) of a given feature"""
+        return self.session.query(sequence.Feature)\
+            .select_from(sequence.FeatureRelationship)\
+            .join(sequence.Feature, sequence.FeatureRelationship.object)\
+            .filter(sequence.FeatureRelationship.type_id.in_(type_ids))\
+            .filter(sequence.FeatureRelationship.subject_id == subject_id)\
+            .order_by(sequence.Feature.uniquename)
+
+    def query_child_features(self, object_id: int, type_ids: List[int]) -> sqlalchemy.orm.Query:
+        """Creates a query to select the child features of a given feature"""
+        return self.session.query(sequence.Feature)\
+            .select_from(sequence.FeatureRelationship)\
+            .join(sequence.Feature, sequence.FeatureRelationship.subject)\
+            .filter(sequence.FeatureRelationship.type_id.in_(type_ids))\
+            .filter(sequence.FeatureRelationship.object_id == object_id)\
+            .order_by(sequence.Feature.uniquename)
+
+    def query_features_by_srcfeature(self, sequence_id: int) -> sqlalchemy.orm.Query:
+        """Creates a query to select the features located on a given sequence"""
+        return self.session.query(sequence.Feature).select_from(sequence.FeatureLoc)\
+            .join(sequence.Feature, sequence.FeatureLoc.feature)\
+            .filter(sequence.FeatureLoc.srcfeature_id == sequence_id)\
+            .order_by(sequence.FeatureLoc.fmin)
+
+    def query_features_by_property_type(self, organism_id: int, type_id: int) -> sqlalchemy.orm.Query:
+        """Creates a query to select features of a given organism that have certain properties"""
+        return self.session.query(sequence.Feature)\
+            .select_from(sequence.FeatureProp)\
+            .join(sequence.Feature, sequence.FeatureProp.feature)\
+            .filter(sequence.Feature.organism_id == organism_id)\
+            .filter(sequence.FeatureProp.type_id == type_id)
+
+    def query_features_by_type(self, organism_id: int, type_ids: List[int]) -> sqlalchemy.orm.Query:
+        """Creates a query to select features of a given organism and type"""
+        return self.session.query(sequence.Feature)\
+            .filter(sequence.Feature.organism_id == organism_id)\
+            .filter(sequence.Feature.type_id.in_(type_ids))
+
+    def query_feature_properties(self, feature_id: int) -> sqlalchemy.orm.Query:
+        """Creates a query to select key-value pairs from the 'featureprop' table"""
+        return self.session.query(cv.CvTerm.name, sequence.FeatureProp.value)\
+            .select_from(sequence.FeatureProp)\
+            .join(cv.CvTerm, sequence.FeatureProp.type)\
+            .filter(sequence.FeatureProp.feature_id == feature_id)
+
+    def query_feature_pubs(self, feature_id: int) -> sqlalchemy.orm.Query:
+        """Creates a query to select entries from the 'pub' table associated with a given feature"""
+        return self.session.query(pub.Pub.uniquename)\
+            .select_from(sequence.FeaturePub)\
+            .join(pub.Pub, sequence.FeaturePub.pub)\
+            .filter(sequence.FeaturePub.feature_id == feature_id)
+
+    def query_feature_dbxrefs(self, feature_id: int) -> sqlalchemy.orm.Query:
+        """Creates a query to select dbxrefs associated with a given feature"""
+        return self.session.query(general.Db.name, general.DbxRef.accession)\
+            .select_from(sequence.FeatureDbxRef)\
+            .join(general.DbxRef, sequence.FeatureDbxRef.dbxref)\
+            .join(general.Db, general.DbxRef.db)\
+            .filter(sequence.FeatureDbxRef.feature_id == feature_id)
+
+    def query_feature_synonyms(self, feature_id: int) -> sqlalchemy.orm.Query:
+        """Creates a query to select synonyms associated with a given feature"""
+        return self.session.query(cv.CvTerm.name.label("type"), sequence.Synonym.name.label("synonym"))\
+            .select_from(sequence.FeatureSynonym)\
+            .join(sequence.Synonym, sequence.FeatureSynonym.synonym)\
+            .join(cv.CvTerm, sequence.Synonym.type)\
+            .filter(sequence.FeatureSynonym.feature_id == feature_id)
+
+    def query_feature_ontology_terms(self, feature_id: int, ontology_ids: List[int]) -> sqlalchemy.orm.Query:
+        """Creates a query to select ontology terms associated with a given feature"""
+        return self.session.query(general.Db.name, general.DbxRef.accession)\
+            .select_from(sequence.FeatureCvTerm)\
             .join(cv.CvTerm, sequence.FeatureCvTerm.cvterm)\
             .join(general.DbxRef, cv.CvTerm.dbxref)\
             .join(general.Db, general.DbxRef.db)\
             .filter(sequence.FeatureCvTerm.feature_id == feature_id)\
-            .filter(general.Db.name.in_(ontologies))
+            .filter(general.Db.db_id.in_(ontology_ids))
 
-    def query_parent_feature(self, child_name: str) -> sqlalchemy.orm.Query:
-        """Creates a query to select the parent feature of a given feature"""
-        subject_feature = sqlalchemy.orm.aliased(sequence.Feature, name="subject_feature")
-        object_feature = sqlalchemy.orm.aliased(sequence.Feature, name="object_feature")
-        return self.session.query(object_feature)\
-            .select_from(sequence.FeatureRelationship)\
-            .join(subject_feature, sequence.FeatureRelationship.subject)\
-            .join(object_feature, sequence.FeatureRelationship.object)\
-            .join(cv.CvTerm, sequence.FeatureRelationship.type)\
-            .filter(cv.CvTerm.name == "part_of")\
-            .filter(subject_feature.uniquename == child_name)
+    def _load_db(self, name: str) -> general.Db:
+        """Loads a specific DB"""
+        db_entry = self.query_first(general.Db, name=name)
+        if not db_entry:
+            raise DatabaseError("DB '" + name + "' not present in database")
+        return db_entry
 
-    def query_srcfeatures(self, organism_name: str) -> sqlalchemy.orm.Query:
-        """Creates a query to select the nucleotide sequences of a given organism"""
-        child_feature = sqlalchemy.orm.aliased(sequence.Feature, name="child_feature")
-        parent_feature = sqlalchemy.orm.aliased(sequence.Feature, name="parent_feature")
-        return self.session.query(parent_feature).select_from(sequence.FeatureLoc)\
-            .join(child_feature, sequence.FeatureLoc.feature)\
-            .join(parent_feature, sequence.FeatureLoc.srcfeature)\
-            .join(organism.Organism, child_feature.organism)\
-            .join(cv.CvTerm, child_feature.type)\
-            .filter(organism.Organism.abbreviation == organism_name)\
-            .filter(cv.CvTerm.name == "gene").distinct(parent_feature.feature_id)
-
-    def query_top_level_features(self, organism_name: str) -> sqlalchemy.orm.Query:
-        """Creates a query to select top level features (chromosomes etc) of a given organism"""
-        return self.session.query(sequence.Feature) \
-            .select_from(sequence.FeatureProp) \
-            .join(sequence.Feature, sequence.FeatureProp.feature) \
-            .join(organism.Organism, sequence.Feature.organism) \
-            .join(cv.CvTerm, sequence.FeatureProp.type) \
-            .filter(organism.Organism.abbreviation == organism_name) \
-            .filter(cv.CvTerm.name == "top_level_seq")
-
-    def query_features_by_organism_and_type(self, organism_name: str, feature_types: List[str]) -> sqlalchemy.orm.Query:
-        """Creates a query to select features of a given organism and type"""
-        return self.session.query(sequence.Feature)\
-            .join(organism.Organism, sequence.Feature.organism)\
-            .join(cv.CvTerm, sequence.Feature.type)\
-            .filter(organism.Organism.abbreviation == organism_name)\
-            .filter(cv.CvTerm.name.in_(feature_types))
+    def _load_dbs(self, names: List[str]) -> List[general.Db]:
+        """Loads specific DBs"""
+        db_entries = []
+        for name in names:
+            db_entries.append(self._load_db(name))
+        return db_entries
 
     def _load_cvterm(self, term: str) -> cv.CvTerm:
         """Loads a specific CV term"""
@@ -139,17 +187,40 @@ class IOClient(ddl.ChadoClient):
             raise DatabaseError("CV term '" + term + "' not present in database")
         return cvterm_entry
 
-    def _load_cvterms(self, vocabulary: str, terms: List[str], relationship=False) -> Dict[str, cv.CvTerm]:
-        """Loads CV terms from a given vocabulary and returns them in a dictionary, keyed by name"""
+    def _load_cvterms(self, terms: List[str]) -> List[cv.CvTerm]:
+        """Loads specific CV terms"""
+        cvterm_entries = []
+        for term in terms:
+            cvterm_entries.append(self._load_cvterm(term))
+        return cvterm_entries
+
+    def _load_terms_from_cv(self, vocabulary: str, relationship=False) -> List[cv.CvTerm]:
+        """Loads CV terms from a given vocabulary and returns them in a list"""
         cv_entry = self.query_first(cv.Cv, name=vocabulary)
         if not cv_entry:
             raise DatabaseError("CV '" + vocabulary + "' not present in database")
         cvterm_entries = self.query_all(cv.CvTerm, cv_id=cv_entry.cv_id, is_relationshiptype=int(relationship))
+        return cvterm_entries
+
+    def _load_terms_from_cv_dict(self, vocabulary: str, required_terms: List[str], relationship=False
+                                 ) -> Dict[str, cv.CvTerm]:
+        """Loads CV terms from a given vocabulary and returns them in a dictionary, keyed by name"""
+        cvterm_entries = self._load_terms_from_cv(vocabulary, relationship)
         cvterm_entries_dict = utils.list_to_dict(cvterm_entries, "name")
-        for term in terms:
+        for term in required_terms:
             if term not in cvterm_entries_dict:
                 raise DatabaseError("CV term '" + term + "' not present in database")
         return cvterm_entries_dict
+
+    def _extract_cvterm_ids_from_dict(self, cvterm_dict: Dict[str, cv.CvTerm], terms: List[str]) -> List[int]:
+        """Extracts the IDs of CV terms from a given dictionary"""
+        ids = []
+        for term in terms:
+            if term in cvterm_dict:
+                ids.append(cvterm_dict[term].cvterm_id)
+            else:
+                raise DatabaseError("CV term '" + term + "' not present in database")
+        return ids
 
     def _load_pub(self, pub_name: str) -> pub.Pub:
         """Loads a pub entry from the database"""
@@ -263,7 +334,7 @@ class ImportClient(IOClient):
 
         # Check if the feature is already present in the database
         existing_entry = self.query_first(sequence.Feature, organism_id=new_entry.organism_id,
-                                          type_id=new_entry.type_id, uniquename=new_entry.uniquename)
+                                          uniquename=new_entry.uniquename)
         if existing_entry:
 
             # Check if the entries in database and file have the same properties, and update if not
@@ -680,7 +751,7 @@ class ImportClient(IOClient):
     def update_feature_properties(existing_entry: sequence.Feature, new_entry: sequence.Feature) -> bool:
         """Updates the properties of a feature entry in the database"""
         updated = False
-        for attribute in ["name", "residues", "seqlen", "md5checksum", "is_analysis", "is_obsolete"]:
+        for attribute in ["name", "type_id", "residues", "seqlen", "md5checksum", "is_analysis", "is_obsolete"]:
             if utils.copy_attribute(existing_entry, new_entry, attribute):
                 updated = True
         return updated

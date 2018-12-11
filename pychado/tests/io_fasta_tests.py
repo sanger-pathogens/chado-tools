@@ -1,41 +1,28 @@
 import unittest.mock
 from Bio import SeqIO, Seq
-from .. import dbutils, utils
-from ..io import essentials, fasta
-from ..orm import base, cv, organism, sequence
+from ..io import fasta
+from ..orm import cv, organism, sequence
 
 
 class TestFastaImport(unittest.TestCase):
     """Tests various functions used to load a FASTA file into a database"""
 
-    connection_parameters = utils.parse_yaml(dbutils.default_configuration_file())
-    connection_uri = dbutils.random_database_uri(connection_parameters)
-
     @classmethod
     def setUpClass(cls):
-        # Creates a database and establishes a connection
-        dbutils.create_database(cls.connection_uri)
-        schema_base = base.PublicBase
-        schema_metadata = schema_base.metadata
-        essentials_client = essentials.EssentialsClient(cls.connection_uri)
-        schema_metadata.create_all(essentials_client.engine, tables=schema_metadata.sorted_tables)
-        essentials_client.load()
-        essentials_client._load_sequence_type_entries()
-        cls.client = fasta.FastaImportClient(cls.connection_uri)
-
-    @classmethod
-    def tearDownClass(cls):
-        # Drops the database
-        dbutils.drop_database(cls.connection_uri, True)
+        """Creates an instance of the base class to be tested and instantiates global attributes"""
+        cls.client = fasta.FastaImportClient("testuri", test_environment=True)
+        cls.client._sequence_terms = {
+            "contig": cv.CvTerm(cv_id=4, dbxref_id=41, name="contig", cvterm_id=41),
+            "supercontig": cv.CvTerm(cv_id=4, dbxref_id=42, name="supercontig", cvterm_id=42),
+            "chromosome": cv.CvTerm(cv_id=4, dbxref_id=43, name="chromosome", cvterm_id=43),
+            "region": cv.CvTerm(cv_id=4, dbxref_id=44, name="region", cvterm_id=44)
+        }
+        cls.client._top_level_term = cv.CvTerm(cv_id=11, dbxref_id=91, name="top_level_seq", cvterm_id=91)
 
     def setUp(self):
         # Create a default FASTA record
         self.default_fasta_record = SeqIO.SeqRecord(seq="ACTGAAC", id="testid", name="testname",
                                                     description="sequence_name | organism=testorganism | SO=chromosome")
-
-    def tearDown(self):
-        # Rolls back all changes to the database
-        self.client.session.rollback()
 
     @unittest.mock.patch("pychado.io.fasta.FastaImportClient._handle_feature")
     @unittest.mock.patch("pychado.io.fasta.FastaImportClient._create_feature")
@@ -48,19 +35,18 @@ class TestFastaImport(unittest.TestCase):
         self.assertIs(mock_insert, self.client._handle_feature)
 
         organism_entry = organism.Organism(genus="", species="", abbreviation="testorganism", organism_id=33)
-        type_entry = cv.CvTerm(name="contig", cv_id=1, dbxref_id=2, cvterm_id=44)
+        type_entry = cv.CvTerm(name="contig", cv_id=1, dbxref_id=2, cvterm_id=77)
 
         mock_extract_type.return_value = None
         self.client._handle_sequence(self.default_fasta_record, organism_entry, type_entry)
         mock_extract_type.assert_called_with(self.default_fasta_record)
-        mock_create.assert_called_with(self.default_fasta_record, 33, 44)
+        mock_create.assert_called_with(self.default_fasta_record, 33, 77)
         mock_insert.assert_called()
 
         mock_extract_type.return_value = "chromosome"
         self.client._handle_sequence(self.default_fasta_record, organism_entry, type_entry)
         mock_extract_type.assert_called_with(self.default_fasta_record)
-        mock_create.assert_called_with(self.default_fasta_record, 33,
-                                       self.client._sequence_terms["chromosome"].cvterm_id)
+        mock_create.assert_called_with(self.default_fasta_record, 33, 43)
         mock_insert.assert_called()
 
     @unittest.mock.patch("pychado.io.fasta.FastaImportClient._handle_featureprop")
@@ -76,7 +62,7 @@ class TestFastaImport(unittest.TestCase):
 
         self.client._mark_as_top_level_sequence(feature_entry)
         mock_query.assert_called_with(sequence.FeatureProp, feature_id=33)
-        mock_featureprop.assert_called_with(feature_id=33, type_id=self.client._top_level_term.cvterm_id, value="true")
+        mock_featureprop.assert_called_with(feature_id=33, type_id=91, value="true")
         mock_insert.assert_called()
 
     def test_create_feature(self):
@@ -85,7 +71,6 @@ class TestFastaImport(unittest.TestCase):
         self.assertEqual(feature_entry.organism_id, 1)
         self.assertEqual(feature_entry.type_id, 2)
         self.assertEqual(feature_entry.uniquename, "testid")
-        self.assertEqual(feature_entry.name, "testname")
         self.assertEqual(feature_entry.residues, "ACTGAAC")
         self.assertEqual(feature_entry.seqlen, 7)
 
@@ -101,19 +86,16 @@ class TestFastaImport(unittest.TestCase):
 class TestFastaExport(unittest.TestCase):
     """Tests various functions used to export a FASTA file from a database"""
 
-    connection_parameters = utils.parse_yaml(dbutils.default_configuration_file())
-    connection_uri = dbutils.random_database_uri(connection_parameters)
-
     @classmethod
     def setUpClass(cls):
-        # Creates a database and establishes a connection
-        dbutils.create_database(cls.connection_uri)
-        cls.client = fasta.FastaExportClient(cls.connection_uri)
-
-    @classmethod
-    def tearDownClass(cls):
-        # Drops the database
-        dbutils.drop_database(cls.connection_uri, True)
+        """Creates an instance of the base class to be tested and instantiates global attributes"""
+        cls.client = fasta.FastaExportClient("testuri", test_environment=True)
+        cls.client._sequence_terms = {
+            "gene": cv.CvTerm(cv_id=4, dbxref_id=41, name="gene", cvterm_id=41),
+            "pseudogene": cv.CvTerm(cv_id=4, dbxref_id=42, name="pseudogene", cvterm_id=42),
+            "polypeptide": cv.CvTerm(cv_id=4, dbxref_id=43, name="polypeptide", cvterm_id=43)
+        }
+        cls.client._top_level_term = cv.CvTerm(cv_id=11, dbxref_id=91, name="top_level_seq", cvterm_id=91)
 
     @unittest.mock.patch("pychado.io.fasta.FastaExportClient._extract_nucleotide_sequence")
     def test_extract_residues_by_type(self, mock_extract_nucleotides: unittest.mock.Mock):
@@ -172,37 +154,41 @@ class TestFastaExport(unittest.TestCase):
         mock_sequence.assert_called_with("AGCT")
         mock_record.assert_called_with("seq", id="test", name="test", description="desc")
 
-    @unittest.mock.patch("pychado.io.fasta.FastaExportClient.query_srcfeatures")
+    @unittest.mock.patch("pychado.io.fasta.FastaExportClient.query_features_by_property_type")
     def test_extract_srcfeatures_by_type(self, mock_query: unittest.mock.Mock):
         # Tests that the feature table is only queried for certain feature types
-        self.assertIs(mock_query, self.client.query_srcfeatures)
-        self.client._extract_srcfeatures_by_type("testorganism", "contigs")
-        mock_query.assert_not_called()
-        self.client._extract_srcfeatures_by_type("testorganism", "genes")
-        mock_query.assert_called_with("testorganism")
+        self.assertIs(mock_query, self.client.query_features_by_property_type)
 
-    @unittest.mock.patch("pychado.io.fasta.FastaExportClient.query_top_level_features")
-    @unittest.mock.patch("pychado.io.fasta.FastaExportClient.query_features_by_organism_and_type")
+        organism_entry = organism.Organism(genus="testgenus", species="testspecies", organism_id=44)
+        self.client._extract_srcfeatures_by_type(organism_entry, "contigs")
+        mock_query.assert_not_called()
+
+        self.client._extract_srcfeatures_by_type(organism_entry, "genes")
+        mock_query.assert_called_with(44, 91)
+
+    @unittest.mock.patch("pychado.io.fasta.FastaExportClient.query_features_by_property_type")
+    @unittest.mock.patch("pychado.io.fasta.FastaExportClient.query_features_by_type")
     def test_extract_features_by_type(self, mock_query_by_type: unittest.mock.Mock,
                                       mock_query_contigs: unittest.mock.Mock):
         # Tests that the feature table is correctly queried depending on the type of features of interest
-        self.assertIs(mock_query_by_type, self.client.query_features_by_organism_and_type)
-        self.assertIs(mock_query_contigs, self.client.query_top_level_features)
+        self.assertIs(mock_query_by_type, self.client.query_features_by_type)
+        self.assertIs(mock_query_contigs, self.client.query_features_by_property_type)
 
-        self.client._extract_features_by_type("testorganism", "contigs")
+        organism_entry = organism.Organism(genus="testgenus", species="testspecies", organism_id=44)
+        self.client._extract_features_by_type(organism_entry, "contigs")
         mock_query_by_type.assert_not_called()
-        mock_query_contigs.assert_called_with("testorganism")
+        mock_query_contigs.assert_called_with(44, 91)
 
         mock_query_by_type.reset_mock()
         mock_query_contigs.reset_mock()
-        self.client._extract_features_by_type("testorganism", "proteins")
-        mock_query_by_type.assert_called_with("testorganism", ["polypeptide"])
+        self.client._extract_features_by_type(organism_entry, "proteins")
+        mock_query_by_type.assert_called_with(44, [43])
         mock_query_contigs.assert_not_called()
 
         mock_query_by_type.reset_mock()
         mock_query_contigs.reset_mock()
-        self.client._extract_features_by_type("testorganism", "genes")
-        mock_query_by_type.assert_called_with("testorganism", ["gene", "pseudogene"])
+        self.client._extract_features_by_type(organism_entry, "genes")
+        mock_query_by_type.assert_called_with(44, [41, 42])
         mock_query_contigs.assert_not_called()
 
     @unittest.mock.patch("pychado.io.fasta.FastaExportClient._release_key_value_pair")

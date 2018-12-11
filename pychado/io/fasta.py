@@ -10,14 +10,27 @@ from ..orm import cv, organism, sequence
 class FastaImportClient(iobase.ImportClient):
     """Class for importing genomic data from FASTA files into Chado"""
 
-    def __init__(self, uri: str, verbose=False):
+    def __init__(self, uri: str, verbose=False, test_environment=False):
         """Constructor"""
 
         # Connect to database
-        super().__init__(uri, verbose)
+        self.test_environment = test_environment
+        if not self.test_environment:
+            super().__init__(uri, verbose)
 
         # Load essentials
-        self._sequence_terms = self._load_cvterms("sequence", ["contig", "supercontig", "chromosome", "region"])
+        if not self.test_environment:
+            self._load_essentials()
+
+    def __del__(self):
+        """Destructor - disconnect from database"""
+        if not self.test_environment:
+            super().__del__()
+
+    def _load_essentials(self) -> None:
+        """Loads essential database entries"""
+        self._sequence_terms = self._load_terms_from_cv_dict(
+            "sequence", ["contig", "supercontig", "chromosome", "region"])
         self._top_level_term = self._load_cvterm("top_level_seq")
 
     def load(self, filename: str, organism_name: str, sequence_type: str):
@@ -76,7 +89,7 @@ class FastaImportClient(iobase.ImportClient):
         """Creates a feature object from a FASTA record"""
         residues = str(fasta_record.seq)
         return sequence.Feature(organism_id=organism_id, type_id=type_id, uniquename=fasta_record.id,
-                                name=fasta_record.name, residues=residues, seqlen=len(residues))
+                                residues=residues, seqlen=len(residues))
 
     @staticmethod
     def _extract_type(fasta_record: SeqIO.SeqRecord) -> Union[None, str]:
@@ -92,13 +105,36 @@ class FastaImportClient(iobase.ImportClient):
 class FastaExportClient(iobase.ExportClient):
     """Class for exporting genomic data from Chado to FASTA files"""
 
+    def __init__(self, uri: str, verbose=False, test_environment=False):
+        """Constructor"""
+
+        # Connect to database
+        self.test_environment = test_environment
+        if not self.test_environment:
+            super().__init__(uri, verbose)
+
+        # Load essentials
+        if not self.test_environment:
+            self._load_essentials()
+
+    def __del__(self):
+        """Destructor - disconnect from database"""
+        if not self.test_environment:
+            super().__del__()
+
+    def _load_essentials(self) -> None:
+        """Loads essential database entries"""
+        self._sequence_terms = self._load_terms_from_cv_dict(
+            "sequence", ["gene", "pseudogene", "polypeptide"])
+        self._top_level_term = self._load_cvterm("top_level_seq")
+
     def export(self, filename: str, organism_name: str, sequence_type: str, release: str):
         """Exports sequences from Chado to a FASTA file"""
 
         # Load dependencies and features of interest
         organism_entry = self._load_organism(organism_name)
-        feature_entries = self._extract_features_by_type(organism_name, sequence_type)
-        srcfeature_entries = self._extract_srcfeatures_by_type(organism_name, sequence_type)
+        feature_entries = self._extract_features_by_type(organism_entry, sequence_type)
+        srcfeature_entries = self._extract_srcfeatures_by_type(organism_entry, sequence_type)
         records = []
 
         # Loop over all features of interest
@@ -124,21 +160,27 @@ class FastaExportClient(iobase.ExportClient):
                                  description=attributes)
         return record
 
-    def _extract_srcfeatures_by_type(self, organism_name: str, sequence_type: str) -> List[sequence.Feature]:
+    def _extract_srcfeatures_by_type(self, organism_entry: organism.Organism, sequence_type: str
+                                     ) -> List[sequence.Feature]:
         """Extract features from the database"""
         srcfeature_entries = []
         if sequence_type == "genes":
-            srcfeature_entries = self.query_srcfeatures(organism_name).all()
+            srcfeature_entries = self.query_features_by_property_type(organism_entry.organism_id,
+                                                                      self._top_level_term.cvterm_id).all()
         return srcfeature_entries
 
-    def _extract_features_by_type(self, organism_name: str, sequence_type: str) -> List[sequence.Feature]:
+    def _extract_features_by_type(self, organism_entry: organism.Organism, sequence_type: str
+                                  ) -> List[sequence.Feature]:
         """Extract features from the database"""
         if sequence_type == "proteins":
-            query = self.query_features_by_organism_and_type(organism_name, ["polypeptide"])
+            query = self.query_features_by_type(
+                organism_entry.organism_id, [self._sequence_terms["polypeptide"].cvterm_id])
         elif sequence_type == "genes":
-            query = self.query_features_by_organism_and_type(organism_name, ["gene", "pseudogene"])
+            query = self.query_features_by_type(
+                organism_entry.organism_id, [self._sequence_terms["gene"].cvterm_id,
+                                             self._sequence_terms["pseudogene"].cvterm_id])
         else:
-            query = self.query_top_level_features(organism_name)
+            query = self.query_features_by_property_type(organism_entry.organism_id, self._top_level_term.cvterm_id)
         return query.all()
 
     def _extract_residues_by_type(self, feature_entry: sequence.Feature, srcfeature_entries: List[sequence.Feature],

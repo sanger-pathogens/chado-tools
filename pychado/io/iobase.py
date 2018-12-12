@@ -212,7 +212,8 @@ class IOClient(ddl.ChadoClient):
                 raise DatabaseError("CV term '" + term + "' not present in database")
         return cvterm_entries_dict
 
-    def _extract_cvterm_ids_from_dict(self, cvterm_dict: Dict[str, cv.CvTerm], terms: List[str]) -> List[int]:
+    @staticmethod
+    def _extract_cvterm_ids_from_dict(cvterm_dict: Dict[str, cv.CvTerm], terms: List[str]) -> List[int]:
         """Extracts the IDs of CV terms from a given dictionary"""
         ids = []
         for term in terms:

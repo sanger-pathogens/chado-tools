@@ -35,14 +35,14 @@ class TestGFFImport(unittest.TestCase):
             "source": cv.CvTerm(cv_id=5, dbxref_id=52, name="source", cvterm_id=52),
             "comment": cv.CvTerm(cv_id=5, dbxref_id=53, name="comment", cvterm_id=53)
         }
-        cls.client._feature_relationship_terms = {
+        cls.client._parent_terms = {
             "part_of": cv.CvTerm(cv_id=6, dbxref_id=62, name="part_of", cvterm_id=62, is_relationshiptype=1),
             "derives_from": cv.CvTerm(cv_id=6, dbxref_id=63, name="derives_from", cvterm_id=63, is_relationshiptype=1)
         }
         cls.client._default_pub = pub.Pub(uniquename="defaultpub", type_id=71, pub_id=33)
         cls.client._synonym_type_ids = [31, 32, 33]
         cls.client._feature_property_type_ids = [51, 52, 53]
-        cls.client._feature_relationship_type_ids = [62, 63]
+        cls.client._parent_type_ids = [62, 63]
         cls.client._ontology_ids = [131, 132]
 
     def setUp(self):
@@ -624,12 +624,12 @@ class TestGFFExport(unittest.TestCase):
     def setUpClass(cls):
         # Creates an instance of the base class to be tested and instantiates global attributes
         cls.client = gff.GFFExportClient("testuri", test_environment=True)
-        cls.client._feature_relationship_terms = {
+        cls.client._parent_terms = {
             "part_of": cv.CvTerm(cv_id=6, dbxref_id=62, name="part_of", cvterm_id=62, is_relationshiptype=1),
             "derives_from": cv.CvTerm(cv_id=6, dbxref_id=63, name="derives_from", cvterm_id=63, is_relationshiptype=1)
         }
         cls.client._top_level_term = cv.CvTerm(cv_id=11, dbxref_id=91, name="top_level_seq", cvterm_id=91)
-        cls.client._feature_relationship_type_ids = [62, 63]
+        cls.client._parent_type_ids = [62, 63]
         cls.client._ontology_ids = [131, 132]
 
     @unittest.mock.patch("pychado.io.gff.GFFExportClient._export_gff_record")
@@ -641,14 +641,22 @@ class TestGFFExport(unittest.TestCase):
 
         feature_entry = sequence.Feature(feature_id=77, organism_id=11, type_id=200, uniquename="parentid")
         childfeature_entry = sequence.Feature(feature_id=78, organism_id=11, type_id=300, uniquename="childid")
+        derivedfeature_entry = sequence.Feature(feature_id=79, organism_id=11, type_id=400, uniquename="derivedid")
         mock_query_obj = mock_query.return_value
-        mock_query_obj.configure_mock(**{"first.side_effect": [None, childfeature_entry]})
+        mock_query_obj.configure_mock(**{"all.side_effect": [[childfeature_entry],
+                                                             [childfeature_entry, derivedfeature_entry]]})
 
         self.client._handle_child_features(feature_entry, "testsequence", None)
-        mock_query.assert_called_with(77, [63])
+        self.assertIn(unittest.mock.call(77, 62), mock_query.mock_calls)
+        self.assertIn(unittest.mock.call(77, 63), mock_query.mock_calls)
         self.assertEqual(mock_query.call_count, 2)
-        mock_export.assert_called_with(childfeature_entry, "testsequence", {"derives_from": "parentid"}, None)
-        self.assertEqual(mock_export.call_count, 1)
+        self.assertIn(unittest.mock.call(childfeature_entry, "testsequence", {"part_of": "parentid"}, None),
+                      mock_export.mock_calls)
+        self.assertIn(unittest.mock.call(childfeature_entry, "testsequence", {"derives_from": "parentid"}, None),
+                      mock_export.mock_calls)
+        self.assertIn(unittest.mock.call(derivedfeature_entry, "testsequence", {"derives_from": "parentid"}, None),
+                      mock_export.mock_calls)
+        self.assertEqual(mock_export.call_count, 3)
 
     @unittest.mock.patch("pychado.io.fasta.FastaExportClient")
     @unittest.mock.patch("pychado.io.gff.GFFExportClient._append_fasta")
@@ -741,12 +749,12 @@ class TestGFFExport(unittest.TestCase):
         feature_entry = sequence.Feature(organism_id=11, type_id=200, uniquename="testid", feature_id=77)
         mock_query_obj = mock_query.return_value
         mock_query_obj.configure_mock(**{"first.return_value": None})
-        has_parents = self.client._has_feature_parents(feature_entry, [11, 12])
-        mock_query.assert_called_with(77, [11, 12])
+        has_parents = self.client._has_feature_parents(feature_entry)
+        mock_query.assert_called_with(77, [62, 63])
         self.assertFalse(has_parents)
         mock_query_obj.configure_mock(**{"first.return_value": sequence.Feature(
             organism_id=11, type_id=300, uniquename="parentid", feature_id=88)})
-        has_parents = self.client._has_feature_parents(feature_entry, [11, 12])
+        has_parents = self.client._has_feature_parents(feature_entry)
         self.assertTrue(has_parents)
 
     @unittest.mock.patch("pychado.io.gff.GFFExportClient.query_first")

@@ -96,12 +96,12 @@ class IOClient(ddl.ChadoClient):
             .filter(sequence.FeatureRelationship.subject_id == subject_id)\
             .order_by(sequence.Feature.uniquename)
 
-    def query_child_features(self, object_id: int, type_ids: List[int]) -> sqlalchemy.orm.Query:
+    def query_child_features(self, object_id: int, type_id: int) -> sqlalchemy.orm.Query:
         """Creates a query to select the child features of a given feature"""
         return self.session.query(sequence.Feature)\
             .select_from(sequence.FeatureRelationship)\
             .join(sequence.Feature, sequence.FeatureRelationship.subject)\
-            .filter(sequence.FeatureRelationship.type_id.in_(type_ids))\
+            .filter(sequence.FeatureRelationship.type_id == type_id)\
             .filter(sequence.FeatureRelationship.object_id == object_id)\
             .order_by(sequence.Feature.uniquename)
 
@@ -183,6 +183,16 @@ class IOClient(ddl.ChadoClient):
     def _load_cvterm(self, term: str) -> cv.CvTerm:
         """Loads a specific CV term"""
         cvterm_entry = self.query_first(cv.CvTerm, name=term)
+        if not cvterm_entry:
+            raise DatabaseError("CV term '" + term + "' not present in database")
+        return cvterm_entry
+
+    def _load_cvterm_from_cv(self, term: str, vocabulary: str) -> cv.CvTerm:
+        """Loads a specific CV term from a specific vocabulary"""
+        cv_entry = self.query_first(cv.Cv, name=vocabulary)
+        if not cv_entry:
+            raise DatabaseError("CV '" + vocabulary + "' not present in database")
+        cvterm_entry = self.query_first(cv.CvTerm, name=term, cv_id=cv_entry.cv_id)
         if not cvterm_entry:
             raise DatabaseError("CV term '" + term + "' not present in database")
         return cvterm_entry

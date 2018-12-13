@@ -133,13 +133,13 @@ class TestIOClient(unittest.TestCase):
 
     def test_query_child_features(self):
         # Tests the function that creates a query against the feature_relationship table
-        query = self.client.query_child_features(12, [300, 400])
+        query = self.client.query_child_features(12, 300)
         compiled_query = str(query.statement.compile(compile_kwargs={"literal_binds": True}))
         self.assertIn("FROM public.feature_relationship JOIN public.feature "
                       "ON public.feature.feature_id = public.feature_relationship.subject_id",
                       compiled_query)
         self.assertIn("public.feature_relationship.object_id = 12", compiled_query)
-        self.assertIn("public.feature_relationship.type_id IN (300, 400)", compiled_query)
+        self.assertIn("public.feature_relationship.type_id = 300", compiled_query)
 
     def test_query_features_by_srcfeature(self):
         # Tests the function that creates a query against the featureloc table
@@ -287,6 +287,15 @@ class TestImportClient(unittest.TestCase):
         self.assertEqual("comment", comment_term.name)
         with self.assertRaises(iobase.DatabaseError):
             self.client._load_cvterm("inexistent_term")
+
+    def test_load_cvterm_from_cv(self):
+        # Tests the function loading a CV term from the database
+        existent_term = self.client._load_cvterm_from_cv("defaultterm", "defaultcv")
+        self.assertEqual("defaultterm", existent_term.name)
+        with self.assertRaises(iobase.DatabaseError):
+            self.client._load_cvterm_from_cv("wrong_term", "defaultcv")
+        with self.assertRaises(iobase.DatabaseError):
+            self.client._load_cvterm_from_cv("defaultterm", "wrong_cv")
 
     def test_load_cvterms(self):
         # Tests the function loading multiple CV terms from the database

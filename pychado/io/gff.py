@@ -114,21 +114,26 @@ class GFFImportClient(iobase.ImportClient, GFFClient):
 
     def _load_essentials(self) -> None:
         """Loads essential database entries"""
+
+        self._part_of_term = self._load_cvterm_from_cv("part_of", "relationship")
+        self._derives_from_term = self._load_cvterm_from_cv("derives_from", "sequence")
+        self._parent_terms = {self._part_of_term.name: self._part_of_term,
+                              self._derives_from_term.name: self._derives_from_term}
+        self._parent_type_ids = [self._part_of_term.cvterm_id, self._derives_from_term.cvterm_id]
+
         self._synonym_terms = self._load_terms_from_cv_dict(
             "genedb_synonym_type", self._synonym_types())
-        self._feature_relationship_terms = self._load_terms_from_cv_dict(
-            "relationship", self._feature_relationship_types(), True)
+        self._synonym_type_ids = self._extract_cvterm_ids_from_dict(
+            self._synonym_terms, self._synonym_types())
+
         self._feature_property_terms = self._load_terms_from_cv_dict(
             "feature_property", self._feature_property_types())
+        self._feature_property_type_ids = self._extract_cvterm_ids_from_dict(
+            self._feature_property_terms, self._feature_property_types())
+
         self._sequence_terms = self._load_terms_from_cv_dict(
             "sequence", ["gene", "intron", "exon", "CDS", "mRNA", "chromosome"])
         self._default_pub = self._load_pub("null")
-        self._feature_relationship_type_ids = self._extract_cvterm_ids_from_dict(
-            self._feature_relationship_terms, self._feature_relationship_types())
-        self._feature_property_type_ids = self._extract_cvterm_ids_from_dict(
-            self._feature_property_terms, self._feature_property_types())
-        self._synonym_type_ids = self._extract_cvterm_ids_from_dict(
-            self._synonym_terms, self._synonym_types())
         self._ontology_ids = [db_entry.db_id for db_entry in self._load_dbs(self._ontologies())]
 
     def load(self, filename: str, organism_name: str, fasta_filename: str, sequence_type: str, fresh_load=False,
@@ -392,7 +397,7 @@ class GFFImportClient(iobase.ImportClient, GFFClient):
 
         # Extract existing relationships for this subject from the database
         existing_feature_relationships = self.query_feature_relationship_by_type(
-            subject_entry.feature_id, self._feature_relationship_type_ids).all()
+            subject_entry.feature_id, self._parent_type_ids).all()
         all_feature_relationships = []
 
         # Loop over all relationships for this feature in the GFF record
@@ -400,10 +405,7 @@ class GFFImportClient(iobase.ImportClient, GFFClient):
         for relationship, parents in relationships.items():
 
             # Get database entry for relationship type
-            if relationship not in self._feature_relationship_terms:
-                self.printer.print("WARNING: Relationship '" + relationship + "' not present in database.")
-                continue
-            type_entry = self._feature_relationship_terms[relationship]
+            type_entry = self._parent_terms[relationship]
 
             for parent in parents:
 
@@ -554,7 +556,7 @@ class GFFImportClient(iobase.ImportClient, GFFClient):
         else:
             parent_entry = self.query_parent_features(
                 feature_entry.feature_id,
-                [self._feature_relationship_terms["part_of"].cvterm_id]).first()            # type: sequence.Feature
+                [self._parent_terms["part_of"].cvterm_id]).first()                          # type: sequence.Feature
         if parent_entry:
             loc_entry = self.query_first(sequence.FeatureLoc,
                                          feature_id=parent_entry.feature_id)                # type: sequence.FeatureLoc
@@ -777,14 +779,15 @@ class GFFExportClient(iobase.ExportClient, GFFClient):
 
     def _load_essentials(self) -> None:
         """Loads essential database entries"""
-        self._feature_relationship_terms = self._load_terms_from_cv_dict(
-            "relationship", self._feature_relationship_types(), True)
+        self._part_of_term = self._load_cvterm_from_cv("part_of", "relationship")
+        self._derives_from_term = self._load_cvterm_from_cv("derives_from", "sequence")
+        self._parent_terms = {self._part_of_term.name: self._part_of_term,
+                              self._derives_from_term.name: self._derives_from_term}
+        self._parent_type_ids = [self._part_of_term.cvterm_id, self._derives_from_term.cvterm_id]
         self._top_level_term = self._load_cvterm("top_level_seq")
-        self._feature_relationship_type_ids = self._extract_cvterm_ids_from_dict(
-            self._feature_relationship_terms, self._feature_relationship_types())
         self._ontology_ids = [db_entry.db_id for db_entry in self._load_dbs(self._ontologies())]
 
-    def export(self, gff_filename: str, organism_name: str, export_fasta: bool, fasta_filename: str):
+    def export(self, gff_filename: str, organism_name: str, export_fasta: bool, fasta_filename: str) -> None:
         """Exports sequences from Chado to a GFF file"""
 
         # Load dependencies
@@ -809,7 +812,7 @@ class GFFExportClient(iobase.ExportClient, GFFClient):
             for feature_entry in feature_entries:
 
                 # Check if the feature has parents, and ignore it if this is the case
-                if self._has_feature_parents(feature_entry, self._feature_relationship_type_ids):
+                if self._has_feature_parents(feature_entry):
                     continue
 
                 # Load all attributes associated with this feature
@@ -880,13 +883,13 @@ class GFFExportClient(iobase.ExportClient, GFFClient):
         feature_ontology_terms = self._extract_feature_ontology_terms(feature_entry)
 
         # Add attributes to the GFF record
-        self._add_gff_featuretype(gff_record, feature_type, feature_entry.residues)
-        self._add_gff_synonyms(gff_record, feature_synonyms)
-        self._add_gff_properties(gff_record, feature_properties)
-        self._add_gff_publications(gff_record, feature_publications)
+        self._add_gff_relationships(gff_record, parent_relationships)
         self._add_gff_cross_references(gff_record, feature_dbxrefs)
         self._add_gff_ontology_terms(gff_record, feature_ontology_terms)
-        self._add_gff_relationships(gff_record, parent_relationships)
+        self._add_gff_synonyms(gff_record, feature_synonyms)
+        self._add_gff_publications(gff_record, feature_publications)
+        self._add_gff_properties(gff_record, feature_properties)
+        self._add_gff_featuretype(gff_record, feature_type, feature_entry.residues)
 
         # Write the generated GFF record to file
         self._print_gff_record(gff_record, file_handle)
@@ -896,19 +899,15 @@ class GFFExportClient(iobase.ExportClient, GFFClient):
 
     def _handle_child_features(self, feature_entry: sequence.Feature, chromosome_name: str, file_handle) -> None:
         """Export GFF records for all child features of a given feature"""
-        child_entries = []
-        parent_relationships = {}
-        for relationship_type, relationship_term in self._feature_relationship_terms.items():
-            child_entry = self.query_child_features(feature_entry.feature_id, [relationship_term.cvterm_id]).first()
-            if child_entry:
-                child_entries.append(child_entry)
-                parent_relationships[relationship_type] = feature_entry.uniquename
-        for child_entry in child_entries:
-            self._export_gff_record(child_entry, chromosome_name, parent_relationships, file_handle)
+        for relationship_type, relationship_term in self._parent_terms.items():
+            child_entries = self.query_child_features(feature_entry.feature_id, relationship_term.cvterm_id).all()
+            parent_relationships = {relationship_type: feature_entry.uniquename}
+            for child_entry in child_entries:
+                self._export_gff_record(child_entry, chromosome_name, parent_relationships, file_handle)
 
-    def _has_feature_parents(self, feature_entry: sequence.Feature, parent_type_ids: List[int]) -> bool:
+    def _has_feature_parents(self, feature_entry: sequence.Feature) -> bool:
         """Checks if a given Feature has parents in the database"""
-        parent_entry = self.query_parent_features(feature_entry.feature_id, parent_type_ids).first()
+        parent_entry = self.query_parent_features(feature_entry.feature_id, self._parent_type_ids).first()
         return parent_entry is not None
 
     def _extract_feature_type(self, feature_entry: sequence.Feature) -> str:
@@ -998,8 +997,8 @@ class GFFExportClient(iobase.ExportClient, GFFClient):
         if "source" in properties:
             gff_record.source = properties["source"][0]
         for property_type in ["comment", "description", "Note"]:
-            if property_type in properties:
-                gff_record.attributes[property_type] = properties[property_type]
+            if property_type.lower() in properties:
+                gff_record.attributes[property_type] = properties[property_type.lower()]
 
     @staticmethod
     def _add_gff_publications(gff_record: gffutils.Feature, publications: List[str]):

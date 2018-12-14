@@ -7,18 +7,29 @@ from ..orm import general, cv, organism, pub, sequence
 class GAFImportClient(iobase.ImportClient):
     """Class for importing genomic data from GAF files into Chado"""
 
-    def __init__(self, uri: str, verbose=False):
+    def __init__(self, uri: str, verbose=False, test_environment=False):
         """Constructor"""
 
         # Connect to database
-        self.uri = uri
-        self.verbose = verbose
-        super().__init__(self.uri, self.verbose)
+        self.test_environment = test_environment
+        if not self.test_environment:
+            super().__init__(uri, verbose)
 
         # Load essentials
+        if not self.test_environment:
+            self._load_essentials()
+
+    def __del__(self):
+        """Destructor - disconnect from database"""
+        if not self.test_environment:
+            super().__del__()
+
+    def _load_essentials(self) -> None:
+        """Loads essential database entries"""
         self._date_term = self._load_cvterm("date")
         self._evidence_term = self._load_cvterm("evidence")
         self._default_pub = self._load_pub("null")
+        self._go_db = self._load_db("GO")
 
     def load(self, filename: str, organism_name: str):
         """Import data from a GAF file into a Chado database"""
@@ -76,9 +87,6 @@ class GAFImportClient(iobase.ImportClient):
         (db_authority, accession, version) = ontology.split_dbxref(ontology_term)
         publication = gaf_record["DB:Reference"][0].strip()
 
-        # Extract existing ontology terms for this feature from the database
-        existing_feature_cvterms = self.query_feature_cvterm_by_ontology(feature_entry.feature_id, [db_authority]).all()
-
         # Get entry from 'db' table
         db_entry = self.query_first(general.Db, name=db_authority)
         if not db_entry:
@@ -105,6 +113,10 @@ class GAFImportClient(iobase.ImportClient):
         else:
             pub_entry = self._default_pub
 
+        # Extract existing ontology terms for this feature from the database
+        existing_feature_cvterms = self.query_feature_cvterm_by_ontology(
+            feature_entry.feature_id, [db_entry.db_id]).all()
+
         # Insert/update entry in the 'feature_cvterm' table
         new_feature_cvterm_entry = sequence.FeatureCvTerm(feature_id=feature_entry.feature_id,
                                                           cvterm_id=cvterm_entry.cvterm_id,
@@ -123,9 +135,6 @@ class GAFImportClient(iobase.ImportClient):
         if not product:
             return None
         publication = gaf_record["DB:Reference"][0].strip()
-
-        # Extract existing product terms for this feature from the database
-        existing_feature_cvterms = self.query_feature_cvterm_by_ontology(feature_entry.feature_id, ["PRODUCT"]).all()
 
         # Insert/update entry in the 'db' table
         new_db_entry = general.Db(name="PRODUCT")
@@ -149,6 +158,10 @@ class GAFImportClient(iobase.ImportClient):
             pub_entry = self._handle_pub(new_pub_entry)
         else:
             pub_entry = self._default_pub
+
+        # Extract existing product terms for this feature from the database
+        existing_feature_cvterms = self.query_feature_cvterm_by_ontology(
+            feature_entry.feature_id, [db_entry.db_id]).all()
 
         # Insert/update entry in the 'feature_cvterm' table
         new_feature_cvterm_entry = sequence.FeatureCvTerm(feature_id=feature_entry.feature_id,

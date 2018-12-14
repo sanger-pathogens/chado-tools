@@ -88,76 +88,132 @@ class TestIOClient(unittest.TestCase):
 
     def test_query_feature_relationship_by_type(self):
         # Tests the function that creates a query against the feature_relationship table
-        query = self.client.query_feature_relationship_by_type(12, ["testtype"])
+        query = self.client.query_feature_relationship_by_type(12, [300, 400])
         compiled_query = str(query.statement.compile(compile_kwargs={"literal_binds": True}))
-        self.assertIn("FROM public.feature_relationship JOIN public.cvterm ON public.cvterm.cvterm_id = "
-                      "public.feature_relationship.type_id ", compiled_query)
+        self.assertIn("FROM public.feature_relationship", compiled_query)
         self.assertIn("feature_relationship.subject_id = 12", compiled_query)
-        self.assertIn("cvterm.name IN ('testtype')", compiled_query)
+        self.assertIn("feature_relationship.type_id IN (300, 400)", compiled_query)
 
     def test_query_featureprop_by_type(self):
         # Tests the function that creates a query against the feature_relationship table
-        query = self.client.query_featureprop_by_type(12, ["testtype"])
+        query = self.client.query_featureprop_by_type(12, [300, 400])
         compiled_query = str(query.statement.compile(compile_kwargs={"literal_binds": True}))
-        self.assertIn("FROM public.featureprop JOIN public.cvterm ON public.cvterm.cvterm_id = "
-                      "public.featureprop.type_id ", compiled_query)
+        self.assertIn("FROM public.featureprop", compiled_query)
         self.assertIn("featureprop.feature_id = 12", compiled_query)
-        self.assertIn("cvterm.name IN ('testtype')", compiled_query)
+        self.assertIn("featureprop.type_id IN (300, 400)", compiled_query)
 
     def test_query_feature_synonym_by_type(self):
         # Tests the function that creates a query against the feature_synonym table
-        query = self.client.query_feature_synonym_by_type(12, ["testtype"])
+        query = self.client.query_feature_synonym_by_type(12, [300, 400])
         compiled_query = str(query.statement.compile(compile_kwargs={"literal_binds": True}))
         self.assertIn("FROM public.feature_synonym JOIN public.synonym ON public.synonym.synonym_id = "
-                      "public.feature_synonym.synonym_id JOIN public.cvterm ON public.cvterm.cvterm_id = "
-                      "public.synonym.type_id ", compiled_query)
+                      "public.feature_synonym.synonym_id", compiled_query)
         self.assertIn("feature_synonym.feature_id = 12", compiled_query)
-        self.assertIn("cvterm.name IN ('testtype')", compiled_query)
+        self.assertIn("synonym.type_id IN (300, 400)", compiled_query)
 
     def test_query_feature_cvterm_by_ontology(self):
         # Tests the function that creates a query against the feature_cvterm table
-        query = self.client.query_feature_cvterm_by_ontology(12, ["testontology"])
+        query = self.client.query_feature_cvterm_by_ontology(12, [300, 400])
         compiled_query = str(query.statement.compile(compile_kwargs={"literal_binds": True}))
         self.assertIn("FROM public.feature_cvterm JOIN public.cvterm ON public.cvterm.cvterm_id = "
                       "public.feature_cvterm.cvterm_id JOIN public.dbxref ON public.dbxref.dbxref_id = "
-                      "public.cvterm.dbxref_id JOIN public.db ON public.db.db_id = public.dbxref.db_id", compiled_query)
+                      "public.cvterm.dbxref_id", compiled_query)
         self.assertIn("feature_cvterm.feature_id = 12", compiled_query)
-        self.assertIn("db.name IN ('testontology')", compiled_query)
+        self.assertIn("dbxref.db_id IN (300, 400)", compiled_query)
 
-    def test_query_parent_feature(self):
+    def test_query_parent_features(self):
         # Tests the function that creates a query against the feature_relationship table
-        query = self.client.query_parent_feature("testname")
+        query = self.client.query_parent_features(12, [300, 400])
         compiled_query = str(query.statement.compile(compile_kwargs={"literal_binds": True}))
-        self.assertIn("FROM public.feature_relationship "
-                      "JOIN public.feature AS subject_feature "
-                      "ON subject_feature.feature_id = public.feature_relationship.subject_id "
-                      "JOIN public.feature AS object_feature "
-                      "ON object_feature.feature_id = public.feature_relationship.object_id "
-                      "JOIN public.cvterm ON public.cvterm.cvterm_id = public.feature_relationship.type_id",
+        self.assertIn("FROM public.feature_relationship JOIN public.feature "
+                      "ON public.feature.feature_id = public.feature_relationship.object_id",
                       compiled_query)
-        self.assertIn("public.cvterm.name = 'part_of'", compiled_query)
-        self.assertIn("subject_feature.uniquename = 'testname'", compiled_query)
+        self.assertIn("public.feature_relationship.subject_id = 12", compiled_query)
+        self.assertIn("public.feature_relationship.type_id IN (300, 400)", compiled_query)
 
-    def test_query_top_level_features(self):
-        # Tests the function that creates a query against the feature table
-        query = self.client.query_top_level_features("testorganism")
+    def test_query_child_features(self):
+        # Tests the function that creates a query against the feature_relationship table
+        query = self.client.query_child_features(12, 300)
         compiled_query = str(query.statement.compile(compile_kwargs={"literal_binds": True}))
-        self.assertIn("FROM public.featureprop "
-                      "JOIN public.feature ON public.feature.feature_id = public.featureprop.feature_id "
-                      "JOIN public.organism ON public.organism.organism_id = public.feature.organism_id "
-                      "JOIN public.cvterm ON public.cvterm.cvterm_id = public.featureprop.type_id ", compiled_query)
-        self.assertIn("public.organism.abbreviation = 'testorganism'", compiled_query)
-        self.assertIn("public.cvterm.name = 'top_level_seq'", compiled_query)
+        self.assertIn("FROM public.feature_relationship JOIN public.feature "
+                      "ON public.feature.feature_id = public.feature_relationship.subject_id",
+                      compiled_query)
+        self.assertIn("public.feature_relationship.object_id = 12", compiled_query)
+        self.assertIn("public.feature_relationship.type_id = 300", compiled_query)
 
-    def test_query_feature_by_organism_and_type(self):
-        # Tests the function that creates a query against the feature table
-        query = self.client.query_features_by_organism_and_type("testorganism", "testtype")
+    def test_query_features_by_srcfeature(self):
+        # Tests the function that creates a query against the featureloc table
+        query = self.client.query_features_by_srcfeature(12)
         compiled_query = str(query.statement.compile(compile_kwargs={"literal_binds": True}))
-        self.assertIn("FROM public.feature "
-                      "JOIN public.organism ON public.organism.organism_id = public.feature.organism_id "
-                      "JOIN public.cvterm ON public.cvterm.cvterm_id = public.feature.type_id ", compiled_query)
-        self.assertIn("public.organism.abbreviation = 'testorganism'", compiled_query)
-        self.assertIn("public.cvterm.name = 'testtype'", compiled_query)
+        self.assertIn("FROM public.featureloc JOIN public.feature "
+                      "ON public.feature.feature_id = public.featureloc.feature_id", compiled_query)
+        self.assertIn("public.featureloc.srcfeature_id = 12", compiled_query)
+
+    def test_query_features_by_property_type(self):
+        # Tests the function that creates a query against the feature table
+        query = self.client.query_features_by_property_type(12, 300)
+        compiled_query = str(query.statement.compile(compile_kwargs={"literal_binds": True}))
+        self.assertIn("FROM public.featureprop JOIN public.feature "
+                      "ON public.feature.feature_id = public.featureprop.feature_id", compiled_query)
+        self.assertIn("public.feature.organism_id = 12", compiled_query)
+        self.assertIn("public.featureprop.type_id = 300", compiled_query)
+
+    def test_query_features_by_type(self):
+        # Tests the function that creates a query against the feature table
+        query = self.client.query_features_by_type(12, [300, 400])
+        compiled_query = str(query.statement.compile(compile_kwargs={"literal_binds": True}))
+        self.assertIn("FROM public.feature", compiled_query)
+        self.assertIn("public.feature.organism_id = 12", compiled_query)
+        self.assertIn("public.feature.type_id IN (300, 400)", compiled_query)
+
+    def test_query_feature_properties(self):
+        # Tests the function that creates a query against the featureprop and cvterm tables
+        query = self.client.query_feature_properties(44)
+        compiled_query = str(query.statement.compile(compile_kwargs={"literal_binds": True}))
+        self.assertIn("SELECT public.cvterm.name, public.featureprop.value", compiled_query)
+        self.assertIn("FROM public.featureprop JOIN public.cvterm "
+                      "ON public.cvterm.cvterm_id = public.featureprop.type_id", compiled_query)
+        self.assertIn("WHERE public.featureprop.feature_id = 44", compiled_query)
+
+    def test_query_feature_pubs(self):
+        # Tests the function that creates a query against the feature_pub and pub tables
+        query = self.client.query_feature_pubs(44)
+        compiled_query = str(query.statement.compile(compile_kwargs={"literal_binds": True}))
+        self.assertIn("SELECT public.pub.uniquename", compiled_query)
+        self.assertIn("FROM public.feature_pub JOIN public.pub "
+                      "ON public.pub.pub_id = public.feature_pub.pub_id", compiled_query)
+        self.assertIn("WHERE public.feature_pub.feature_id = 44", compiled_query)
+
+    def test_query_feature_dbxrefs(self):
+        # Tests the function that creates a query against the feature_dbxref, dxbref and db tables
+        query = self.client.query_feature_dbxrefs(44)
+        compiled_query = str(query.statement.compile(compile_kwargs={"literal_binds": True}))
+        self.assertIn("SELECT public.db.name, public.dbxref.accession", compiled_query)
+        self.assertIn("FROM public.feature_dbxref JOIN public.dbxref "
+                      "ON public.dbxref.dbxref_id = public.feature_dbxref.dbxref_id JOIN public.db "
+                      "ON public.db.db_id = public.dbxref.db_id", compiled_query)
+        self.assertIn("WHERE public.feature_dbxref.feature_id = 44", compiled_query)
+
+    def test_query_feature_synonyms(self):
+        # Tests the function that creates a query against the feature_synonym, synonym and cvterm tables
+        query = self.client.query_feature_synonyms(44)
+        compiled_query = str(query.statement.compile(compile_kwargs={"literal_binds": True}))
+        self.assertIn("SELECT public.cvterm.name AS type, public.synonym.name AS synonym", compiled_query)
+        self.assertIn("FROM public.feature_synonym JOIN public.synonym "
+                      "ON public.synonym.synonym_id = public.feature_synonym.synonym_id JOIN public.cvterm "
+                      "ON public.cvterm.cvterm_id = public.synonym.type_id", compiled_query)
+        self.assertIn("WHERE public.feature_synonym.feature_id = 44", compiled_query)
+
+    def test_query_feature_ontology_terms(self):
+        # Tests the function that creates a query against the feature_cvterm, cvterm, dxbref and db tables
+        query = self.client.query_feature_ontology_terms(44, [81, 82])
+        compiled_query = str(query.statement.compile(compile_kwargs={"literal_binds": True}))
+        self.assertIn("SELECT public.db.name, public.dbxref.accession", compiled_query)
+        self.assertIn("FROM public.feature_cvterm JOIN public.cvterm "
+                      "ON public.cvterm.cvterm_id = public.feature_cvterm.cvterm_id JOIN public.dbxref "
+                      "ON public.dbxref.dbxref_id = public.cvterm.dbxref_id JOIN public.db "
+                      "ON public.db.db_id = public.dbxref.db_id", compiled_query)
+        self.assertIn("WHERE public.feature_cvterm.feature_id = 44 AND public.db.db_id IN (81, 82)", compiled_query)
 
 
 class TestImportClient(unittest.TestCase):
@@ -213,6 +269,18 @@ class TestImportClient(unittest.TestCase):
         return (default_db, default_dbxref, default_cv, default_cvterm, default_organism, default_feature, default_pub,
                 default_synonym)
 
+    def test_load_db(self):
+        # Tests the function loading a DB entry from the database
+        db_entry = self.client._load_db("defaultdb")
+        self.assertEqual("defaultdb", db_entry.name)
+        with self.assertRaises(iobase.DatabaseError):
+            self.client._load_db("inexistent_db")
+
+    def test_load_dbs(self):
+        # Tests the function loading multiple DB entries from the database
+        db_entries = self.client._load_dbs(["defaultdb"])
+        self.assertEqual(len(db_entries), 1)
+
     def test_load_cvterm(self):
         # Tests the function loading a CV term from the database
         comment_term = self.client._load_cvterm("comment")
@@ -220,15 +288,45 @@ class TestImportClient(unittest.TestCase):
         with self.assertRaises(iobase.DatabaseError):
             self.client._load_cvterm("inexistent_term")
 
+    def test_load_cvterm_from_cv(self):
+        # Tests the function loading a CV term from the database
+        existent_term = self.client._load_cvterm_from_cv("defaultterm", "defaultcv")
+        self.assertEqual("defaultterm", existent_term.name)
+        with self.assertRaises(iobase.DatabaseError):
+            self.client._load_cvterm_from_cv("wrong_term", "defaultcv")
+        with self.assertRaises(iobase.DatabaseError):
+            self.client._load_cvterm_from_cv("defaultterm", "wrong_cv")
+
     def test_load_cvterms(self):
         # Tests the function loading multiple CV terms from the database
-        synonym_type_terms = self.client._load_cvterms("synonym_type", ["narrow", "broad"], False)
+        synonym_type_terms = self.client._load_cvterms(["narrow", "broad"])
+        self.assertEqual(len(synonym_type_terms), 2)
+        self.assertEqual("narrow", synonym_type_terms[0].name)
+
+    def test_load_terms_from_cv(self):
+        # Tests the function loading multiple CV terms from the database
+        synonym_type_terms = self.client._load_terms_from_cv("synonym_type", False)
+        self.assertGreater(len(synonym_type_terms), 0)
+        synonym_type_terms = self.client._load_terms_from_cv("synonym_type", True)
+        self.assertEqual(len(synonym_type_terms), 0)
+        with self.assertRaises(iobase.DatabaseError):
+            self.client._load_terms_from_cv("inexistent_vocabulary")
+
+    def test_load_terms_from_cv_dict(self):
+        # Tests the function loading multiple CV terms from the database
+        synonym_type_terms = self.client._load_terms_from_cv_dict("synonym_type", ["narrow", "broad"], False)
         self.assertIn("narrow", synonym_type_terms)
         self.assertEqual(synonym_type_terms["narrow"].name, "narrow")
         with self.assertRaises(iobase.DatabaseError):
-            self.client._load_cvterms("synonym_type", ["inexistent_term"], False)
+            self.client._load_terms_from_cv_dict("synonym_type", ["inexistent_term"], False)
+
+    def test_extract_cvterm_ids_from_dict(self):
+        # Tests the function that extracts the IDs of CV terms in a dictionary
+        cvterm_dict = {"testterm": cv.CvTerm(cvterm_id=22, cv_id=1, dbxref_id=2, name="testterm")}
+        cvterm_ids = self.client._extract_cvterm_ids_from_dict(cvterm_dict, ["testterm"])
+        self.assertEqual(cvterm_ids, [22])
         with self.assertRaises(iobase.DatabaseError):
-            self.client._load_cvterms("inexistent_vocabulary", [])
+            self.client._extract_cvterm_ids_from_dict(cvterm_dict, ["otherterm"])
 
     def test_load_organism(self):
         # Tests the function loading an organism from the database

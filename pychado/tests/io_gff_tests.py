@@ -1,39 +1,49 @@
 import os
+import shutil
 import tempfile
 import filecmp
 import unittest.mock
 import sqlalchemy.orm
 import gffutils
-from .. import dbutils, utils
-from ..io import iobase, essentials, fasta, gff
-from ..orm import base, general, cv, organism, pub, sequence
+from .. import utils
+from ..io import iobase, fasta, gff
+from ..orm import general, cv, organism, pub, sequence
+
+modules_dir = os.path.dirname(os.path.abspath(gff.__file__))
+data_dir = os.path.abspath(os.path.join(modules_dir, '..', 'tests', 'data'))
 
 
-class TestGFF(unittest.TestCase):
+class TestGFFImport(unittest.TestCase):
     """Tests various functions used to load a GFF file into a database"""
-
-    modules_dir = os.path.dirname(os.path.abspath(gff.__file__))
-    data_dir = os.path.abspath(os.path.join(modules_dir, '..', 'tests', 'data'))
-    connection_parameters = utils.parse_yaml(dbutils.default_configuration_file())
-    connection_uri = dbutils.random_database_uri(connection_parameters)
 
     @classmethod
     def setUpClass(cls):
-        # Creates a database, establishes a connection, creates tables and populates them with essential entries
-        dbutils.create_database(cls.connection_uri)
-        schema_base = base.PublicBase
-        schema_metadata = schema_base.metadata
-        essentials_client = essentials.EssentialsClient(cls.connection_uri)
-        schema_metadata.create_all(essentials_client.engine, tables=schema_metadata.sorted_tables)
-        essentials_client.load()
-        essentials_client._load_further_relationship_entries()
-        essentials_client._load_sequence_type_entries()
-        cls.client = gff.GFFImportClient(cls.connection_uri)
-
-    @classmethod
-    def tearDownClass(cls):
-        # Drops the database
-        dbutils.drop_database(cls.connection_uri, True)
+        # Creates an instance of the base class to be tested and instantiates global attributes
+        cls.client = gff.GFFImportClient("testuri", test_environment=True)
+        cls.client._synonym_terms = {
+            "synonym": cv.CvTerm(cv_id=3, dbxref_id=31, name="synonym", cvterm_id=31),
+            "previous_systematic_id": cv.CvTerm(cv_id=3, dbxref_id=32, name="previous_systematic_id", cvterm_id=32),
+            "alias": cv.CvTerm(cv_id=3, dbxref_id=33, name="alias", cvterm_id=33)
+        }
+        cls.client._sequence_terms = {
+            "gene": cv.CvTerm(cv_id=4, dbxref_id=41, name="gene", cvterm_id=41),
+            "mRNA": cv.CvTerm(cv_id=4, dbxref_id=42, name="gene", cvterm_id=42),
+            "chromosome": cv.CvTerm(cv_id=4, dbxref_id=43, name="chromosome", cvterm_id=43)
+        }
+        cls.client._feature_property_terms = {
+            "score": cv.CvTerm(cv_id=5, dbxref_id=51, name="score", cvterm_id=51),
+            "source": cv.CvTerm(cv_id=5, dbxref_id=52, name="source", cvterm_id=52),
+            "comment": cv.CvTerm(cv_id=5, dbxref_id=53, name="comment", cvterm_id=53)
+        }
+        cls.client._parent_terms = {
+            "part_of": cv.CvTerm(cv_id=6, dbxref_id=62, name="part_of", cvterm_id=62, is_relationshiptype=1),
+            "derives_from": cv.CvTerm(cv_id=6, dbxref_id=63, name="derives_from", cvterm_id=63, is_relationshiptype=1)
+        }
+        cls.client._default_pub = pub.Pub(uniquename="defaultpub", type_id=71, pub_id=33)
+        cls.client._synonym_type_ids = [31, 32, 33]
+        cls.client._feature_property_type_ids = [51, 52, 53]
+        cls.client._parent_type_ids = [62, 63]
+        cls.client._ontology_ids = [131, 132]
 
     def setUp(self):
         # Creates a default GFF record
@@ -44,13 +54,9 @@ class TestGFF(unittest.TestCase):
                 "previous_systematic_id": "testsynonym", "Parent": "testparent", "Dbxref": ["testdb:testaccession"],
                 "Ontology_term": ["GO:7890"], "Note": "testnote"})
 
-    def tearDown(self):
-        # Rolls back all changes to the database
-        self.client.session.rollback()
-
     def test_create_sqlite_db(self):
         # Tests the function that creates a SQLite database from a GFF file
-        gff_file = os.path.join(self.data_dir, 'gff_without_fasta.gff3')
+        gff_file = os.path.join(data_dir, 'gff_without_fasta.gff3')
         self.assertTrue(os.path.exists(gff_file))
         gff_db = self.client._create_sqlite_db(gff_file)
         self.assertEqual(len(self.client._sqlite_databases), 1)
@@ -62,17 +68,17 @@ class TestGFF(unittest.TestCase):
 
     def test_has_fasta(self):
         # Tests the function that checks if a GFF file contains a FASTA section
-        gff_file = os.path.join(self.data_dir, 'gff_without_fasta.gff3')
+        gff_file = os.path.join(data_dir, 'gff_without_fasta.gff3')
         self.assertFalse(self.client._has_fasta(gff_file))
-        gff_file = os.path.join(self.data_dir, 'gff_with_fasta.gff3')
+        gff_file = os.path.join(data_dir, 'gff_with_fasta.gff3')
         self.assertTrue(self.client._has_fasta(gff_file))
 
     def test_split_off_fasta(self):
         # Tests the function copying the FASTA section from a GFF file into a separate file
-        gff_file = os.path.join(self.data_dir, 'gff_with_fasta.gff3')
+        gff_file = os.path.join(data_dir, 'gff_with_fasta.gff3')
         fasta_file = tempfile.mkstemp()[1]
         self.client._split_off_fasta(gff_file, fasta_file)
-        actual_fasta_file = os.path.join(self.data_dir, 'fasta_only.fa')
+        actual_fasta_file = os.path.join(data_dir, 'fasta_only.fa')
         self.assertTrue(filecmp.cmp(fasta_file, actual_fasta_file))
         os.remove(fasta_file)
 
@@ -98,7 +104,7 @@ class TestGFF(unittest.TestCase):
         self.client._import_fasta("testgff", "testfasta", "testorganism", "region")
         mock_includes.assert_called_with("testgff")
         mock_copy.assert_not_called()
-        mock_fasta.assert_called_with(self.client.uri, self.client.verbose)
+        mock_fasta.assert_called_with("testuri", False)
         self.assertIn(unittest.mock.call().load("testfasta", "testorganism", "region"), mock_fasta.mock_calls)
 
         # FASTA in GFF only
@@ -153,7 +159,7 @@ class TestGFF(unittest.TestCase):
         self.assertIn(unittest.mock.call.delete(), mock_query_object.method_calls)
         self.assertEqual(len(mock_query_object.mock_calls), 2)
 
-    @unittest.mock.patch("pychado.io.gff.GFFImportClient._check_if_attributes_are_recognized")
+    @unittest.mock.patch("pychado.io.gff.GFFImportClient._check_if_gff_attributes_are_recognized")
     @unittest.mock.patch("pychado.io.gff.GFFImportClient._handle_protein")
     @unittest.mock.patch("pychado.io.gff.GFFImportClient._handle_relationships")
     @unittest.mock.patch("pychado.io.gff.GFFImportClient._handle_publications")
@@ -179,7 +185,7 @@ class TestGFF(unittest.TestCase):
         self.assertIs(mock_handle_publications, self.client._handle_publications)
         self.assertIs(mock_handle_relationships, self.client._handle_relationships)
         self.assertIs(mock_handle_protein, self.client._handle_protein)
-        self.assertIs(mock_check_recognized, self.client._check_if_attributes_are_recognized)
+        self.assertIs(mock_check_recognized, self.client._check_if_gff_attributes_are_recognized)
 
         organism_entry = organism.Organism(genus="", species="", abbreviation="testorganism", organism_id=1)
         all_features = {}
@@ -218,7 +224,7 @@ class TestGFF(unittest.TestCase):
         self.default_gff_record.featuretype = "gene"
         mock_create.return_value = "AAA"
         self.client._handle_child_feature(self.default_gff_record, organism_entry)
-        mock_create.assert_called_with(self.default_gff_record, 1, self.client._sequence_terms["gene"].cvterm_id)
+        mock_create.assert_called_with(self.default_gff_record, 1, 41)
         mock_insert.assert_called_with("AAA", "testorganism")
 
     @unittest.mock.patch("pychado.io.gff.GFFImportClient._handle_featureloc")
@@ -266,11 +272,10 @@ class TestGFF(unittest.TestCase):
         mock_insert_synonym.return_value = utils.EmptyObject(synonym_id=12)
 
         all_synonyms = self.client._handle_synonyms(self.default_gff_record, feature_entry)
-        mock_query.assert_called_with(1, ["alias", "synonym", "previous_systematic_id"])
-        mock_synonym.assert_any_call(name="testalias", type_id=self.client._synonym_terms["alias"].cvterm_id,
-                                     synonym_sgml="testalias")
+        mock_query.assert_called_with(1, [31, 32, 33])
+        mock_synonym.assert_any_call(name="testalias", type_id=33, synonym_sgml="testalias")
         self.assertEqual(mock_insert_synonym.call_count, 2)
-        mock_feature_synonym.assert_any_call(synonym_id=12, feature_id=1, pub_id=self.client._default_pub.pub_id)
+        mock_feature_synonym.assert_any_call(synonym_id=12, feature_id=1, pub_id=33)
         self.assertEqual(mock_insert_feature_synonym.call_count, 2)
         mock_delete_feature_synonym.assert_called()
         self.assertEqual(len(all_synonyms), 2)
@@ -298,7 +303,7 @@ class TestGFF(unittest.TestCase):
 
         all_pubs = self.client._handle_publications(self.default_gff_record, feature_entry)
         mock_query.assert_called_with(sequence.FeaturePub, feature_id=12)
-        mock_pub.assert_any_call(uniquename="PMID:12334", type_id=self.client._default_pub.type_id)
+        mock_pub.assert_any_call(uniquename="PMID:12334", type_id=71)
         self.assertEqual(mock_insert_pub.call_count, 1)
         mock_featurepub.assert_any_call(feature_id=12, pub_id=32)
         self.assertEqual(mock_insert_feature_pub.call_count, 1)
@@ -323,9 +328,8 @@ class TestGFF(unittest.TestCase):
         all_features = {object_entry.uniquename: object_entry}
 
         all_relationships = self.client._handle_relationships(self.default_gff_record, subject_entry, all_features)
-        mock_query.assert_called_with(33, ["part_of", "derives_from"])
-        mock_relationship.assert_any_call(subject_id=33, object_id=44,
-                                          type_id=self.client._relationship_terms["part_of"].cvterm_id)
+        mock_query.assert_called_with(33, [62, 63])
+        mock_relationship.assert_any_call(subject_id=33, object_id=44, type_id=62)
         self.assertEqual(mock_insert_relationship.call_count, 1)
         mock_delete_relationship.assert_called()
         self.assertEqual(len(all_relationships), 1)
@@ -344,13 +348,10 @@ class TestGFF(unittest.TestCase):
 
         feature_entry = sequence.Feature(organism_id=11, type_id=200, uniquename="testname", feature_id=12)
         all_properties = self.client._handle_properties(self.default_gff_record, feature_entry)
-        mock_query.assert_called_with(12, ["comment", "description", "score", "source"])
-        mock_prop.assert_any_call(feature_id=12, type_id=self.client._feature_property_terms["source"].cvterm_id,
-                                  value="testsource")
-        mock_prop.assert_any_call(feature_id=12, type_id=self.client._feature_property_terms["comment"].cvterm_id,
-                                  value="testnote")
-        mock_prop.assert_any_call(feature_id=12, type_id=self.client._feature_property_terms["score"].cvterm_id,
-                                  value="3.5")
+        mock_query.assert_called_with(12, [51, 52, 53])
+        mock_prop.assert_any_call(feature_id=12, type_id=51, value="3.5")
+        mock_prop.assert_any_call(feature_id=12, type_id=52, value="testsource")
+        mock_prop.assert_any_call(feature_id=12, type_id=53, value="testnote")
         self.assertEqual(mock_insert_prop.call_count, 3)
         mock_delete_prop.assert_called()
         self.assertEqual(len(all_properties), 3)
@@ -415,12 +416,12 @@ class TestGFF(unittest.TestCase):
                                         utils.EmptyObject(cvterm_id=55, name="")]
 
         all_ontology_terms = self.client._handle_ontology_terms(self.default_gff_record, feature_entry)
-        mock_query.assert_called_with(12, ["GO"])
+        mock_query.assert_called_with(12, [131, 132])
         mock_query_first.assert_any_call(general.Db, name="GO")
         mock_query_first.assert_any_call(general.DbxRef, db_id=33, accession="7890")
         mock_query_first.assert_any_call(cv.CvTerm, dbxref_id=44)
         self.assertEqual(mock_query_first.call_count, 3)
-        mock_feature_cvterm.assert_any_call(feature_id=12, cvterm_id=55, pub_id=self.client._default_pub.pub_id)
+        mock_feature_cvterm.assert_any_call(feature_id=12, cvterm_id=55, pub_id=33)
         self.assertEqual(mock_insert_feature_cvterm.call_count, 1)
         mock_delete_feature_cvterm.assert_called()
         self.assertEqual(len(all_ontology_terms), 1)
@@ -428,11 +429,11 @@ class TestGFF(unittest.TestCase):
     @unittest.mock.patch("pychado.io.gff.GFFImportClient._insert_gff_record_into_database")
     @unittest.mock.patch("gffutils.Feature")
     @unittest.mock.patch("pychado.io.gff.GFFImportClient.query_first")
-    @unittest.mock.patch("pychado.io.gff.GFFImportClient.query_parent_feature")
+    @unittest.mock.patch("pychado.io.gff.GFFImportClient.query_parent_features")
     def test_handle_protein(self, mock_query: unittest.mock.Mock, mock_query_first: unittest.mock.Mock,
                             mock_record: unittest.mock.Mock, mock_insert: unittest.mock.Mock):
         # Tests the function creating a new GFF record for a polypeptide and inserting it into the database
-        self.assertIs(mock_query, self.client.query_parent_feature)
+        self.assertIs(mock_query, self.client.query_parent_features)
         self.assertIs(mock_query_first, self.client.query_first)
         self.assertIs(mock_record, gffutils.Feature)
         self.assertIs(mock_insert, self.client._insert_gff_record_into_database)
@@ -465,7 +466,7 @@ class TestGFF(unittest.TestCase):
         mock_query_object.configure_mock(**{"first.return_value": sequence.Feature(
             organism_id=11, type_id=200, uniquename="othername", feature_id=13)})
         self.client._handle_protein(self.default_gff_record, feature_entry, organism_entry, all_features)
-        mock_query.assert_called_with("testname")
+        mock_query.assert_called_with(12, [62])
         mock_query_first.assert_called_with(sequence.FeatureLoc, feature_id=13)
         mock_record.assert_called_with(seqid="testseqid", source="testsource", start=301, end=400, strand="+",
                                        featuretype="polypeptide", id="testid", attributes={"Derives_from": "othername"})
@@ -485,13 +486,13 @@ class TestGFF(unittest.TestCase):
         mock_mark.assert_any_call(organism_entry, "id2")
         self.assertEqual(mock_mark.call_count, 2)
 
-    def test_check_attributes(self):
+    def test_check_if_gff_attributes_are_recognized(self):
         # Tests the function that checks if all attributes of a GFF record are recognized
         feature = self.default_gff_record
-        recognized = self.client._check_if_attributes_are_recognized(feature)
+        recognized = self.client._check_if_gff_attributes_are_recognized(feature)
         self.assertTrue(recognized)
         feature.attributes["other_attribute"] = "other_value"
-        recognized = self.client._check_if_attributes_are_recognized(feature)
+        recognized = self.client._check_if_gff_attributes_are_recognized(feature)
         self.assertFalse(recognized)
 
     def test_create_feature(self):
@@ -514,88 +515,88 @@ class TestGFF(unittest.TestCase):
         self.assertEqual(featureloc.strand, 1)
         self.assertEqual(featureloc.phase, 2)
 
-    def test_extract_name(self):
+    def test_extract_gff_name(self):
         # Tests the function that extracts the name from a GFF record
         feature = gffutils.Feature()
-        name = self.client._extract_name(feature)
+        name = self.client._extract_gff_name(feature)
         self.assertIsNone(name)
         feature.attributes = {"Name": "testname"}
-        name = self.client._extract_name(feature)
+        name = self.client._extract_gff_name(feature)
         self.assertEqual(name, "testname")
         feature.attributes = {"Name": ["othername"]}
-        name = self.client._extract_name(feature)
+        name = self.client._extract_gff_name(feature)
         self.assertEqual(name, "othername")
 
-    def test_extract_size(self):
+    def test_extract_gff_size(self):
         # Tests the function that extracts the sequence length from a GFF record
         feature = gffutils.Feature()
-        size = self.client._extract_size(feature)
+        size = self.client._extract_gff_size(feature)
         self.assertIsNone(size)
         feature.attributes = {"size": "587"}
-        size = self.client._extract_size(feature)
+        size = self.client._extract_gff_size(feature)
         self.assertEqual(size, 587)
 
-    def test_extract_synonyms(self):
+    def test_extract_gff_synonyms(self):
         # Tests the function that extracts the synonyms from a GFF record
         feature = gffutils.Feature(attributes={"Alias": "testalias", "previous_systematic_id": ["testsynonym"]})
-        synonyms = self.client._extract_synonyms(feature)
+        synonyms = self.client._extract_gff_synonyms(feature)
         self.assertEqual(len(synonyms), 2)
         self.assertEqual(synonyms["alias"], ["testalias"])
         self.assertEqual(synonyms["previous_systematic_id"], ["testsynonym"])
 
-    def test_extract_residues(self):
+    def test_extract_gff_residues(self):
         # Tests the function that extracts an amino acid sequence from a GFF record
         feature = gffutils.Feature()
-        residues = self.client._extract_residues(feature)
+        residues = self.client._extract_gff_translation(feature)
         self.assertIsNone(residues)
         feature.attributes = {"translation": "actgaa"}
-        residues = self.client._extract_residues(feature)
+        residues = self.client._extract_gff_translation(feature)
         self.assertEqual(residues, "ACTGAA")
         feature.attributes = {"translation": ["cTTg"]}
-        residues = self.client._extract_residues(feature)
+        residues = self.client._extract_gff_translation(feature)
         self.assertEqual(residues, "CTTG")
 
-    def test_extract_relationships(self):
+    def test_extract_gff_relationships(self):
         # Tests the function that extracts feature relationships from a GFF record
         feature = gffutils.Feature(attributes={"Parent": "parentterm", "Derives_from": ["otherterm"],
                                                "other_key": "other_value"})
-        relationships = self.client._extract_relationships(feature)
+        relationships = self.client._extract_gff_relationships(feature)
         self.assertEqual(len(relationships), 2)
         self.assertEqual(relationships["part_of"], ["parentterm"])
         self.assertEqual(relationships["derives_from"], ["otherterm"])
 
-    def test_extract_properties(self):
+    def test_extract_gff_properties(self):
         # Tests the function that extracts feature properties from a GFF record
         feature = gffutils.Feature(source="testsource", score="2.54",
                                    attributes={"Parent": "parentterm", "comment": ["first_value", "second_value"]})
-        properties = self.client._extract_properties(feature)
+        properties = self.client._extract_gff_properties(feature)
         self.assertEqual(len(properties), 3)
         self.assertEqual(properties["source"], ["testsource"])
         self.assertEqual(properties["score"], ["2.54"])
         self.assertEqual(properties["comment"], ["first_value", "second_value"])
 
-    def test_extract_crossrefs(self):
+    def test_extract_gff_crossrefs(self):
         # Tests the function that extracts database cross references from a GFF record
         feature = gffutils.Feature(attributes={"Dbxref": "Wikipedia:gene", "Ontology_term": ["GO:12345", "GO:67890"]})
-        crossrefs = self.client._extract_crossrefs(feature)
+        crossrefs = self.client._extract_gff_crossrefs(feature)
         self.assertEqual(len(crossrefs), 1)
         self.assertIn("Wikipedia:gene", crossrefs)
 
-    def test_extract_ontology_terms(self):
+    def test_extract_gff_ontology_terms(self):
         # Tests the function that extracts ontology terms from a GFF record
         feature = gffutils.Feature(attributes={"Dbxref": "Wikipedia:gene", "Ontology_term": ["GO:12345", "GO:67890"]})
-        ontology_terms = self.client._extract_ontology_terms(feature)
+        ontology_terms = self.client._extract_gff_ontology_terms(feature)
         self.assertEqual(len(ontology_terms), 2)
         self.assertIn("GO:67890", ontology_terms)
 
-    def test_extract_publications(self):
+    def test_extract_gff_publications(self):
         # Tests the function that extracts publications from a GFF record
         feature = gffutils.Feature(attributes={"literature": "PMID:12345"})
-        publications = self.client._extract_publications(feature)
+        publications = self.client._extract_gff_publications(feature)
         self.assertEqual(len(publications), 1)
         self.assertIn("PMID:12345", publications)
 
-    def test_extract_protein_source_id(self):
+    def test_extract_gff_protein_source_id(self):
         # Tests the function that extracts the ID of a polypeptide from a GFF record
         feature = gffutils.Feature()
         protein_id = self.client._extract_protein_source_id(feature)
@@ -604,52 +605,334 @@ class TestGFF(unittest.TestCase):
         protein_id = self.client._extract_protein_source_id(feature)
         self.assertEqual(protein_id, "testid")
 
-    def test_extract_sequence_names(self):
+    def test_extract_gff_sequence_names(self):
         # Tests the function that extracts sequence names from a GFF file
-        gff_file = os.path.join(self.data_dir, 'gff_without_fasta.gff3')
+        gff_file = os.path.join(data_dir, 'gff_without_fasta.gff3')
         self.assertTrue(os.path.exists(gff_file))
         gff_db = self.client._create_sqlite_db(gff_file)
-        sequence_names = self.client._extract_sequence_names(gff_db)
+        sequence_names = self.client._extract_gff_sequence_names(gff_db)
         self.assertIn("CM000574", sequence_names)
         gff_db_name = self.client._sqlite_databases[0]
         os.remove(gff_db_name)
         self.assertFalse(os.path.exists(gff_db_name))
 
+
+class TestGFFExport(unittest.TestCase):
+    """Tests various functions used to export a GFF file from a database"""
+
+    @classmethod
+    def setUpClass(cls):
+        # Creates an instance of the base class to be tested and instantiates global attributes
+        cls.client = gff.GFFExportClient("testuri", test_environment=True)
+        cls.client._parent_terms = {
+            "part_of": cv.CvTerm(cv_id=6, dbxref_id=62, name="part_of", cvterm_id=62, is_relationshiptype=1),
+            "derives_from": cv.CvTerm(cv_id=6, dbxref_id=63, name="derives_from", cvterm_id=63, is_relationshiptype=1)
+        }
+        cls.client._top_level_term = cv.CvTerm(cv_id=11, dbxref_id=91, name="top_level_seq", cvterm_id=91)
+        cls.client._parent_type_ids = [62, 63]
+        cls.client._ontology_ids = [131, 132]
+
+    @unittest.mock.patch("pychado.io.gff.GFFExportClient._export_gff_record")
+    @unittest.mock.patch("pychado.io.gff.GFFExportClient.query_child_features")
+    def test_handle_child_features(self, mock_query: unittest.mock.Mock, mock_export: unittest.mock.Mock):
+        # Tests the function that exports GFF records for the child features of a given feature
+        self.assertIs(mock_query, self.client.query_child_features)
+        self.assertIs(mock_export, self.client._export_gff_record)
+
+        feature_entry = sequence.Feature(feature_id=77, organism_id=11, type_id=200, uniquename="parentid")
+        childfeature_entry = sequence.Feature(feature_id=78, organism_id=11, type_id=300, uniquename="childid")
+        derivedfeature_entry = sequence.Feature(feature_id=79, organism_id=11, type_id=400, uniquename="derivedid")
+        mock_query_obj = mock_query.return_value
+        mock_query_obj.configure_mock(**{"all.side_effect": [[childfeature_entry],
+                                                             [childfeature_entry, derivedfeature_entry]]})
+
+        self.client._handle_child_features(feature_entry, "testsequence", None)
+        self.assertIn(unittest.mock.call(77, 62), mock_query.mock_calls)
+        self.assertIn(unittest.mock.call(77, 63), mock_query.mock_calls)
+        self.assertEqual(mock_query.call_count, 2)
+        self.assertIn(unittest.mock.call(childfeature_entry, "testsequence", {"part_of": "parentid"}, None),
+                      mock_export.mock_calls)
+        self.assertIn(unittest.mock.call(childfeature_entry, "testsequence", {"derives_from": "parentid"}, None),
+                      mock_export.mock_calls)
+        self.assertIn(unittest.mock.call(derivedfeature_entry, "testsequence", {"derives_from": "parentid"}, None),
+                      mock_export.mock_calls)
+        self.assertEqual(mock_export.call_count, 3)
+
+    @unittest.mock.patch("pychado.io.fasta.FastaExportClient")
+    @unittest.mock.patch("pychado.io.gff.GFFExportClient._append_fasta")
+    def test_export_fasta(self, mock_append: unittest.mock.Mock, mock_fasta: unittest.mock.Mock):
+        # Tests the export of FASTA sequences along with a GFF file
+        self.assertIs(mock_append, self.client._append_fasta)
+        self.assertIs(mock_fasta, fasta.FastaExportClient)
+
+        # Output FASTA in separate file
+        self.client._export_fasta("testgff", "testfasta", "testorganism")
+        mock_fasta.assert_called_with("testuri", False)
+        self.assertIn(unittest.mock.call().export("testfasta", "testorganism", "contigs", ""), mock_fasta.mock_calls)
+        mock_append.assert_not_called()
+
+        # Append FASTA to GFF file
+        mock_fasta.reset_mock()
+        mock_append.reset_mock()
+        self.client._export_fasta("testgff", "", "testorganism")
+        mock_fasta.assert_called_with("testuri", False)
+        mock_append.assert_called()
+
+    def test_append_fasta(self):
+        # Tests the function joining a GFF file with a FASTA file
+        gff_file = os.path.join(data_dir, 'gff_without_fasta.gff3')
+        fasta_file = os.path.join(data_dir, 'fasta_only.fa')
+        joined_file = tempfile.mkstemp()[1]
+        shutil.copy(gff_file, joined_file)
+        actual_joined_file = os.path.join(data_dir, 'gff_with_fasta.gff3')
+        self.client._append_fasta(joined_file, fasta_file)
+        self.assertTrue(filecmp.cmp(joined_file, actual_joined_file))
+        os.remove(joined_file)
+
+    def test_write_gff_header(self):
+        # Tests the correct creation of GFF file headers
+        header_file = tempfile.mkstemp()[1]
+        header_file_handle = utils.open_file_write(header_file)
+        self.client._write_gff_header(header_file_handle, [sequence.Feature(feature_id=77, organism_id=11, type_id=200,
+                                                                            seqlen=11697295, uniquename="CM000574")])
+        utils.close(header_file_handle)
+        actual_header_file = os.path.join(data_dir, 'gff_header.gff3')
+        self.assertTrue(filecmp.cmp(header_file, actual_header_file))
+        os.remove(header_file)
+
+    def test_print_gff_record(self):
+        # Tests the correct printing of GFF records to file
+        gff_record = gffutils.Feature(seqid="CM000574", id="FGSG_11579", source="chado", featuretype="gene",
+                                      start=1517, end=2509, strand="+", attributes={"ID": ["FGSG_11579"]})
+        file = tempfile.mkstemp()[1]
+        file_handle = utils.open_file_write(file)
+        self.client._print_gff_record(gff_record, file_handle)
+        utils.close(file_handle)
+        actual_file = os.path.join(data_dir, 'gff_line.gff3')
+        self.assertTrue(filecmp.cmp(file, actual_file))
+        os.remove(file)
+
+    @unittest.mock.patch("pychado.io.gff.GFFExportClient.query_first")
+    def test_create_gff_record(self, mock_query: unittest.mock.Mock):
+        # Tests the function that creates a GFF record
+        self.assertIs(mock_query, self.client.query_first)
+        feature_entry = sequence.Feature(feature_id=77, organism_id=11, type_id=200, seqlen=66, uniquename="testid",
+                                         name="testname")
+
+        # Create GFF record for top-level feature
+        mock_query.return_value = None
+        gff_record = self.client._create_gff_record(feature_entry, "testsequence")
+        self.assertEqual(gff_record.seqid, "testsequence")
+        self.assertEqual(gff_record.id, "testid")
+        self.assertEqual(gff_record.start, 1)
+        self.assertEqual(gff_record.end, 66)
+        self.assertEqual(gff_record.strand, ".")
+        self.assertEqual(gff_record.frame, ".")
+        self.assertEqual(gff_record.attributes["ID"], ["testid"])
+        self.assertEqual(gff_record.attributes["Name"], ["testname"])
+
+        # Create GFF record for feature located on a sequence
+        mock_query.return_value = sequence.FeatureLoc(feature_id=1, srcfeature_id=2, fmin=10, fmax=100, strand=1,
+                                                      phase=2)
+        gff_record = self.client._create_gff_record(feature_entry, "testsequence")
+        self.assertEqual(gff_record.seqid, "testsequence")
+        self.assertEqual(gff_record.id, "testid")
+        self.assertEqual(gff_record.start, 11)
+        self.assertEqual(gff_record.end, 100)
+        self.assertEqual(gff_record.strand, "+")
+        self.assertEqual(gff_record.frame, "2")
+
+    @unittest.mock.patch("pychado.io.gff.GFFExportClient.query_parent_features")
+    def test_has_feature_parents(self, mock_query: unittest.mock.Mock):
+        # Tests the function that checks if a feature entry has parents
+        self.assertIs(mock_query, self.client.query_parent_features)
+        feature_entry = sequence.Feature(organism_id=11, type_id=200, uniquename="testid", feature_id=77)
+        mock_query_obj = mock_query.return_value
+        mock_query_obj.configure_mock(**{"first.return_value": None})
+        has_parents = self.client._has_feature_parents(feature_entry)
+        mock_query.assert_called_with(77, [62, 63])
+        self.assertFalse(has_parents)
+        mock_query_obj.configure_mock(**{"first.return_value": sequence.Feature(
+            organism_id=11, type_id=300, uniquename="parentid", feature_id=88)})
+        has_parents = self.client._has_feature_parents(feature_entry)
+        self.assertTrue(has_parents)
+
+    @unittest.mock.patch("pychado.io.gff.GFFExportClient.query_first")
+    def test_extract_feature_type(self, mock_query: unittest.mock.Mock):
+        # Tests the function that extracts the type of a feature entry from the relevant database table
+        self.assertIs(mock_query, self.client.query_first)
+        feature_entry = sequence.Feature(organism_id=11, type_id=200, uniquename="testid", feature_id=77)
+        mock_query.return_value = cv.CvTerm(cv_id=1, dbxref_id=2, name="testtype")
+        featuretype = self.client._extract_feature_type(feature_entry)
+        mock_query.assert_called_with(cv.CvTerm, cvterm_id=200)
+        self.assertEqual(featuretype, "testtype")
+
+    @unittest.mock.patch("pychado.io.gff.GFFExportClient.query_feature_synonyms")
+    def test_extract_feature_synonyms(self, mock_query: unittest.mock.Mock):
+        # Tests the function that extracts the synonyms of a feature entry from the relevant database table
+        self.assertIs(mock_query, self.client.query_feature_synonyms)
+        feature_entry = sequence.Feature(organism_id=11, type_id=200, uniquename="testid", feature_id=77)
+        mock_query_obj = mock_query.return_value
+        mock_query_obj.configure_mock(**{"all.return_value": [("sometype", "somename"), ("sometype", "othername")]})
+        synonyms = self.client._extract_feature_synonyms(feature_entry)
+        mock_query.assert_called_with(77)
+        self.assertEqual(synonyms, {"sometype": ["somename", "othername"]})
+
+    @unittest.mock.patch("pychado.io.gff.GFFExportClient.query_feature_properties")
+    def test_extract_feature_properties(self, mock_query: unittest.mock.Mock):
+        # Tests the function that extracts the synonyms of a feature entry from the relevant database table
+        self.assertIs(mock_query, self.client.query_feature_properties)
+        feature_entry = sequence.Feature(organism_id=11, type_id=200, uniquename="testid", feature_id=77)
+        mock_query_obj = mock_query.return_value
+        mock_query_obj.configure_mock(**{"all.return_value": [("somekey", "somevalue"), ("somekey", "othervalue"),
+                                                              ("otherkey", "yetanothervalue")]})
+        properties = self.client._extract_feature_properties(feature_entry)
+        mock_query.assert_called_with(77)
+        self.assertEqual(properties, {"somekey": ["somevalue", "othervalue"], "otherkey": ["yetanothervalue"]})
+
+    @unittest.mock.patch("pychado.io.gff.GFFExportClient.query_feature_pubs")
+    def test_extract_feature_publications(self, mock_query: unittest.mock.Mock):
+        # Tests the function that extracts the publications of a feature entry from the relevant database table
+        self.assertIs(mock_query, self.client.query_feature_pubs)
+        feature_entry = sequence.Feature(organism_id=11, type_id=200, uniquename="testid", feature_id=77)
+        mock_query_obj = mock_query.return_value
+        mock_query_obj.configure_mock(**{"all.return_value": [("somepublication", ), ("otherpublication", )]})
+        publications = self.client._extract_feature_publications(feature_entry)
+        mock_query.assert_called_with(77)
+        self.assertEqual(publications, ["somepublication", "otherpublication"])
+
+    @unittest.mock.patch("pychado.io.gff.GFFExportClient.query_feature_dbxrefs")
+    def test_extract_feature_dbxrefs(self, mock_query: unittest.mock.Mock):
+        # Tests the function that extracts the cross references of a feature entry from the relevant database table
+        self.assertIs(mock_query, self.client.query_feature_dbxrefs)
+        feature_entry = sequence.Feature(organism_id=11, type_id=200, uniquename="testid", feature_id=77)
+        mock_query_obj = mock_query.return_value
+        mock_query_obj.configure_mock(**{"all.return_value": [("somedb", "someacc",), ("otherdb", "otheracc")]})
+        dbxrefs = self.client._extract_feature_cross_references(feature_entry)
+        mock_query.assert_called_with(77)
+        self.assertEqual(dbxrefs, ["somedb:someacc", "otherdb:otheracc"])
+
+    @unittest.mock.patch("pychado.io.gff.GFFExportClient.query_feature_ontology_terms")
+    def test_extract_feature_ontology_terms(self, mock_query: unittest.mock.Mock):
+        # Tests the function that extracts the ontology terms of a feature entry from the relevant database table
+        self.assertIs(mock_query, self.client.query_feature_ontology_terms)
+        feature_entry = sequence.Feature(organism_id=11, type_id=200, uniquename="testid", feature_id=77)
+        mock_query_obj = mock_query.return_value
+        mock_query_obj.configure_mock(**{"all.return_value": [("GO", "12345"), ("SO", "54321")]})
+        ontology_terms = self.client._extract_feature_ontology_terms(feature_entry)
+        mock_query.assert_called_with(77, [131, 132])
+        self.assertEqual(ontology_terms, ["GO:12345", "SO:54321"])
+
+    def test_add_gff_featuretype(self):
+        # Tests the function that adds the 'type' and the attribute 'translation' to a GFF record
+        gff_record = gffutils.Feature()
+        self.client._add_gff_featuretype(gff_record, "gene", "MKGHU")
+        self.assertEqual(gff_record.featuretype, "gene")
+        self.assertNotIn("translation", gff_record.attributes)
+        self.client._add_gff_featuretype(gff_record, "polypeptide", "MKGHU")
+        self.assertEqual(gff_record.featuretype, "polypeptide")
+        self.assertEqual(gff_record.attributes["translation"], ["MKGHU"])
+
+    def test_add_gff_synonyms(self):
+        # Tests the function that adds the attribute 'Alias' and various related attributes to a GFF record
+        gff_record = gffutils.Feature()
+        self.client._add_gff_synonyms(gff_record, {"alias": ["testalias", "otheralias"], "synonym": ["testsynonym"],
+                                                   "otherkey": ["othervalue"]})
+        self.assertEqual(gff_record.attributes["Alias"], ["testalias", "otheralias"])
+        self.assertEqual(gff_record.attributes["synonym"], ["testsynonym"])
+        self.assertNotIn("otherkey", gff_record.attributes)
+
+    def test_add_gff_properties(self):
+        # Tests the function that adds the 'source', 'score' and various attributes to a GFF record
+        gff_record = gffutils.Feature()
+        self.client._add_gff_properties(
+            gff_record, {"source": ["testsource"], "score": ["testscore"], "comment": ["testcomment", "othercomment"],
+                         "otherkey": ["othervalue"]})
+        self.assertEqual(gff_record.source, "testsource")
+        self.assertEqual(gff_record.score, "testscore")
+        self.assertEqual(gff_record.attributes["comment"], ["testcomment", "othercomment"])
+        self.assertNotIn("otherkey", gff_record.attributes)
+
+    def test_add_gff_publications(self):
+        # Tests the function that adds the attribute 'literature' to a GFF record
+        gff_record = gffutils.Feature()
+        self.client._add_gff_publications(gff_record, ["testpub"])
+        self.assertEqual(gff_record.attributes["literature"], ["testpub"])
+
+    def test_add_gff_cross_references(self):
+        # Tests the function that adds the attribute 'Dbxref' to a GFF record
+        gff_record = gffutils.Feature()
+        self.client._add_gff_cross_references(gff_record, ["testdbxref", "otherdbxref"])
+        self.assertEqual(gff_record.attributes["Dbxref"], ["testdbxref", "otherdbxref"])
+
+    def test_add_gff_ontology_terms(self):
+        # Tests the function that adds the attribute 'Ontology_term' to a GFF record
+        gff_record = gffutils.Feature()
+        self.client._add_gff_ontology_terms(gff_record, ["GO:12345"])
+        self.assertEqual(gff_record.attributes["Ontology_term"], ["GO:12345"])
+
+    def test_add_gff_relationships(self):
+        # Tests the function that adds the attributes 'Parent' and 'Derives_from' to a GFF record
+        gff_record = gffutils.Feature()
+        self.client._add_gff_relationships(gff_record, {"part_of": "feature1", "derives_from": "feature2",
+                                                        "orthologous_to": "other_feature"})
+        self.assertEqual(gff_record.attributes["Parent"], ["feature1"])
+        self.assertEqual(gff_record.attributes["Derives_from"], ["feature2"])
+        self.assertNotIn("orthologous_to", gff_record.attributes)
+
+
+class TestGFFFunctions(unittest.TestCase):
+    """Tests various general functions used in connection with GFF import/export"""
+
+    @classmethod
+    def setUpClass(cls):
+        # Creates an instance of the base class to be tested
+        cls.client = gff.GFFClient()
+
     def test_convert_strand(self):
         # Tests the function converting the 'strand' attribute from string notation to integer notation
         gff_strand = "+"
-        chado_strand = gff.convert_strand(gff_strand)
+        chado_strand = self.client.convert_strand(gff_strand)
         self.assertEqual(chado_strand, 1)
         gff_strand = "-"
-        chado_strand = gff.convert_strand(gff_strand)
+        chado_strand = self.client.convert_strand(gff_strand)
         self.assertEqual(chado_strand, -1)
-        gff_strand = "something_elsa"
-        chado_strand = gff.convert_strand(gff_strand)
+        gff_strand = "something_else"
+        chado_strand = self.client.convert_strand(gff_strand)
         self.assertIsNone(chado_strand)
 
     def test_back_convert_strand(self):
         # Tests the function converting the 'strand' attribute from integer notation to string notation
         chado_strand = 1
-        gff_strand = gff.back_convert_strand(chado_strand)
+        gff_strand = self.client.back_convert_strand(chado_strand)
         self.assertEqual(gff_strand, "+")
         chado_strand = -5
-        gff_strand = gff.back_convert_strand(chado_strand)
+        gff_strand = self.client.back_convert_strand(chado_strand)
         self.assertEqual(gff_strand, "-")
         chado_strand = None
-        gff_strand = gff.back_convert_strand(chado_strand)
-        self.assertIsNone(gff_strand)
+        gff_strand = self.client.back_convert_strand(chado_strand)
+        self.assertEqual(gff_strand, ".")
 
     def test_convert_frame(self):
         # Tests the function converting the 'frame' attribute from string notation to integer notation
         gff_frame = "."
-        chado_frame = gff.convert_frame(gff_frame)
+        chado_frame = self.client.convert_frame(gff_frame)
         self.assertIsNone(chado_frame)
         gff_frame = "2"
-        chado_frame = gff.convert_frame(gff_frame)
+        chado_frame = self.client.convert_frame(gff_frame)
         self.assertEqual(chado_frame, 2)
         gff_frame = "3"
-        chado_frame = gff.convert_frame(gff_frame)
+        chado_frame = self.client.convert_frame(gff_frame)
         self.assertIsNone(chado_frame)
+
+    def test_back_convert_frame(self):
+        # Tests the function converting the 'frame' attribute from integer notation to string notation
+        chado_frame = 1
+        gff_frame = self.client.back_convert_frame(chado_frame)
+        self.assertEqual(gff_frame, "1")
+        chado_frame = None
+        gff_frame = self.client.back_convert_frame(chado_frame)
+        self.assertEqual(gff_frame, ".")
 
 
 if __name__ == '__main__':

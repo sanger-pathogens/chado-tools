@@ -1,7 +1,7 @@
 import unittest.mock
 from .. import dbutils, utils
-from ..io import essentials, gaf
-from ..orm import base, general, cv, pub, organism, sequence
+from ..io import gaf
+from ..orm import general, cv, pub, organism, sequence
 
 
 class TestGAF(unittest.TestCase):
@@ -12,19 +12,12 @@ class TestGAF(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        # Creates a database, establishes a connection, creates tables and populates them with essential entries
-        dbutils.create_database(cls.connection_uri)
-        schema_base = base.PublicBase
-        schema_metadata = schema_base.metadata
-        essentials_client = essentials.EssentialsClient(cls.connection_uri)
-        schema_metadata.create_all(essentials_client.engine, tables=schema_metadata.sorted_tables)
-        essentials_client.load()
-        cls.client = gaf.GAFImportClient(cls.connection_uri)
-
-    @classmethod
-    def tearDownClass(cls):
-        # Drops the database
-        dbutils.drop_database(cls.connection_uri, True)
+        # Creates an instance of the base class to be tested and instantiates global attributes
+        cls.client = gaf.GAFImportClient(cls.connection_uri, test_environment=True)
+        cls.client._date_term = cv.CvTerm(cv_id=11, dbxref_id=91, name="date", cvterm_id=91)
+        cls.client._evidence_term = cv.CvTerm(cv_id=11, dbxref_id=92, name="evidence", cvterm_id=92)
+        cls.client._default_pub = pub.Pub(uniquename="null", type_id=71, pub_id=33)
+        cls.client._go_db = general.Db(name="GO", db_id=44)
 
     def setUp(self):
         # Creates a default GAF record
@@ -67,13 +60,12 @@ class TestGAF(unittest.TestCase):
         mock_insert_pub.return_value = utils.EmptyObject(pub_id=66)
 
         ontology_term = self.client._handle_ontology_term(self.default_gaf_record, feature_entry)
-        mock_query.assert_called_with(12, ["GO"])
-        mock_query_first.assert_any_call(general.Db, name="GO")
         mock_query_first.assert_any_call(general.DbxRef, db_id=33, accession="12345")
         mock_query_first.assert_any_call(cv.CvTerm, dbxref_id=44)
         self.assertEqual(mock_query_first.call_count, 3)
-        mock_pub.assert_any_call(uniquename="testdb:testaccession", type_id=self.client._default_pub.type_id)
+        mock_pub.assert_any_call(uniquename="testdb:testaccession", type_id=71)
         self.assertEqual(mock_insert_pub.call_count, 1)
+        mock_query.assert_called_with(12, [33])
         mock_feature_cvterm.assert_any_call(feature_id=12, cvterm_id=55, pub_id=66, is_not=False)
         self.assertEqual(mock_insert_feature_cvterm.call_count, 1)
         self.assertIsNotNone(ontology_term)
@@ -122,12 +114,12 @@ class TestGAF(unittest.TestCase):
         mock_insert_pub.return_value = utils.EmptyObject(pub_id=66)
 
         product_term = self.client._handle_product_term(self.default_gaf_record, feature_entry)
-        mock_query.assert_called_with(12, ["PRODUCT"])
         mock_db.assert_called_with(name="PRODUCT")
         mock_dbxref.assert_called_with(db_id=22, accession="testproduct")
         mock_cv.assert_called_with(name="genedb_products")
         mock_cvterm.assert_called_with(cv_id=44, dbxref_id=33, name="testproduct")
-        mock_pub.assert_called_with(uniquename="testdb:testaccession", type_id=self.client._default_pub.type_id)
+        mock_pub.assert_called_with(uniquename="testdb:testaccession", type_id=71)
+        mock_query.assert_called_with(12, [22])
         mock_feature_cvterm.assert_called_with(feature_id=12, cvterm_id=55, pub_id=66)
 
         mock_insert_db.assert_called()
@@ -151,8 +143,8 @@ class TestGAF(unittest.TestCase):
 
         all_properties = self.client._handle_properties(self.default_gaf_record, feature_cvterm_entry)
         mock_query.assert_called_with(sequence.FeatureCvTermProp, feature_cvterm_id=4)
-        mock_prop.assert_any_call(feature_cvterm_id=4, type_id=self.client._date_term.cvterm_id, value="testdate")
-        mock_prop.assert_any_call(feature_cvterm_id=4, type_id=self.client._evidence_term.cvterm_id, value="XYZ")
+        mock_prop.assert_any_call(feature_cvterm_id=4, type_id=91, value="testdate")
+        mock_prop.assert_any_call(feature_cvterm_id=4, type_id=92, value="XYZ")
         self.assertEqual(mock_insert_prop.call_count, 2)
         self.assertEqual(len(all_properties), 2)
 
@@ -216,7 +208,7 @@ class TestGAF(unittest.TestCase):
 
         self.default_gaf_record["DB:Reference"].append("new_publication")
         all_publications = self.client._handle_publications(self.default_gaf_record, feature_cvterm_entry)
-        mock_pub.assert_called_with(uniquename="new_publication", type_id=self.client._default_pub.type_id)
+        mock_pub.assert_called_with(uniquename="new_publication", type_id=71)
         self.assertEqual(mock_insert_pub.call_count, 1)
         mock_feature_cvterm_pub.assert_called_with(feature_cvterm_id=4, pub_id=33)
         self.assertEqual(mock_insert_feature_cvterm_pub.call_count, 1)

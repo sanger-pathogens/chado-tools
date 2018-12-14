@@ -2,8 +2,9 @@ import shutil
 import pkg_resources
 import subprocess
 import urllib.parse
+import json
 import getpass
-import sqlalchemy
+import sqlalchemy.engine
 import sqlalchemy_utils
 from . import utils
 
@@ -137,19 +138,58 @@ def connect_to_database(uri: str) -> None:
     print("Connection to database closed.")
 
 
-def run_query(uri: str, query, header: bool) -> list:
-    """Connects to a database and runs a single query"""
+def query_and_print(uri: str, query, filename: str, file_format: str, header: bool, delimiter: str) -> None:
+    """Opens a database connection, runs a single query, and prints the query result"""
     conn = open_connection(uri)
+    result = run_query(conn, query)
+    print_query_result(result, filename, file_format, header, delimiter)
+    result.close()
+    close_connection(conn)
+
+
+def run_query(conn: sqlalchemy.engine.Connection, query) -> sqlalchemy.engine.ResultProxy:
+    """Runs a single query against a database"""
     if isinstance(query, sqlalchemy.sql.expression.TextClause):
         result = conn.execute(query)
     else:
         result = conn.execute(sqlalchemy.text(query))
-    rows = []
+    return result
+
+
+def print_query_result(result: sqlalchemy.engine.ResultProxy, filename: str, file_format: str, header: bool,
+                       delimiter: str) -> None:
+    """Exports a table resulting from a database query"""
+    file_handle = utils.open_file_write(filename)
+    if file_format == "csv":
+        print_query_result_csv(result, file_handle, header, delimiter)
+    elif file_format == "json":
+        print_query_result_json(result, file_handle)
+    else:
+        print("Unknown file format: '" + file_format + "'")
+    utils.close(file_handle)
+
+
+def print_query_result_csv(result: sqlalchemy.engine.ResultProxy, file_handle, header: bool, delimiter: str) -> None:
+    """Exports a table resulting from a database query as CSV"""
+    keys = result.keys()
     if header:
-        rows = [result.keys()]
-    for result_row in result.fetchall():
-        row = [value for key, value in result_row.items()]
-        rows.append(row)
-    result.close()
-    close_connection(conn)
-    return rows
+        file_handle.write(utils.list_to_string(keys, delimiter) + "\n")
+    while True:
+        row = result.fetchone()
+        if not row:
+            break
+        file_handle.write(utils.list_to_string(row, delimiter) + "\n")
+
+
+def print_query_result_json(result: sqlalchemy.engine.ResultProxy, file_handle) -> None:
+    """Exports a table resulting from a database query as JSON"""
+    keys = result.keys()
+    json_obj = []
+    while True:
+        row = result.fetchone()
+        if not row:
+            break
+        json_dict = dict(zip(keys, row))
+        json_obj.append(json_dict)
+    json.dump(json_obj, file_handle, indent=4, sort_keys=True)
+    file_handle.write("\n")

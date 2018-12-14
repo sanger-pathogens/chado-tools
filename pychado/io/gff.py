@@ -7,38 +7,134 @@ from .. import utils
 from ..orm import general, cv, organism, pub, sequence
 
 
-class GFFImportClient(iobase.ImportClient):
+class GFFClient(object):
+    """Helper class for GFF-related operations"""
+
+    @staticmethod
+    def convert_strand(strand: str) -> Union[None, int]:
+        """Converts the strand from string notation to integer notation"""
+        if strand == '+':
+            return 1
+        elif strand == '-':
+            return -1
+        else:
+            return None
+
+    @staticmethod
+    def back_convert_strand(strand: Union[None, int]) -> str:
+        """Converts the strand from integer notation to string notation"""
+        if strand is None:
+            return "."
+        elif strand > 0:
+            return "+"
+        elif strand < 0:
+            return "-"
+        else:
+            return "."
+
+    @staticmethod
+    def convert_frame(frame: str) -> Union[None, int]:
+        """Converts the frame from string notation to integer notation"""
+        try:
+            phase = int(frame)
+        except ValueError:
+            return None
+        if phase in [0, 1, 2]:
+            return phase
+        else:
+            return None
+
+    @staticmethod
+    def back_convert_frame(phase: Union[None, int]) -> str:
+        """Converts the frame from integer notation to string notation"""
+        if phase is None:
+            return "."
+        else:
+            return str(phase)
+
+    @staticmethod
+    def _transcript_types() -> List[str]:
+        """Lists considered transcript types"""
+        return ["mrna", "rrna", "trna", "snrna", "ncrna", "scrna", "snorna"]
+
+    @staticmethod
+    def _feature_relationship_types() -> List[str]:
+        """Lists considered feature_relationship types"""
+        return ["part_of", "derives_from"]
+
+    @staticmethod
+    def _feature_property_types() -> List[str]:
+        """Lists considered featureprop types"""
+        return ["comment", "description", "score", "source"]
+
+    @staticmethod
+    def _synonym_types() -> List[str]:
+        """Lists considered synonym types"""
+        return ["alias", "synonym", "previous_systematic_id"]
+
+    @staticmethod
+    def _ontologies() -> List[str]:
+        """Lists considered ontologies"""
+        return ["GO"]
+
+
+class GFFImportClient(iobase.ImportClient, GFFClient):
     """Class for importing genomic data from GFF files into Chado"""
 
-    def __init__(self, uri: str, verbose=False):
+    def __init__(self, uri: str, verbose=False, test_environment=False):
         """Constructor"""
 
         # Connect to database
         self.uri = uri
         self.verbose = verbose
-        super().__init__(self.uri, self.verbose)
+        self.test_environment = test_environment
+        if self.test_environment:
+            self.printer = utils.VerbosePrinter(self.verbose)
+        else:
+            super().__init__(self.uri, self.verbose)
 
         # Create array for temporary SQLite databases
         self._sqlite_databases = []
 
-        # Load essentials
-        self._synonym_terms = self._load_cvterms("genedb_synonym_type", ["synonym", "previous_systematic_id"])
-        self._relationship_terms = self._load_cvterms("relationship", ["is_a", "part_of", "derives_from"], True)
-        self._feature_property_terms = self._load_cvterms("feature_property", ["score", "source", "description",
-                                                                               "comment"])
-        self._sequence_terms = self._load_cvterms("sequence", ["gene", "intron", "exon", "CDS", "mRNA", "chromosome"])
-        self._default_pub = self._load_pub("null")
+        # Load essential database entries
+        if not self.test_environment:
+            self._load_essentials()
 
     def __del__(self):
         """Destructor"""
 
         # Disconnect from database
-        super().__del__()
+        if not self.test_environment:
+            super().__del__()
 
         # Delete temporary SQLite database
         for database in self._sqlite_databases:
             if os.path.exists(database):
                 os.remove(database)
+
+    def _load_essentials(self) -> None:
+        """Loads essential database entries"""
+
+        self._part_of_term = self._load_cvterm_from_cv("part_of", "relationship")
+        self._derives_from_term = self._load_cvterm_from_cv("derives_from", "sequence")
+        self._parent_terms = {self._part_of_term.name: self._part_of_term,
+                              self._derives_from_term.name: self._derives_from_term}
+        self._parent_type_ids = [self._part_of_term.cvterm_id, self._derives_from_term.cvterm_id]
+
+        self._synonym_terms = self._load_terms_from_cv_dict(
+            "genedb_synonym_type", self._synonym_types())
+        self._synonym_type_ids = self._extract_cvterm_ids_from_dict(
+            self._synonym_terms, self._synonym_types())
+
+        self._feature_property_terms = self._load_terms_from_cv_dict(
+            "feature_property", self._feature_property_types())
+        self._feature_property_type_ids = self._extract_cvterm_ids_from_dict(
+            self._feature_property_terms, self._feature_property_types())
+
+        self._sequence_terms = self._load_terms_from_cv_dict(
+            "sequence", ["gene", "intron", "exon", "CDS", "mRNA", "chromosome"])
+        self._default_pub = self._load_pub("null")
+        self._ontology_ids = [db_entry.db_id for db_entry in self._load_dbs(self._ontologies())]
 
     def load(self, filename: str, organism_name: str, fasta_filename: str, sequence_type: str, fresh_load=False,
              force_purge=False, full_genome=False):
@@ -68,8 +164,8 @@ class GFFImportClient(iobase.ImportClient):
             self._insert_gff_record_into_database(gff_record, default_organism, all_feature_entries)
 
         # Mark obsolete features
-        if full_genome:
-            top_level_entries = self._extract_sequence_names(gff_db)
+        if full_genome and not fresh_load:
+            top_level_entries = self._extract_gff_sequence_names(gff_db)
             self._mark_obsolete_features(default_organism, all_feature_entries, top_level_entries)
 
         # Commit changes
@@ -197,7 +293,7 @@ class GFFImportClient(iobase.ImportClient):
             self._handle_protein(gff_record, feature_entry, organism_entry, all_feature_entries)
 
             # Save 'feature' entry in global array
-            self._check_if_attributes_are_recognized(gff_record)
+            self._check_if_gff_attributes_are_recognized(gff_record)
             all_feature_entries[feature_entry.uniquename] = feature_entry
 
     def _handle_child_feature(self, gff_record: gffutils.Feature, organism_entry: organism.Organism
@@ -238,11 +334,11 @@ class GFFImportClient(iobase.ImportClient):
 
         # Extract existing synonyms for this feature from the database
         existing_feature_synonyms = self.query_feature_synonym_by_type(
-            feature_entry.feature_id, self._synonym_types()).all()
+            feature_entry.feature_id, self._synonym_type_ids).all()
         all_feature_synonyms = []
 
         # Loop over all synonyms for this feature in the GFF record
-        synonyms = self._extract_synonyms(gff_record)
+        synonyms = self._extract_gff_synonyms(gff_record)
         for synonym_type, aliases in synonyms.items():
 
             # Get database entry for synonym type
@@ -278,7 +374,7 @@ class GFFImportClient(iobase.ImportClient):
         all_feature_pubs = []
 
         # Loop over all publications for this feature in the GFF record
-        publications = self._extract_publications(gff_record)
+        publications = self._extract_gff_publications(gff_record)
         for publication in publications:
 
             # Insert/update entry in the 'pub' table
@@ -301,18 +397,15 @@ class GFFImportClient(iobase.ImportClient):
 
         # Extract existing relationships for this subject from the database
         existing_feature_relationships = self.query_feature_relationship_by_type(
-            subject_entry.feature_id, self._feature_relationship_types()).all()
+            subject_entry.feature_id, self._parent_type_ids).all()
         all_feature_relationships = []
 
         # Loop over all relationships for this feature in the GFF record
-        relationships = self._extract_relationships(gff_record)
+        relationships = self._extract_gff_relationships(gff_record)
         for relationship, parents in relationships.items():
 
             # Get database entry for relationship type
-            if relationship not in self._relationship_terms:
-                self.printer.print("WARNING: Relationship '" + relationship + "' not present in database.")
-                continue
-            type_entry = self._relationship_terms[relationship]
+            type_entry = self._parent_terms[relationship]
 
             for parent in parents:
 
@@ -342,11 +435,11 @@ class GFFImportClient(iobase.ImportClient):
 
         # Extract existing properties for this feature from the database
         existing_featureprops = self.query_featureprop_by_type(
-            feature_entry.feature_id, self._feature_property_types()).all()
+            feature_entry.feature_id, self._feature_property_type_ids).all()
         all_featureprops = []
 
         # Loop over all properties of this feature in the GFF record
-        props = self._extract_properties(gff_record)
+        props = self._extract_gff_properties(gff_record)
         for prop, values in props.items():
             for value in values:
 
@@ -376,7 +469,7 @@ class GFFImportClient(iobase.ImportClient):
         all_feature_dbxrefs = []
 
         # Loop over all cross references of this feature in the GFF record
-        crossrefs = self._extract_crossrefs(gff_record)
+        crossrefs = self._extract_gff_crossrefs(gff_record)
         for crossref in crossrefs:
 
             # Split database cross reference (dbxref) into db, accession, version
@@ -407,11 +500,11 @@ class GFFImportClient(iobase.ImportClient):
 
         # Extract existing ontology terms for this feature from the database
         existing_feature_cvterms = self.query_feature_cvterm_by_ontology(
-            feature_entry.feature_id, self._ontologies()).all()
+            feature_entry.feature_id, self._ontology_ids).all()
         all_feature_cvterms = []
 
         # Loop over all ontology terms of this feature in the GFF record
-        ontology_terms = self._extract_ontology_terms(gff_record)
+        ontology_terms = self._extract_gff_ontology_terms(gff_record)
         for ontology_term in ontology_terms:
 
             # Split database cross reference (dbxref) into db, accession, version
@@ -461,7 +554,9 @@ class GFFImportClient(iobase.ImportClient):
         if gff_record.featuretype.lower() in self._transcript_types():
             parent_entry = feature_entry
         else:
-            parent_entry = self.query_parent_feature(feature_entry.uniquename).first()      # type: sequence.Feature
+            parent_entry = self.query_parent_features(
+                feature_entry.feature_id,
+                [self._parent_terms["part_of"].cvterm_id]).first()                          # type: sequence.Feature
         if parent_entry:
             loc_entry = self.query_first(sequence.FeatureLoc,
                                          feature_id=parent_entry.feature_id)                # type: sequence.FeatureLoc
@@ -471,18 +566,18 @@ class GFFImportClient(iobase.ImportClient):
         # Create a new GFF record
         protein_feature = gffutils.Feature(seqid=gff_record.seqid, source=gff_record.source,
                                            start=loc_entry.fmin + 1, end=loc_entry.fmax,
-                                           strand=back_convert_strand(loc_entry.strand),
+                                           strand=self.back_convert_strand(loc_entry.strand),
                                            featuretype="polypeptide", id=protein_source_id,
                                            attributes={"Derives_from": parent_entry.uniquename})
 
         # Insert, update or delete entries in various tables for this GFF record (Note: recursive call)
         self._insert_gff_record_into_database(protein_feature, organism_entry, all_feature_entries)
 
-    def _check_if_attributes_are_recognized(self, gff_record: gffutils.Feature) -> bool:
+    def _check_if_gff_attributes_are_recognized(self, gff_record: gffutils.Feature) -> bool:
         """Checks if all attributes of a GFF record can be recognized"""
         all_recognized = True
         for key in gff_record.attributes.keys():
-            if key.lower() not in self._recognized_attributes():
+            if key.lower() not in self._recognized_gff_attributes():
                 self.printer.print("WARNING: The attribute '" + key + "' for feature '" + gff_record.id +
                                    "' is unknown by this program and can't be loaded into the database.")
                 all_recognized = False
@@ -490,24 +585,24 @@ class GFFImportClient(iobase.ImportClient):
 
     def _create_feature(self, gff_record: gffutils.Feature, organism_id: int, type_id: int) -> sequence.Feature:
         """Creates a feature object from a GFF record"""
-        name = self._extract_name(gff_record)
-        residues = self._extract_residues(gff_record)
-        seqlen = self._extract_size(gff_record)
+        name = self._extract_gff_name(gff_record)
+        residues = self._extract_gff_translation(gff_record)
+        seqlen = self._extract_gff_size(gff_record)
         if residues is not None:
             seqlen = len(residues)
         return sequence.Feature(organism_id=organism_id, type_id=type_id, uniquename=gff_record.id, name=name,
                                 residues=residues, seqlen=seqlen)
 
-    @staticmethod
-    def _create_featureloc(gff_record: gffutils.Feature, feature_id: int, srcfeature_id: int) -> sequence.FeatureLoc:
+    def _create_featureloc(self, gff_record: gffutils.Feature, feature_id: int, srcfeature_id: int
+                           ) -> sequence.FeatureLoc:
         """Creates a featureloc object from a GFF record
         coordinates are converted from base-oriented (1-based) to interbase (0-based)"""
         return sequence.FeatureLoc(
             feature_id=feature_id, srcfeature_id=srcfeature_id, fmin=gff_record.start - 1, fmax=gff_record.end,
-            strand=convert_strand(gff_record.strand), phase=convert_frame(gff_record.frame))
+            strand=self.convert_strand(gff_record.strand), phase=self.convert_frame(gff_record.frame))
 
     @staticmethod
-    def _extract_crossrefs(gff_record: gffutils.Feature) -> List[str]:
+    def _extract_gff_crossrefs(gff_record: gffutils.Feature) -> List[str]:
         """Extract database cross references from a GFF record"""
         crossrefs = []
         for key, value in gff_record.attributes.items():
@@ -519,7 +614,7 @@ class GFFImportClient(iobase.ImportClient):
         return crossrefs
 
     @staticmethod
-    def _extract_ontology_terms(gff_record: gffutils.Feature) -> List[str]:
+    def _extract_gff_ontology_terms(gff_record: gffutils.Feature) -> List[str]:
         """Extract cross references to ontology terms from a GFF record"""
         ontology_terms = []
         if "Ontology_term" in gff_record.attributes:
@@ -528,7 +623,7 @@ class GFFImportClient(iobase.ImportClient):
                 ontology_terms = [ontology_terms]
         return ontology_terms
 
-    def _extract_properties(self, gff_record: gffutils.Feature) -> Dict[str, List[str]]:
+    def _extract_gff_properties(self, gff_record: gffutils.Feature) -> Dict[str, List[str]]:
         """Extracts properties from a GFF record. Properties are 'score', 'source' and certain attributes"""
         gff_to_chado_key = {"note": "comment"}
         properties = {}
@@ -552,7 +647,7 @@ class GFFImportClient(iobase.ImportClient):
                     properties[chado_key] = value
         return properties
 
-    def _extract_relationships(self, gff_record: gffutils.Feature) -> Dict[str, List[str]]:
+    def _extract_gff_relationships(self, gff_record: gffutils.Feature) -> Dict[str, List[str]]:
         """Extracts the relationships to other features from a GFF record"""
         gff_to_chado_key = {"parent": "part_of"}
         relationships = {}
@@ -571,7 +666,7 @@ class GFFImportClient(iobase.ImportClient):
                     relationships[chado_key] = value
         return relationships
 
-    def _extract_synonyms(self, gff_record: gffutils.Feature) -> Dict[str, List[str]]:
+    def _extract_gff_synonyms(self, gff_record: gffutils.Feature) -> Dict[str, List[str]]:
         """Extracts synonyms/alias names from a GFF record"""
         aliases = {}
         for gff_key, value in gff_record.attributes.items():
@@ -588,7 +683,7 @@ class GFFImportClient(iobase.ImportClient):
         return aliases
 
     @staticmethod
-    def _extract_name(gff_record: gffutils.Feature) -> Union[None, str]:
+    def _extract_gff_name(gff_record: gffutils.Feature) -> Union[None, str]:
         """Extracts the feature name from a GFF record"""
         name = None
         if "Name" in gff_record.attributes:
@@ -598,7 +693,7 @@ class GFFImportClient(iobase.ImportClient):
         return name
 
     @staticmethod
-    def _extract_size(gff_record: gffutils.Feature) -> Union[None, int]:
+    def _extract_gff_size(gff_record: gffutils.Feature) -> Union[None, int]:
         """Extracts the sequence length of a feature from a GFF record"""
         size = None
         if "size" in gff_record.attributes:
@@ -609,7 +704,7 @@ class GFFImportClient(iobase.ImportClient):
         return size
 
     @staticmethod
-    def _extract_residues(gff_record: gffutils.Feature) -> Union[None, str]:
+    def _extract_gff_translation(gff_record: gffutils.Feature) -> Union[None, str]:
         """Extracts the sequence of amino acids from a GFF record representing a polypeptide"""
         residues = None
         if "translation" in gff_record.attributes:
@@ -621,7 +716,7 @@ class GFFImportClient(iobase.ImportClient):
         return residues
 
     @staticmethod
-    def _extract_publications(gff_record: gffutils.Feature) -> List[str]:
+    def _extract_gff_publications(gff_record: gffutils.Feature) -> List[str]:
         """Extracts publications names from a GFF record"""
         publications = []
         if "literature" in gff_record.attributes:
@@ -632,7 +727,7 @@ class GFFImportClient(iobase.ImportClient):
 
     @staticmethod
     def _extract_protein_source_id(gff_record: gffutils.Feature) -> Union[None, str]:
-        """Extracts the ID of a polypeptide associated with the feature"""
+        """Extracts the ID of a polypeptide associated with the feature from a GFF record"""
         protein_id = None
         if "protein_source_id" in gff_record.attributes:
             protein_id = gff_record.attributes["protein_source_id"]
@@ -641,7 +736,7 @@ class GFFImportClient(iobase.ImportClient):
         return protein_id
 
     @staticmethod
-    def _extract_sequence_names(gff_db: gffutils.FeatureDB) -> List[str]:
+    def _extract_gff_sequence_names(gff_db: gffutils.FeatureDB) -> List[str]:
         """Extracts sequence names from a GFF file"""
         sequences = []
         for directive in gff_db.directives:
@@ -651,67 +746,282 @@ class GFFImportClient(iobase.ImportClient):
                 sequences.append(sequence_name)
         return sequences
 
-    def _recognized_attributes(self) -> List[str]:
+    def _recognized_gff_attributes(self) -> List[str]:
         """Lists GFF attributes that are handled by this program"""
         return self._feature_property_types() + self._feature_relationship_types() + self._synonym_types() \
             + ["id", "name", "parent", "note", "dbxref", "ontology_term", "size", "literature", "translation",
                "protein_source_id"]
 
-    @staticmethod
-    def _transcript_types() -> List[str]:
-        """Lists considered transcript types"""
-        return ["mrna", "rrna", "trna", "snrna", "ncrna", "scrna", "snorna"]
+
+class GFFExportClient(iobase.ExportClient, GFFClient):
+    """Class for exporting genomic data from Chado to GFF files"""
+
+    def __init__(self, uri: str, verbose=False, test_environment=False):
+        """Constructor"""
+
+        # Connect to database
+        self.uri = uri
+        self.verbose = verbose
+        self.test_environment = test_environment
+        if self.test_environment:
+            self.printer = utils.VerbosePrinter(self.verbose)
+        else:
+            super().__init__(self.uri, self.verbose)
+
+        # Load essential database entries
+        if not self.test_environment:
+            self._load_essentials()
+
+    def __del__(self):
+        """Destructor - disconnect from database"""
+        if not self.test_environment:
+            super().__del__()
+
+    def _load_essentials(self) -> None:
+        """Loads essential database entries"""
+        self._part_of_term = self._load_cvterm_from_cv("part_of", "relationship")
+        self._derives_from_term = self._load_cvterm_from_cv("derives_from", "sequence")
+        self._parent_terms = {self._part_of_term.name: self._part_of_term,
+                              self._derives_from_term.name: self._derives_from_term}
+        self._parent_type_ids = [self._part_of_term.cvterm_id, self._derives_from_term.cvterm_id]
+        self._top_level_term = self._load_cvterm("top_level_seq")
+        self._ontology_ids = [db_entry.db_id for db_entry in self._load_dbs(self._ontologies())]
+
+    def export(self, gff_filename: str, organism_name: str, export_fasta: bool, fasta_filename: str) -> None:
+        """Exports sequences from Chado to a GFF file"""
+
+        # Load dependencies
+        organism_entry = self._load_organism(organism_name)
+
+        # Open GFF file
+        gff_handle = utils.open_file_write(gff_filename)
+
+        # Get top-level sequences and write a GFF header
+        chromosome_entries = self.query_features_by_property_type(
+            organism_entry.organism_id, self._top_level_term.cvterm_id).all()           # type: List[sequence.Feature]
+        self._write_gff_header(gff_handle, chromosome_entries)
+
+        # Loop over all top-level sequences
+        for chromosome_entry in chromosome_entries:
+
+            # Load all attributes associated with this sequence
+            self._export_gff_record(chromosome_entry, chromosome_entry.uniquename, {}, gff_handle)
+
+            # Get features located on this sequence
+            feature_entries = self.query_features_by_srcfeature(chromosome_entry.feature_id).all()
+            for feature_entry in feature_entries:
+
+                # Check if the feature has parents, and ignore it if this is the case
+                if self._has_feature_parents(feature_entry):
+                    continue
+
+                # Load all attributes associated with this feature
+                self._export_gff_record(feature_entry, chromosome_entry.uniquename, {}, gff_handle)
+
+        # Close GFF file
+        utils.close(gff_handle)
+
+        # Print FASTA sequences, if required
+        if export_fasta:
+            self._export_fasta(gff_filename, fasta_filename, organism_name)
+
+    def _export_fasta(self, gff_file: str, fasta_file: str, organism_name: str) -> None:
+        """Exports sequences from the Chado database into a FASTA file"""
+        fasta_is_temporary = (fasta_file == "" or fasta_file is None)
+        if fasta_is_temporary:
+
+            # Create temporary file
+            (fasta_handle, fasta_file) = tempfile.mkstemp(dir=os.getcwd())
+            os.close(fasta_handle)
+
+        # Export FASTA sequences to file
+        fasta_client = fasta.FastaExportClient(self.uri, self.verbose)
+        fasta_client.export(fasta_file, organism_name, "contigs", "")
+        if fasta_is_temporary:
+
+            # Append sequences to GFF and remove temporary file
+            self._append_fasta(gff_file, fasta_file)
+            os.remove(fasta_file)
 
     @staticmethod
-    def _feature_relationship_types() -> List[str]:
-        """Lists considered feature_relationship types"""
-        return ["part_of", "derives_from"]
+    def _append_fasta(gff_file: str, fasta_file: str) -> None:
+        """Appends FASTA sequences to a GFF file"""
+        with open(gff_file, 'a') as gff_handle:
+            gff_handle.write("##FASTA\n")
+            with open(fasta_file, 'r') as fasta_handle:
+                for line in fasta_handle:
+                    gff_handle.write(line)
 
     @staticmethod
-    def _feature_property_types() -> List[str]:
-        """Lists considered featureprop types"""
-        return ["comment", "description", "score", "source"]
+    def _write_gff_header(file_handle, chromosome_entries: List[sequence.Feature]) -> None:
+        """Prints the header of a GFF file"""
+        file_handle.write("##gff-version 3\n")
+        file_handle.write("# feature-ontology so.obo\n")
+        for chromosome_entry in chromosome_entries:
+            seq = "\t".join(["##sequence-region", chromosome_entry.uniquename, "1",
+                            str(chromosome_entry.seqlen)]) + "\n"
+            file_handle.write(seq)
 
     @staticmethod
-    def _synonym_types() -> List[str]:
-        """Lists considered synonym types"""
-        return ["alias", "synonym", "previous_systematic_id"]
+    def _print_gff_record(gff_record: gffutils.Feature, file_handle) -> None:
+        """Prints a GFF record to file"""
+        file_handle.write(str(gff_record) + "\n")
+
+    def _export_gff_record(self, feature_entry: sequence.Feature, chromosome_name: str,
+                           parent_relationships: Dict[str, str], file_handle) -> None:
+        """Exports a GFF record for a given feature"""
+
+        # Create GFF record
+        gff_record = self._create_gff_record(feature_entry, chromosome_name)
+
+        # Query various tables to gather information related to the feature
+        feature_type = self._extract_feature_type(feature_entry)
+        feature_synonyms = self._extract_feature_synonyms(feature_entry)
+        feature_properties = self._extract_feature_properties(feature_entry)
+        feature_publications = self._extract_feature_publications(feature_entry)
+        feature_dbxrefs = self._extract_feature_cross_references(feature_entry)
+        feature_ontology_terms = self._extract_feature_ontology_terms(feature_entry)
+
+        # Add attributes to the GFF record
+        self._add_gff_relationships(gff_record, parent_relationships)
+        self._add_gff_cross_references(gff_record, feature_dbxrefs)
+        self._add_gff_ontology_terms(gff_record, feature_ontology_terms)
+        self._add_gff_synonyms(gff_record, feature_synonyms)
+        self._add_gff_publications(gff_record, feature_publications)
+        self._add_gff_properties(gff_record, feature_properties)
+        self._add_gff_featuretype(gff_record, feature_type, feature_entry.residues)
+
+        # Write the generated GFF record to file
+        self._print_gff_record(gff_record, file_handle)
+
+        # Handle children of this feature (recursive call)
+        self._handle_child_features(feature_entry, chromosome_name, file_handle)
+
+    def _handle_child_features(self, feature_entry: sequence.Feature, chromosome_name: str, file_handle) -> None:
+        """Export GFF records for all child features of a given feature"""
+        for relationship_type, relationship_term in self._parent_terms.items():
+            child_entries = self.query_child_features(feature_entry.feature_id, relationship_term.cvterm_id).all()
+            parent_relationships = {relationship_type: feature_entry.uniquename}
+            for child_entry in child_entries:
+                self._export_gff_record(child_entry, chromosome_name, parent_relationships, file_handle)
+
+    def _has_feature_parents(self, feature_entry: sequence.Feature) -> bool:
+        """Checks if a given Feature has parents in the database"""
+        parent_entry = self.query_parent_features(feature_entry.feature_id, self._parent_type_ids).first()
+        return parent_entry is not None
+
+    def _extract_feature_type(self, feature_entry: sequence.Feature) -> str:
+        """Extracts the type of a feature by a database query"""
+        cvterm_entry = self.query_first(cv.CvTerm, cvterm_id=feature_entry.type_id)
+        return cvterm_entry.name
+
+    def _extract_feature_synonyms(self, feature_entry: sequence.Feature) -> Dict[str, List[str]]:
+        """Extracts synonyms of a feature by a database query"""
+        synonyms = {}
+        for synonym_type, synonym_name in self.query_feature_synonyms(feature_entry.feature_id).all():
+            if synonym_type in synonyms:
+                synonyms[synonym_type].append(synonym_name)
+            else:
+                synonyms[synonym_type] = [synonym_name]
+        return synonyms
+
+    def _extract_feature_properties(self, feature_entry: sequence.Feature) -> Dict[str, List[str]]:
+        """Extracts properties of a feature by a database query"""
+        properties = {}
+        for property_type, property_value in self.query_feature_properties(feature_entry.feature_id).all():
+            if property_type in properties:
+                properties[property_type].append(property_value)
+            else:
+                properties[property_type] = [property_value]
+        return properties
+
+    def _extract_feature_publications(self, feature_entry: sequence.Feature) -> List[str]:
+        """Extracts publications associated with a feature by a database query"""
+        publications = []
+        for publication, in self.query_feature_pubs(feature_entry.feature_id).all():
+            publications.append(publication)
+        return publications
+
+    def _extract_feature_cross_references(self, feature_entry: sequence.Feature) -> List[str]:
+        """Extracts cross references associated with a feature by a database query"""
+        cross_references = []
+        for db_authority, accession in self.query_feature_dbxrefs(feature_entry.feature_id).all():
+            crossref = ontology.create_dbxref(db_authority, accession)
+            cross_references.append(crossref)
+        return cross_references
+
+    def _extract_feature_ontology_terms(self, feature_entry: sequence.Feature) -> List[str]:
+        """Extracts ontology terms associated with a feature by a database query"""
+        ontology_terms = []
+        for db_authority, accession in self.query_feature_ontology_terms(
+                feature_entry.feature_id, self._ontology_ids).all():
+            crossref = ontology.create_dbxref(db_authority, accession)
+            ontology_terms.append(crossref)
+        return ontology_terms
+
+    def _create_gff_record(self, feature_entry: sequence.Feature, chromosome_name: str) -> gffutils.Feature:
+        """Creates a GFF record with the fields 'seqid', 'start', 'end', 'strand' and 'phase'"""
+        featureloc_entry = self.query_first(sequence.FeatureLoc, feature_id=feature_entry.feature_id)
+        if featureloc_entry:
+            gff_record = gffutils.Feature(seqid=chromosome_name, id=feature_entry.uniquename,
+                                          start=featureloc_entry.fmin+1, end=featureloc_entry.fmax,
+                                          strand=self.back_convert_strand(featureloc_entry.strand),
+                                          frame=self.back_convert_frame(featureloc_entry.phase))
+        else:
+            gff_record = gffutils.Feature(seqid=chromosome_name, id=feature_entry.uniquename,
+                                          start=1, end=feature_entry.seqlen)
+        gff_record.attributes["ID"] = feature_entry.uniquename
+        if feature_entry.name:
+            gff_record.attributes["Name"] = feature_entry.name
+        return gff_record
 
     @staticmethod
-    def _ontologies() -> List[str]:
-        """Lists considered ontologies"""
-        return ["GO"]
+    def _add_gff_featuretype(gff_record: gffutils.Feature, featuretype: str, residues: str) -> None:
+        """Adds the 'type' and potentially the attribute 'translation' to a GFF record"""
+        gff_record.featuretype = featuretype
+        if gff_record.featuretype == "polypeptide" and residues:
+            gff_record.attributes["translation"] = residues.upper()
 
+    @staticmethod
+    def _add_gff_synonyms(gff_record: gffutils.Feature, synonyms: Dict[str, List[str]]):
+        """Adds the attribute 'Alias' and various other attributes to a GFF record"""
+        for synonym_type in ["Alias", "synonym", "previous_systematic_id"]:
+            if synonym_type.lower() in synonyms:
+                gff_record.attributes[synonym_type] = synonyms[synonym_type.lower()]
 
-def convert_strand(strand: str) -> Union[None, int]:
-    """Converts the strand from string notation to integer notation"""
-    if strand == '+':
-        return 1
-    elif strand == '-':
-        return -1
-    else:
-        return None
+    @staticmethod
+    def _add_gff_properties(gff_record: gffutils.Feature, properties: Dict[str, List[str]]) -> None:
+        """Adds the 'source', 'score' and various attributes to a GFF record"""
+        if "score" in properties:
+            gff_record.score = properties["score"][0]
+        if "source" in properties:
+            gff_record.source = properties["source"][0]
+        for property_type in ["comment", "description", "Note"]:
+            if property_type.lower() in properties:
+                gff_record.attributes[property_type] = properties[property_type.lower()]
 
+    @staticmethod
+    def _add_gff_publications(gff_record: gffutils.Feature, publications: List[str]):
+        """Adds the attribute 'literature' to a GFF record"""
+        if publications:
+            gff_record.attributes["literature"] = publications
 
-def back_convert_strand(strand: Union[None, int]) -> Union[None, str]:
-    """Converts the strand from integer notation to string notation"""
-    if strand is None:
-        return None
-    elif strand > 0:
-        return "+"
-    elif strand < 0:
-        return "-"
-    else:
-        return None
+    @staticmethod
+    def _add_gff_cross_references(gff_record: gffutils.Feature, cross_references: List[str]):
+        """Adds the attribute 'Dbxref' to a GFF record"""
+        if cross_references:
+            gff_record.attributes["Dbxref"] = cross_references
 
+    @staticmethod
+    def _add_gff_ontology_terms(gff_record: gffutils.Feature, ontology_terms: List[str]):
+        """Adds the attribute 'Ontology_term' to a GFF record"""
+        if ontology_terms:
+            gff_record.attributes["Ontology_term"] = ontology_terms
 
-def convert_frame(frame: str) -> Union[None, int]:
-    """Converts the frame from string notation to integer notation"""
-    try:
-        phase = int(frame)
-    except ValueError:
-        return None
-    if phase in [0, 1, 2]:
-        return phase
-    else:
-        return None
+    @staticmethod
+    def _add_gff_relationships(gff_record: gffutils.Feature, relationships: Dict[str, str]) -> None:
+        """Adds the attributes 'Parent' and 'Derives_from' to a GFF record"""
+        chado_to_gff_key = {"part_of": "Parent", "derives_from": "Derives_from"}
+        for chado_relationship_type, gff_relationship_type in chado_to_gff_key.items():
+            if chado_relationship_type in relationships:
+                gff_record.attributes[gff_relationship_type] = relationships[chado_relationship_type]

@@ -149,7 +149,7 @@ def run_select_command(specifier: str, arguments, uri: str) -> None:
     """Run a pre-compiled query against a database"""
     if specifier == "organisms":
         client = direct.DirectIOClient(uri)
-        query = client.select_organisms(arguments.public_only)
+        query = client.select_organisms(arguments.public_only, arguments.extract_version)
     else:
         template = queries.load_query(specifier)
         if specifier == "cvterms":
@@ -173,7 +173,7 @@ def run_insert_command(specifier: str, arguments, uri: str) -> None:
     client = direct.DirectIOClient(uri)
     if specifier == "organism":
         client.insert_organism(arguments.genus, arguments.species, arguments.abbreviation, arguments.common_name,
-                               arguments.infraspecific_name, arguments.comment)
+                               arguments.infraspecific_name, arguments.comment, arguments.genome_version)
     else:
         print("Functionality 'insert " + specifier + "' is not yet implemented.")
 
@@ -219,7 +219,8 @@ def run_export_command(specifier: str, arguments, uri: str) -> None:
     """Exports data from a database to a file"""
     if specifier == "fasta":
         client = fasta.FastaExportClient(uri, arguments.verbose)
-        client.export(arguments.output_file, arguments.organism, arguments.sequence_type, arguments.release)
+        client.export(arguments.output_file, arguments.organism, arguments.sequence_type, arguments.release,
+                      arguments.extract_version)
     elif specifier == "gff":
         client = gff.GFFExportClient(uri, arguments.verbose)
         client.export(arguments.output_file, arguments.organism, arguments.export_fasta, arguments.fasta_file)

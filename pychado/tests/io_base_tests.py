@@ -217,7 +217,7 @@ class TestIOClient(unittest.TestCase):
 
     def test_query_all_organisms(self):
         # Tests the function that creates a query against the organism table
-        query = self.client.query_all_organisms()
+        query = self.client.query_all_organisms(False)
         compiled_query = str(query.statement.compile(compile_kwargs={"literal_binds": True}))
         self.assertIn("SELECT public.organism.abbreviation, public.organism.genus, public.organism.species, "
                       "public.organism.infraspecific_name AS strain, public.organism.common_name", compiled_query)
@@ -225,13 +225,14 @@ class TestIOClient(unittest.TestCase):
 
     def test_query_organisms_by_property_type(self):
         # Tests the function that creates a query against the organism table
-        query = self.client.query_organisms_by_property_type(44)
+        query = self.client.query_organisms_by_property_type(44, False)
         compiled_query = str(query.statement.compile(compile_kwargs={"literal_binds": True}))
         self.assertIn("SELECT public.organism.abbreviation, public.organism.genus, public.organism.species, "
                       "public.organism.infraspecific_name AS strain, public.organism.common_name", compiled_query)
         self.assertIn("FROM public.organismprop JOIN public.organism "
                       "ON public.organism.organism_id = public.organismprop.organism_id", compiled_query)
         self.assertIn("WHERE public.organismprop.type_id = 44", compiled_query)
+
 
 class TestImportClient(unittest.TestCase):
     """Test functions for loading data into a CHADO database"""

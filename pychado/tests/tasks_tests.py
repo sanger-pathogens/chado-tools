@@ -316,14 +316,14 @@ class TestTasks(unittest.TestCase):
         self.assertIs(mock_client, direct.DirectIOClient)
         self.assertIs(mock_query, dbutils.query_and_print)
 
-        args = ["chado", "extract", "organisms", "testdb"]
+        args = ["chado", "extract", "organisms", "--public_only", "testdb"]
         parsed_args = chado_tools.parse_arguments(args)
         mock_client_obj = mock_client.return_value
         mock_client_obj.configure_mock(**{"select_organisms.return_value": "testquery"})
 
         tasks.run_select_command(args[2], parsed_args, self.uri)
         mock_client.assert_called_with(self.uri)
-        self.assertIn(unittest.mock.call().select_organisms(False), mock_client.mock_calls)
+        self.assertIn(unittest.mock.call().select_organisms(True, False), mock_client.mock_calls)
         mock_query.assert_called_with(self.uri, "testquery", "", "csv", False, "\t")
 
     @unittest.mock.patch('pychado.dbutils.query_and_print')
@@ -396,7 +396,7 @@ class TestTasks(unittest.TestCase):
         tasks.run_insert_command(args[2], parsed_args, self.uri)
         mock_client.assert_called_with(self.uri)
         self.assertIn(unittest.mock.call().insert_organism("testgenus", "testspecies", "testorganism",
-                                                           None, None, None), mock_client.mock_calls)
+                                                           None, None, None, None), mock_client.mock_calls)
 
         mock_client.reset_mock()
         tasks.run_insert_command("inexistent_specifier", parsed_args, self.uri)
@@ -512,7 +512,7 @@ class TestTasks(unittest.TestCase):
         parsed_args = chado_tools.parse_arguments(args)
         tasks.run_export_command(args[2], parsed_args, self.uri)
         mock_client.assert_called_with(self.uri, False)
-        self.assertIn(unittest.mock.call().export("testfile", "testorganism", "proteins", "testrelease"),
+        self.assertIn(unittest.mock.call().export("testfile", "testorganism", "proteins", "testrelease", False),
                       mock_client.mock_calls)
 
     @unittest.mock.patch('pychado.io.gff.GFFExportClient')

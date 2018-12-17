@@ -67,7 +67,7 @@ class TestDirectIO(unittest.TestCase):
         self.assertIs(mock_query_public, self.client.query_organisms_by_property_type)
         mock_load_cvterm.return_value = cv.CvTerm(cv_id=1, dbxref_id=2, cvterm_id=3, name="")
 
-        self.client.select_organisms(False)
+        self.client.select_organisms(False, False)
         mock_load_cvterm.assert_not_called()
         mock_query_public.assert_not_called()
         mock_query_all.assert_called()
@@ -75,7 +75,7 @@ class TestDirectIO(unittest.TestCase):
         mock_load_cvterm.reset_mock()
         mock_query_public.reset_mock()
         mock_query_all.reset_mock()
-        self.client.select_organisms(True)
+        self.client.select_organisms(True, False)
         mock_load_cvterm.assert_called_with("genedb_public")
-        mock_query_public.assert_called_with(3)
+        mock_query_public.assert_called_with(3, False)
         mock_query_all.assert_not_called()

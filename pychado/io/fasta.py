@@ -128,7 +128,7 @@ class FastaExportClient(iobase.ExportClient):
             "sequence", ["gene", "pseudogene", "polypeptide"])
         self._top_level_term = self._load_cvterm("top_level_seq")
 
-    def export(self, filename: str, organism_name: str, sequence_type: str, release: str):
+    def export(self, filename: str, organism_name: str, sequence_type: str, release: str, extract_version=False):
         """Exports sequences from Chado to a FASTA file"""
 
         # Load dependencies and features of interest
@@ -146,16 +146,18 @@ class FastaExportClient(iobase.ExportClient):
             # Create FASTA record
             residues = self._extract_residues_by_type(feature_entry, srcfeature_entries, sequence_type)
             if residues:
-                record = self._create_fasta_record(feature_entry, organism_entry, type_entry, residues, release)
+                record = self._create_fasta_record(feature_entry, organism_entry, type_entry, residues, release,
+                                                   extract_version)
                 records.append(record)
 
         # Write all FASTA records to file
         SeqIO.write(records, filename, "fasta")
 
     def _create_fasta_record(self, feature_entry: sequence.Feature, organism_entry: organism.Organism,
-                             type_entry: cv.CvTerm, residues: str, release: str) -> Union[None, SeqIO.SeqRecord]:
+                             type_entry: cv.CvTerm, residues: str, release: str, extract_version: bool
+                             ) -> Union[None, SeqIO.SeqRecord]:
         """Creates a FASTA record"""
-        attributes = self._create_fasta_attributes(organism_entry, type_entry, release)
+        attributes = self._create_fasta_attributes(organism_entry, type_entry, release, extract_version)
         record = SeqIO.SeqRecord(Seq.Seq(residues), id=feature_entry.uniquename, name=feature_entry.uniquename,
                                  description=attributes)
         return record
@@ -216,9 +218,12 @@ class FastaExportClient(iobase.ExportClient):
             residues = None
         return residues
 
-    def _create_fasta_attributes(self, organism_entry: organism.Organism, type_entry: cv.CvTerm, release: str) -> str:
+    def _create_fasta_attributes(self, organism_entry: organism.Organism, type_entry: cv.CvTerm, release: str,
+                                 extract_version: bool) -> str:
         """Creates a header line for a FASTA sequence with several attributes"""
         attributes_as_list = ["", self._organism_key_value_pair(organism_entry), self._type_key_value_pair(type_entry)]
+        if extract_version and organism_entry.version:
+            attributes_as_list.append(self._genome_version_key_value_pair(organism_entry))
         if release:
             attributes_as_list.append(self._release_key_value_pair(release))
         attributes_as_string = " | ".join(attributes_as_list).strip()
@@ -234,6 +239,14 @@ class FastaExportClient(iobase.ExportClient):
         organism_name_as_string = urllib.parse.quote(" ".join(organism_name_as_list))
         organism_pair = "=".join([organism_key, organism_name_as_string])
         return organism_pair
+
+    @staticmethod
+    def _genome_version_key_value_pair(organism_entry: organism.Organism):
+        """Creates a key-value pair for the FASTA header with the genome version"""
+        version_key = "genome_version"
+        version_number = str(organism_entry.version)
+        version_pair = "=".join([version_key, version_number])
+        return version_pair
 
     @staticmethod
     def _type_key_value_pair(type_entry: cv.CvTerm):

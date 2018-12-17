@@ -147,19 +147,21 @@ def run_execute_command(specifier: str, arguments, uri: str) -> None:
 
 def run_select_command(specifier: str, arguments, uri: str) -> None:
     """Run a pre-compiled query against a database"""
-    template = queries.load_query(specifier)
     if specifier == "organisms":
-        query = queries.set_query_conditions(template)
-    elif specifier == "cvterms":
-        query = queries.set_query_conditions(template, database=arguments.database, vocabulary=arguments.vocabulary)
-    elif specifier == "genedb_products":
-        query = queries.set_query_conditions(template, organism=arguments.organism)
-    elif specifier == "stats":
-        query = queries.set_query_conditions(template, organism=arguments.organism, start_date=arguments.start_date,
-                                             end_date=(arguments.end_date or utils.current_date()))
+        client = direct.DirectIOClient(uri)
+        query = client.select_organisms(arguments.public_only)
     else:
-        print("Functionality 'extract " + specifier + "' is not yet implemented.")
-        query = queries.set_query_conditions("")
+        template = queries.load_query(specifier)
+        if specifier == "cvterms":
+            query = queries.set_query_conditions(template, database=arguments.database, vocabulary=arguments.vocabulary)
+        elif specifier == "genedb_products":
+            query = queries.set_query_conditions(template, organism=arguments.organism)
+        elif specifier == "stats":
+            query = queries.set_query_conditions(template, organism=arguments.organism, start_date=arguments.start_date,
+                                                 end_date=(arguments.end_date or utils.current_date()))
+        else:
+            print("Functionality 'extract " + specifier + "' is not yet implemented.")
+            query = queries.set_query_conditions("")
     dbutils.query_and_print(uri, query, arguments.output_file, arguments.format, arguments.include_header,
                             arguments.delimiter)
     if arguments.output_file:

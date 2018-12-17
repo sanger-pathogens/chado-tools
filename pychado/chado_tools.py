@@ -312,7 +312,7 @@ def add_extract_arguments(parser: argparse.ArgumentParser):
 def add_extract_arguments_by_command(command: str, parser: argparse.ArgumentParser):
     """Defines formal arguments for a specified sub-command of 'chado extract'"""
     if command == "organisms":
-        pass
+        add_extract_organisms_arguments(parser)
     elif command == "cvterms":
         add_extract_cvterms_arguments(parser)
     elif command == "genedb_products":
@@ -321,6 +321,11 @@ def add_extract_arguments_by_command(command: str, parser: argparse.ArgumentPars
         add_extract_stats_arguments(parser)
     else:
         print("Command '" + parser.prog + "' is not available.")
+
+
+def add_extract_organisms_arguments(parser: argparse.ArgumentParser):
+    """Defines formal arguments for the 'chado extract organisms' sub-command"""
+    parser.add_argument("--public_only", action="store_true", help="only extract public genomes (default: extract all)")
 
 
 def add_extract_cvterms_arguments(parser: argparse.ArgumentParser):

@@ -1,7 +1,7 @@
-import unittest
+import unittest.mock
 from .. import dbutils, utils
 from ..io import direct
-from ..orm import base, organism
+from ..orm import base, organism, cv
 
 
 class TestDirectIO(unittest.TestCase):
@@ -55,3 +55,27 @@ class TestDirectIO(unittest.TestCase):
         self.client.delete_organism('CCC')
         fifth_result = self.client.query_table(organism.Organism).first()
         self.assertIsNone(fifth_result)
+
+    @unittest.mock.patch("pychado.io.direct.DirectIOClient.query_organisms_by_property_type")
+    @unittest.mock.patch("pychado.io.direct.DirectIOClient.query_all_organisms")
+    @unittest.mock.patch("pychado.io.direct.DirectIOClient._load_cvterm")
+    def test_select_organisms(self, mock_load_cvterm: unittest.mock.Mock, mock_query_all: unittest.mock.Mock,
+                              mock_query_public: unittest.mock.Mock):
+        # Tests the selection of organisms from a Chado database
+        self.assertIs(mock_load_cvterm, self.client._load_cvterm)
+        self.assertIs(mock_query_all, self.client.query_all_organisms)
+        self.assertIs(mock_query_public, self.client.query_organisms_by_property_type)
+        mock_load_cvterm.return_value = cv.CvTerm(cv_id=1, dbxref_id=2, cvterm_id=3, name="")
+
+        self.client.select_organisms(False)
+        mock_load_cvterm.assert_not_called()
+        mock_query_public.assert_not_called()
+        mock_query_all.assert_called()
+
+        mock_load_cvterm.reset_mock()
+        mock_query_public.reset_mock()
+        mock_query_all.reset_mock()
+        self.client.select_organisms(True)
+        mock_load_cvterm.assert_called_with("genedb_public")
+        mock_query_public.assert_called_with(3)
+        mock_query_all.assert_not_called()

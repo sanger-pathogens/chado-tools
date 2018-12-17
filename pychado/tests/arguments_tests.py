@@ -219,12 +219,13 @@ class TestArguments(unittest.TestCase):
 
     def test_extract_organisms_args(self):
         # Tests if the command line arguments for the subcommand 'chado extract organisms' are parsed correctly
-        args = ["chado", "extract", "organisms", "-H", "-d", ";", "-o", "testfile", "testdb"]
+        args = ["chado", "extract", "organisms", "-H", "-d", ";", "-o", "testfile", "--public_only", "testdb"]
         parsed_args = vars(chado_tools.parse_arguments(args))
         self.assertTrue(parsed_args["include_header"])
         self.assertEqual(parsed_args["delimiter"], ";")
         self.assertEqual(parsed_args["output_file"], "testfile")
         self.assertEqual(parsed_args["format"], "csv")
+        self.assertTrue(parsed_args["public_only"])
         self.assertEqual(parsed_args["dbname"], "testdb")
 
     def test_extract_cvterms_args(self):

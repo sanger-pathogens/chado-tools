@@ -1,9 +1,19 @@
+import sqlalchemy.sql
 from . import iobase
 from ..orm import organism
 
 
 class DirectIOClient(iobase.IOClient):
     """Class for inserting, updating or deleting database entries"""
+
+    def select_organisms(self, public_only: bool) -> sqlalchemy.sql.Select:
+        """Loads organisms from the database"""
+        if public_only:
+            public_type_term = self._load_cvterm("genedb_public")
+            query = self.query_organisms_by_property_type(public_type_term.cvterm_id)
+        else:
+            query = self.query_all_organisms()
+        return query.statement
 
     def insert_organism(self, genus: str, species: str, abbreviation: str, common_name=None,
                         infraspecific_name=None, comment=None):

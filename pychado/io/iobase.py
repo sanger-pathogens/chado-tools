@@ -166,6 +166,21 @@ class IOClient(ddl.ChadoClient):
             .filter(sequence.FeatureCvTerm.feature_id == feature_id)\
             .filter(general.Db.db_id.in_(ontology_ids))
 
+    def query_all_organisms(self) -> sqlalchemy.orm.Query:
+        """Creates a query to select organisms in the database"""
+        return self.session.query(organism.Organism.abbreviation, organism.Organism.genus,
+                                  organism.Organism.species, organism.Organism.infraspecific_name.label("strain"),
+                                  organism.Organism.common_name)
+
+    def query_organisms_by_property_type(self, type_id: int) -> sqlalchemy.orm.Query:
+        """Creates a query to select organisms with a specific property in the database"""
+        return self.session.query(organism.Organism.abbreviation, organism.Organism.genus,
+                                  organism.Organism.species, organism.Organism.infraspecific_name.label("strain"),
+                                  organism.Organism.common_name)\
+            .select_from(organism.OrganismProp)\
+            .join(organism.Organism, organism.OrganismProp.organism)\
+            .filter(organism.OrganismProp.type_id == type_id)
+
     def _load_db(self, name: str) -> general.Db:
         """Loads a specific DB"""
         db_entry = self.query_first(general.Db, name=name)

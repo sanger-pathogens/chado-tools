@@ -312,7 +312,7 @@ def add_extract_arguments(parser: argparse.ArgumentParser):
 def add_extract_arguments_by_command(command: str, parser: argparse.ArgumentParser):
     """Defines formal arguments for a specified sub-command of 'chado extract'"""
     if command == "organisms":
-        pass
+        add_extract_organisms_arguments(parser)
     elif command == "cvterms":
         add_extract_cvterms_arguments(parser)
     elif command == "genedb_products":
@@ -321,6 +321,12 @@ def add_extract_arguments_by_command(command: str, parser: argparse.ArgumentPars
         add_extract_stats_arguments(parser)
     else:
         print("Command '" + parser.prog + "' is not available.")
+
+
+def add_extract_organisms_arguments(parser: argparse.ArgumentParser):
+    """Defines formal arguments for the 'chado extract organisms' sub-command"""
+    parser.add_argument("--public_only", action="store_true", help="only extract public genomes (default: extract all)")
+    parser.add_argument("--extract_version", action="store_true", help="extract the genome version, if available")
 
 
 def add_extract_cvterms_arguments(parser: argparse.ArgumentParser):
@@ -371,6 +377,7 @@ def add_insert_organism_arguments(parser: argparse.ArgumentParser):
     parser.add_argument("-a", "--abbreviation", required=True, help="abbreviation/short name of the organism")
     parser.add_argument("--common_name", help="common name of the organism (default: use abbreviation, if provided)")
     parser.add_argument("--comment", help="comment")
+    parser.add_argument("--genome_version", type=int, help="version of the genome (integer)")
 
 
 def add_delete_arguments(parser: argparse.ArgumentParser):
@@ -497,6 +504,7 @@ def add_export_fasta_arguments(parser: argparse.ArgumentParser):
     parser.add_argument("-t", "--sequence_type", required=True, choices={"contigs", "genes", "proteins"},
                         help="type of the sequences to be exported")
     parser.add_argument("-r", "--release", help="name of the FASTA release")
+    parser.add_argument("--extract_version", action="store_true", help="extract the genome version, if available")
 
 
 def add_export_gff_arguments(parser: argparse.ArgumentParser):

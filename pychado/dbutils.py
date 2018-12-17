@@ -5,6 +5,7 @@ import urllib.parse
 import json
 import getpass
 import sqlalchemy.engine
+import sqlalchemy.sql
 import sqlalchemy_utils
 from . import utils
 
@@ -149,7 +150,7 @@ def query_and_print(uri: str, query, filename: str, file_format: str, header: bo
 
 def run_query(conn: sqlalchemy.engine.Connection, query) -> sqlalchemy.engine.ResultProxy:
     """Runs a single query against a database"""
-    if isinstance(query, sqlalchemy.sql.expression.TextClause):
+    if isinstance(query, sqlalchemy.sql.expression.TextClause) or isinstance(query, sqlalchemy.sql.Select):
         result = conn.execute(query)
     else:
         result = conn.execute(sqlalchemy.text(query))

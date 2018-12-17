@@ -149,8 +149,8 @@ class TestFastaExport(unittest.TestCase):
         mock_attributes.return_value = "desc"
         mock_sequence.return_value = "seq"
 
-        self.client._create_fasta_record(feature_entry, organism_entry, type_entry, "AGCT", "testrelease")
-        mock_attributes.assert_called_with(organism_entry, type_entry, "testrelease")
+        self.client._create_fasta_record(feature_entry, organism_entry, type_entry, "AGCT", "testrelease", True)
+        mock_attributes.assert_called_with(organism_entry, type_entry, "testrelease", True)
         mock_sequence.assert_called_with("AGCT")
         mock_record.assert_called_with("seq", id="test", name="test", description="desc")
 
@@ -192,30 +192,36 @@ class TestFastaExport(unittest.TestCase):
         mock_query_contigs.assert_not_called()
 
     @unittest.mock.patch("pychado.io.fasta.FastaExportClient._release_key_value_pair")
+    @unittest.mock.patch("pychado.io.fasta.FastaExportClient._genome_version_key_value_pair")
     @unittest.mock.patch("pychado.io.fasta.FastaExportClient._type_key_value_pair")
     @unittest.mock.patch("pychado.io.fasta.FastaExportClient._organism_key_value_pair")
     def test_create_fasta_attributes(self, mock_organism: unittest.mock.Mock, mock_type: unittest.mock.Mock,
-                                     mock_release: unittest.mock.Mock):
+                                     mock_version: unittest.mock.Mock, mock_release: unittest.mock.Mock):
         # Tests the correct creation of a header for a FASTA sequence
         self.assertIs(mock_organism, self.client._organism_key_value_pair)
         self.assertIs(mock_type, self.client._type_key_value_pair)
+        self.assertIs(mock_version, self.client._genome_version_key_value_pair)
         self.assertIs(mock_release, self.client._release_key_value_pair)
 
         organism_entry = organism.Organism(genus="testgenus", species="testspecies", organism_id=33)
         type_entry = cv.CvTerm(name="contig", cv_id=1, dbxref_id=2, cvterm_id=44)
         mock_organism.return_value = "orgname"
         mock_type.return_value = "typename"
+        mock_version.return_value = "versionnumber"
         mock_release.return_value = "relname"
 
-        attributes = self.client._create_fasta_attributes(organism_entry, type_entry, "")
+        attributes = self.client._create_fasta_attributes(organism_entry, type_entry, "", True)
         mock_organism.assert_called_with(organism_entry)
         mock_type.assert_called_with(type_entry)
+        mock_version.assert_not_called()
         mock_release.assert_not_called()
         self.assertEqual(attributes, "| orgname | typename")
 
-        attributes = self.client._create_fasta_attributes(organism_entry, type_entry, "testrelease")
+        organism_entry.version = 11
+        attributes = self.client._create_fasta_attributes(organism_entry, type_entry, "testrelease", True)
+        mock_version.assert_called_with(organism_entry)
         mock_release.assert_called_with("testrelease")
-        self.assertEqual(attributes, "| orgname | typename | relname")
+        self.assertEqual(attributes, "| orgname | typename | versionnumber | relname")
 
     def test_organism_key_value_pair(self):
         # Tests the correct creation of a key-value pair for an organism name with proper escaping applied
@@ -225,6 +231,12 @@ class TestFastaExport(unittest.TestCase):
         organism_entry.infraspecific_name = "teststrain"
         pair = self.client._organism_key_value_pair(organism_entry)
         self.assertEqual(pair, "organism=testgenus%20testspecies%20teststrain")
+
+    def test_genome_version_key_value_pair(self):
+        # Tests the correct creation of a key-value pair for a genome version with proper escaping applied
+        organism_entry = organism.Organism(genus="testgenus", species="testspecies", organism_id=33, version=11)
+        pair = self.client._genome_version_key_value_pair(organism_entry)
+        self.assertEqual(pair, "genome_version=11")
 
     def test_type_key_value_pair(self):
         # Tests the correct creation of a key-value pair for a feature type with proper escaping applied

@@ -420,7 +420,7 @@ class TestPublic(unittest.TestCase):
         organism_obj = organism.Organism(genus=utils.random_string(10), species=utils.random_string(10),
                                          abbreviation=utils.random_string(10), common_name=utils.random_string(10),
                                          infraspecific_name=utils.random_string(10), comment=utils.random_string(10),
-                                         type_id=type_obj.cvterm_id)
+                                         type_id=type_obj.cvterm_id, version=utils.random_integer(100))
         self.client.add_and_flush(organism_obj)
         return organism_obj
 
@@ -433,17 +433,25 @@ class TestPublic(unittest.TestCase):
     def test_organism_type_id_fkey(self):
         # Test foreign key constraint on 'organism.type_id'
         existing_obj = self.add_organism_object()
-        obj = organism.Organism(genus=existing_obj.genus, species=existing_obj.species,
-                                type_id=(existing_obj.type_id+100))
+        obj = organism.Organism(genus=utils.random_string(10), species=utils.random_string(10),
+                                abbreviation=utils.random_string(10), type_id=(existing_obj.type_id+100))
         with self.assertRaises(sqlalchemy.exc.IntegrityError):
             self.client.add_and_flush(obj)
 
     def test_organism_c1(self):
-        # Test unique constraint on 'organism.genus', 'organism.species', 'organism.type_id',
-        # 'organism.infraspecific_name'
+        # Test unique constraint on 'organism.genus', 'organism.species', 'organism.infraspecific_name'
         existing_obj = self.add_organism_object()
         obj = organism.Organism(genus=existing_obj.genus, species=existing_obj.species,
-                                infraspecific_name=existing_obj.infraspecific_name, type_id=existing_obj.type_id)
+                                infraspecific_name=existing_obj.infraspecific_name,
+                                abbreviation=utils.random_string(10), version=existing_obj.version)
+        with self.assertRaises(sqlalchemy.exc.IntegrityError):
+            self.client.add_and_flush(obj)
+
+    def test_organism_c2(self):
+        # Test unique constraint on 'organism.abbreviation'
+        existing_obj = self.add_organism_object()
+        obj = organism.Organism(genus=utils.random_string(10), species=utils.random_string(10),
+                                infraspecific_name=utils.random_string(10), abbreviation=existing_obj.abbreviation)
         with self.assertRaises(sqlalchemy.exc.IntegrityError):
             self.client.add_and_flush(obj)
 

@@ -310,26 +310,21 @@ class TestTasks(unittest.TestCase):
         mock_query.assert_called_with(self.uri, "testquery_with_params", "testfile", "csv", True, ";")
 
     @unittest.mock.patch('pychado.dbutils.query_and_print')
-    @unittest.mock.patch('pychado.queries.set_query_conditions')
-    @unittest.mock.patch('pychado.queries.load_query')
-    def test_extract_organisms(self, mock_load, mock_set, mock_query):
+    @unittest.mock.patch('pychado.io.direct.DirectIOClient')
+    def test_extract_organisms(self, mock_client, mock_query):
         # Checks that the function extracting organisms is correctly called
-        self.assertIs(mock_load, queries.load_query)
-        self.assertIs(mock_set, queries.set_query_conditions)
+        self.assertIs(mock_client, direct.DirectIOClient)
         self.assertIs(mock_query, dbutils.query_and_print)
 
-        args = ["chado", "extract", "organisms", "testdb"]
+        args = ["chado", "extract", "organisms", "--public_only", "testdb"]
         parsed_args = chado_tools.parse_arguments(args)
-        mock_load.return_value = "testquery"
-        mock_set.return_value = "testquery_with_params"
+        mock_client_obj = mock_client.return_value
+        mock_client_obj.configure_mock(**{"select_organisms.return_value": "testquery"})
 
         tasks.run_select_command(args[2], parsed_args, self.uri)
-        mock_load.assert_called_with("organisms")
-        mock_set.assert_called_with("testquery")
-        mock_query.assert_called_with(self.uri, "testquery_with_params", "", "csv", False, "\t")
-
-        tasks.run_select_command("inexistent_specifier", parsed_args, self.uri)
-        mock_set.assert_called_with("")
+        mock_client.assert_called_with(self.uri)
+        self.assertIn(unittest.mock.call().select_organisms(True, False), mock_client.mock_calls)
+        mock_query.assert_called_with(self.uri, "testquery", "", "csv", False, "\t")
 
     @unittest.mock.patch('pychado.dbutils.query_and_print')
     @unittest.mock.patch('pychado.queries.set_query_conditions')
@@ -349,6 +344,9 @@ class TestTasks(unittest.TestCase):
         mock_load.assert_called_with("cvterms")
         mock_set.assert_called_with("testquery", vocabulary="testvocabulary", database="testdatabase")
         mock_query.assert_called_with(self.uri, "testquery_with_params", "", "csv", False, "\t")
+
+        tasks.run_select_command("inexistent_specifier", parsed_args, self.uri)
+        mock_set.assert_called_with("")
 
     @unittest.mock.patch('pychado.dbutils.query_and_print')
     @unittest.mock.patch('pychado.queries.set_query_conditions')
@@ -398,7 +396,7 @@ class TestTasks(unittest.TestCase):
         tasks.run_insert_command(args[2], parsed_args, self.uri)
         mock_client.assert_called_with(self.uri)
         self.assertIn(unittest.mock.call().insert_organism("testgenus", "testspecies", "testorganism",
-                                                           None, None, None), mock_client.mock_calls)
+                                                           None, None, None, None), mock_client.mock_calls)
 
         mock_client.reset_mock()
         tasks.run_insert_command("inexistent_specifier", parsed_args, self.uri)
@@ -514,7 +512,7 @@ class TestTasks(unittest.TestCase):
         parsed_args = chado_tools.parse_arguments(args)
         tasks.run_export_command(args[2], parsed_args, self.uri)
         mock_client.assert_called_with(self.uri, False)
-        self.assertIn(unittest.mock.call().export("testfile", "testorganism", "proteins", "testrelease"),
+        self.assertIn(unittest.mock.call().export("testfile", "testorganism", "proteins", "testrelease", False),
                       mock_client.mock_calls)
 
     @unittest.mock.patch('pychado.io.gff.GFFExportClient')

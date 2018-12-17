@@ -219,12 +219,14 @@ class TestArguments(unittest.TestCase):
 
     def test_extract_organisms_args(self):
         # Tests if the command line arguments for the subcommand 'chado extract organisms' are parsed correctly
-        args = ["chado", "extract", "organisms", "-H", "-d", ";", "-o", "testfile", "testdb"]
+        args = ["chado", "extract", "organisms", "-H", "-d", ";", "-o", "testfile", "--public_only", "testdb"]
         parsed_args = vars(chado_tools.parse_arguments(args))
         self.assertTrue(parsed_args["include_header"])
         self.assertEqual(parsed_args["delimiter"], ";")
         self.assertEqual(parsed_args["output_file"], "testfile")
         self.assertEqual(parsed_args["format"], "csv")
+        self.assertTrue(parsed_args["public_only"])
+        self.assertFalse(parsed_args["extract_version"])
         self.assertEqual(parsed_args["dbname"], "testdb")
 
     def test_extract_cvterms_args(self):
@@ -254,7 +256,8 @@ class TestArguments(unittest.TestCase):
     def test_insert_organism_args(self):
         # Tests if the command line arguments for the subcommand 'chado insert organism' are parsed correctly
         args = ["chado", "insert", "organism", "-g", "testgenus", "-s", "testspecies", "-a", "testabbreviation",
-                "--common_name", "testname", "-i", "teststrain", "--comment", "testcomment", "testdb"]
+                "--common_name", "testname", "-i", "teststrain", "--comment", "testcomment", "--genome_version", "5",
+                "testdb"]
         parsed_args = vars(chado_tools.parse_arguments(args))
         self.assertEqual(parsed_args["genus"], "testgenus")
         self.assertEqual(parsed_args["species"], "testspecies")
@@ -262,6 +265,7 @@ class TestArguments(unittest.TestCase):
         self.assertEqual(parsed_args["abbreviation"], "testabbreviation")
         self.assertEqual(parsed_args["common_name"], "testname")
         self.assertEqual(parsed_args["comment"], "testcomment")
+        self.assertEqual(parsed_args["genome_version"], 5)
         self.assertEqual(parsed_args["dbname"], "testdb")
 
     def test_delete_organism_args(self):
@@ -342,6 +346,7 @@ class TestArguments(unittest.TestCase):
         self.assertEqual(parsed_args["organism"], "testorganism")
         self.assertEqual(parsed_args["sequence_type"], "proteins")
         self.assertEqual(parsed_args["release"], "testrelease")
+        self.assertFalse(parsed_args["extract_version"])
         self.assertEqual(parsed_args["dbname"], "testdb")
 
     def test_export_gff_args(self):

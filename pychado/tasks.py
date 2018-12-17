@@ -147,19 +147,21 @@ def run_execute_command(specifier: str, arguments, uri: str) -> None:
 
 def run_select_command(specifier: str, arguments, uri: str) -> None:
     """Run a pre-compiled query against a database"""
-    template = queries.load_query(specifier)
     if specifier == "organisms":
-        query = queries.set_query_conditions(template)
-    elif specifier == "cvterms":
-        query = queries.set_query_conditions(template, database=arguments.database, vocabulary=arguments.vocabulary)
-    elif specifier == "genedb_products":
-        query = queries.set_query_conditions(template, organism=arguments.organism)
-    elif specifier == "stats":
-        query = queries.set_query_conditions(template, organism=arguments.organism, start_date=arguments.start_date,
-                                             end_date=(arguments.end_date or utils.current_date()))
+        client = direct.DirectIOClient(uri)
+        query = client.select_organisms(arguments.public_only, arguments.extract_version)
     else:
-        print("Functionality 'extract " + specifier + "' is not yet implemented.")
-        query = queries.set_query_conditions("")
+        template = queries.load_query(specifier)
+        if specifier == "cvterms":
+            query = queries.set_query_conditions(template, database=arguments.database, vocabulary=arguments.vocabulary)
+        elif specifier == "genedb_products":
+            query = queries.set_query_conditions(template, organism=arguments.organism)
+        elif specifier == "stats":
+            query = queries.set_query_conditions(template, organism=arguments.organism, start_date=arguments.start_date,
+                                                 end_date=(arguments.end_date or utils.current_date()))
+        else:
+            print("Functionality 'extract " + specifier + "' is not yet implemented.")
+            query = queries.set_query_conditions("")
     dbutils.query_and_print(uri, query, arguments.output_file, arguments.format, arguments.include_header,
                             arguments.delimiter)
     if arguments.output_file:
@@ -171,7 +173,7 @@ def run_insert_command(specifier: str, arguments, uri: str) -> None:
     client = direct.DirectIOClient(uri)
     if specifier == "organism":
         client.insert_organism(arguments.genus, arguments.species, arguments.abbreviation, arguments.common_name,
-                               arguments.infraspecific_name, arguments.comment)
+                               arguments.infraspecific_name, arguments.comment, arguments.genome_version)
     else:
         print("Functionality 'insert " + specifier + "' is not yet implemented.")
 
@@ -217,7 +219,8 @@ def run_export_command(specifier: str, arguments, uri: str) -> None:
     """Exports data from a database to a file"""
     if specifier == "fasta":
         client = fasta.FastaExportClient(uri, arguments.verbose)
-        client.export(arguments.output_file, arguments.organism, arguments.sequence_type, arguments.release)
+        client.export(arguments.output_file, arguments.organism, arguments.sequence_type, arguments.release,
+                      arguments.extract_version)
     elif specifier == "gff":
         client = gff.GFFExportClient(uri, arguments.verbose)
         client.export(arguments.output_file, arguments.organism, arguments.export_fasta, arguments.fasta_file)

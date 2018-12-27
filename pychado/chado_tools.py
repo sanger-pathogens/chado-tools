@@ -116,7 +116,8 @@ def export_commands() -> dict:
     """Lists the available sub-commands of the 'chado export' command with corresponding descriptions"""
     return {
         "fasta": "export genome/protein sequences from the CHADO database to a FASTA file",
-        "gff": "export genomic data from the CHADO database to a GFF3 file"
+        "gff": "export genomic data from the CHADO database to a GFF3 file",
+        "gaf": "export gene annotation data from the CHADO database to a GAF file"
     }
 
 
@@ -492,6 +493,8 @@ def add_export_arguments_by_command(command: str, parser: argparse.ArgumentParse
         add_export_fasta_arguments(parser)
     elif command == "gff":
         add_export_gff_arguments(parser)
+    elif command == "gaf":
+        add_export_gaf_arguments(parser)
     else:
         print("Command '" + parser.prog + "' is not available.")
 
@@ -514,3 +517,15 @@ def add_export_gff_arguments(parser: argparse.ArgumentParser):
                         help="abbreviation/short name of the organism")
     parser.add_argument("--export_fasta", action="store_true", help="export FASTA sequences along with annotations")
     parser.add_argument("--fasta_file", help="FASTA output file with sequences (default: paste to end of GFF file)")
+
+
+def add_export_gaf_arguments(parser: argparse.ArgumentParser):
+    """Defines formal arguments for the 'chado export gff' sub-command"""
+    parser.add_argument("-f", "--output_file", required=True, help="GAF output file")
+    parser.add_argument("-a", "--abbreviation", required=True, dest="organism",
+                        help="abbreviation/short name of the organism")
+    parser.add_argument("-A", "--database_authority", required=True,
+                        help="database from which the file is created, e.g. 'UniProtKB'")
+    parser.add_argument("-t", "--feature_type", choices={"default", "gene", "transcript", "protein"}, default="default",
+                        help="type of the features in the output file (default: use features to which GO terms are "
+                             "related in the database)")

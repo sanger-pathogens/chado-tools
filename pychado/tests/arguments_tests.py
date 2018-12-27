@@ -68,9 +68,10 @@ class TestCommands(unittest.TestCase):
 
     def test_export_commands(self):
         commands = chado_tools.export_commands()
-        self.assertEqual(len(commands), 2)
+        self.assertEqual(len(commands), 3)
         self.assertIn("fasta", commands)
         self.assertIn("gff", commands)
+        self.assertIn("gaf", commands)
 
     def test_execute_commands(self):
         commands = chado_tools.execute_commands()
@@ -358,6 +359,17 @@ class TestArguments(unittest.TestCase):
         self.assertEqual(parsed_args["organism"], "testorganism")
         self.assertTrue(parsed_args["export_fasta"])
         self.assertEqual(parsed_args["fasta_file"], "testfasta")
+        self.assertEqual(parsed_args["dbname"], "testdb")
+
+    def test_export_gaf_args(self):
+        # Tests if the command line arguments for the subcommand 'chado export gaf' are parsed correctly
+        args = ["chado", "export", "gaf", "-f", "testfile", "-a", "testorganism", "-A", "testauthority",
+                "-t", "protein", "testdb"]
+        parsed_args = vars(chado_tools.parse_arguments(args))
+        self.assertEqual(parsed_args["output_file"], "testfile")
+        self.assertEqual(parsed_args["organism"], "testorganism")
+        self.assertEqual(parsed_args["database_authority"], "testauthority")
+        self.assertEqual(parsed_args["feature_type"], "protein")
         self.assertEqual(parsed_args["dbname"], "testdb")
 
 

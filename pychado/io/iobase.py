@@ -79,13 +79,23 @@ class IOClient(ddl.ChadoClient):
             .filter(sequence.FeatureSynonym.feature_id == feature_id)\
             .filter(sequence.Synonym.type_id.in_(type_ids))
 
-    def query_feature_cvterm_by_ontology(self, feature_id: int, ontology_ids: List[int]) -> sqlalchemy.orm.Query:
+    def query_feature_cvterm_by_ontology(self, feature_id: int, ontology_id: int) -> sqlalchemy.orm.Query:
         """Creates a query to select entries related to a specific 'dbxref.db_id' from the feature_cvterm table"""
         return self.session.query(sequence.FeatureCvTerm)\
             .join(cv.CvTerm, sequence.FeatureCvTerm.cvterm)\
             .join(general.DbxRef, cv.CvTerm.dbxref)\
             .filter(sequence.FeatureCvTerm.feature_id == feature_id)\
-            .filter(general.DbxRef.db_id.in_(ontology_ids))
+            .filter(general.DbxRef.db_id == ontology_id)
+
+    def query_feature_cvterm_by_ontology_and_organism(self, organism_id: int, ontology_id: int
+                                                      ) -> sqlalchemy.orm.Query:
+        """Creates a query to select ontology terms associated with feature of a given organism"""
+        return self.session.query(sequence.FeatureCvTerm)\
+            .join(sequence.Feature, sequence.FeatureCvTerm.feature)\
+            .join(cv.CvTerm, sequence.FeatureCvTerm.cvterm)\
+            .join(general.DbxRef, cv.CvTerm.dbxref)\
+            .filter(sequence.Feature.organism_id == organism_id)\
+            .filter(general.DbxRef.db_id == ontology_id)
 
     def query_parent_features(self, subject_id: int, type_ids: List[int]) -> sqlalchemy.orm.Query:
         """Creates a query to select the parent feature(s) of a given feature"""
@@ -156,7 +166,7 @@ class IOClient(ddl.ChadoClient):
             .join(cv.CvTerm, sequence.Synonym.type)\
             .filter(sequence.FeatureSynonym.feature_id == feature_id)
 
-    def query_feature_ontology_terms(self, feature_id: int, ontology_ids: List[int]) -> sqlalchemy.orm.Query:
+    def query_feature_ontology_terms(self, feature_id: int, ontology_id: int) -> sqlalchemy.orm.Query:
         """Creates a query to select ontology terms associated with a given feature"""
         return self.session.query(general.Db.name, general.DbxRef.accession)\
             .select_from(sequence.FeatureCvTerm)\
@@ -164,7 +174,53 @@ class IOClient(ddl.ChadoClient):
             .join(general.DbxRef, cv.CvTerm.dbxref)\
             .join(general.Db, general.DbxRef.db)\
             .filter(sequence.FeatureCvTerm.feature_id == feature_id)\
-            .filter(general.Db.db_id.in_(ontology_ids))
+            .filter(general.Db.db_id == ontology_id)
+
+    def query_feature_cvterm_properties(self, feature_cvterm_id: int) -> sqlalchemy.orm.Query:
+        """Creates a query to select key-value pairs from the 'feature_cvtermprop' table"""
+        return self.session.query(cv.CvTerm.name, sequence.FeatureCvTermProp.value)\
+            .select_from(sequence.FeatureCvTermProp)\
+            .join(cv.CvTerm, sequence.FeatureCvTermProp.type)\
+            .filter(sequence.FeatureCvTermProp.feature_cvterm_id == feature_cvterm_id)
+
+    def query_feature_cvterm_pubs(self, feature_cvterm_id: int) -> sqlalchemy.orm.Query:
+        """Creates a query to select entries from the 'pub' table associated with a given feature_cvterm"""
+        return self.session.query(pub.Pub.uniquename)\
+            .select_from(sequence.FeatureCvTerm)\
+            .join(pub.Pub, sequence.FeatureCvTerm.pub)\
+            .filter(sequence.FeatureCvTerm.feature_cvterm_id == feature_cvterm_id)
+
+    def query_feature_cvterm_secondary_pubs(self, feature_cvterm_id: int) -> sqlalchemy.orm.Query:
+        """Creates a query to select entries from the 'pub' table associated with a given feature_cvterm"""
+        return self.session.query(pub.Pub.uniquename)\
+            .select_from(sequence.FeatureCvTermPub)\
+            .join(pub.Pub, sequence.FeatureCvTermPub.pub)\
+            .filter(sequence.FeatureCvTermPub.feature_cvterm_id == feature_cvterm_id)
+
+    def query_feature_cvterm_dbxrefs(self, feature_cvterm_id: int) -> sqlalchemy.orm.Query:
+        """Creates a query to select dbxrefs associated with a given feature_cvterm"""
+        return self.session.query(general.Db.name, general.DbxRef.accession)\
+            .select_from(sequence.FeatureCvTermDbxRef)\
+            .join(general.DbxRef, sequence.FeatureCvTermDbxRef.dbxref)\
+            .join(general.Db, general.DbxRef.db)\
+            .filter(sequence.FeatureCvTermDbxRef.feature_cvterm_id == feature_cvterm_id)
+
+    def query_feature_cvterm_ontology_terms(self, feature_cvterm_id: int, ontology_id: int
+                                            ) -> sqlalchemy.orm.Query:
+        """Creates a query to select ontology terms associated with a given feature_cvterm"""
+        return self.session.query(general.Db.name, general.DbxRef.accession)\
+            .select_from(sequence.FeatureCvTerm)\
+            .join(cv.CvTerm, sequence.FeatureCvTerm.cvterm)\
+            .join(general.DbxRef, cv.CvTerm.dbxref)\
+            .join(general.Db, general.DbxRef.db)\
+            .filter(sequence.FeatureCvTerm.feature_cvterm_id == feature_cvterm_id)\
+            .filter(general.Db.db_id == ontology_id)
+
+    def query_cvterm_namespace(self, cvterm_id: int) -> sqlalchemy.orm.Query:
+        """Creates a query to select the namespace/vocabulary of a CV term"""
+        return self.session.query(cv.Cv.name).select_from(cv.CvTerm)\
+            .join(cv.Cv, cv.CvTerm.cv)\
+            .filter(cv.CvTerm.cvterm_id == cvterm_id)
 
     def query_all_organisms(self, query_version: bool) -> sqlalchemy.orm.Query:
         """Creates a query to select organisms in the database"""

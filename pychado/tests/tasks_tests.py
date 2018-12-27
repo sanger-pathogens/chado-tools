@@ -527,6 +527,18 @@ class TestTasks(unittest.TestCase):
         self.assertIn(unittest.mock.call().export("testfile", "testorganism", True, "testfasta"),
                       mock_client.mock_calls)
 
+    @unittest.mock.patch('pychado.io.gaf.GAFExportClient')
+    def test_export_gaf(self, mock_client):
+        # Checks that the function exporting gene annotation data from the database to a GAF file is correctly called
+        self.assertIs(mock_client, gaf.GAFExportClient)
+        args = ["chado", "export", "gaf", "-f", "testfile", "-a", "testorganism", "-A", "testauthority",
+                "-t", "protein", "testdb"]
+        parsed_args = chado_tools.parse_arguments(args)
+        tasks.run_export_command(args[2], parsed_args, self.uri)
+        mock_client.assert_called_with(self.uri, False)
+        self.assertIn(unittest.mock.call().export("testfile", "testorganism", "testauthority", "protein"),
+                      mock_client.mock_calls)
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=2, buffer=True)

@@ -55,7 +55,7 @@ class GFFClient(object):
     @staticmethod
     def _transcript_types() -> List[str]:
         """Lists considered transcript types"""
-        return ["mrna", "rrna", "trna", "snrna", "ncrna", "scrna", "snorna"]
+        return ["mrna", "rrna", "trna", "snrna", "ncrna", "scrna", "snorna", "pseudogenic_transcript"]
 
     @staticmethod
     def _feature_relationship_types() -> List[str]:
@@ -71,11 +71,6 @@ class GFFClient(object):
     def _synonym_types() -> List[str]:
         """Lists considered synonym types"""
         return ["alias", "synonym", "previous_systematic_id"]
-
-    @staticmethod
-    def _ontologies() -> List[str]:
-        """Lists considered ontologies"""
-        return ["GO"]
 
 
 class GFFImportClient(iobase.ImportClient, GFFClient):
@@ -134,7 +129,8 @@ class GFFImportClient(iobase.ImportClient, GFFClient):
         self._sequence_terms = self._load_terms_from_cv_dict(
             "sequence", ["gene", "intron", "exon", "CDS", "mRNA", "chromosome"])
         self._default_pub = self._load_pub("null")
-        self._ontology_ids = [db_entry.db_id for db_entry in self._load_dbs(self._ontologies())]
+
+        self._go_db = self._load_db("GO")
 
     def load(self, filename: str, organism_name: str, fasta_filename: str, sequence_type: str, fresh_load=False,
              force_purge=False, full_genome=False):
@@ -500,7 +496,7 @@ class GFFImportClient(iobase.ImportClient, GFFClient):
 
         # Extract existing ontology terms for this feature from the database
         existing_feature_cvterms = self.query_feature_cvterm_by_ontology(
-            feature_entry.feature_id, self._ontology_ids).all()
+            feature_entry.feature_id, self._go_db.db_id).all()
         all_feature_cvterms = []
 
         # Loop over all ontology terms of this feature in the GFF record
@@ -785,7 +781,7 @@ class GFFExportClient(iobase.ExportClient, GFFClient):
                               self._derives_from_term.name: self._derives_from_term}
         self._parent_type_ids = [self._part_of_term.cvterm_id, self._derives_from_term.cvterm_id]
         self._top_level_term = self._load_cvterm("top_level_seq")
-        self._ontology_ids = [db_entry.db_id for db_entry in self._load_dbs(self._ontologies())]
+        self._go_db = self._load_db("GO")
 
     def export(self, gff_filename: str, organism_name: str, export_fasta: bool, fasta_filename: str) -> None:
         """Exports sequences from Chado to a GFF file"""
@@ -954,7 +950,7 @@ class GFFExportClient(iobase.ExportClient, GFFClient):
         """Extracts ontology terms associated with a feature by a database query"""
         ontology_terms = []
         for db_authority, accession in self.query_feature_ontology_terms(
-                feature_entry.feature_id, self._ontology_ids).all():
+                feature_entry.feature_id, self._go_db.db_id).all():
             crossref = ontology.create_dbxref(db_authority, accession)
             ontology_terms.append(crossref)
         return ontology_terms

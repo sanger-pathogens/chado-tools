@@ -12,8 +12,8 @@ class InputFileError(Exception):
     pass
 
 
-class IOClient(ddl.ChadoClient):
-    """Base class for read-write access to a CHADO database"""
+class IOClient(ddl.DatabaseAccessClient):
+    """Base class for read-write access to a database"""
 
     def __init__(self, uri: str):
         """Constructor - connect to database"""
@@ -59,6 +59,19 @@ class IOClient(ddl.ChadoClient):
             entry = self.insert_into_table(table, **kwargs)
         return entry
 
+
+class ChadoClient(IOClient):
+    """Class for import/export operations on Chado databases"""
+
+    def __init__(self, uri: str, verbose=False):
+        """Constructor"""
+
+        # Connect to database
+        super().__init__(uri)
+
+        # Set up printer
+        self.printer = utils.VerbosePrinter(verbose)
+
     def query_feature_relationship_by_type(self, subject_id: int, type_ids: List[int]) -> sqlalchemy.orm.Query:
         """Creates a query to select entries with specific 'type_id' from the feature_relationship table"""
         return self.session.query(sequence.FeatureRelationship)\
@@ -79,13 +92,23 @@ class IOClient(ddl.ChadoClient):
             .filter(sequence.FeatureSynonym.feature_id == feature_id)\
             .filter(sequence.Synonym.type_id.in_(type_ids))
 
-    def query_feature_cvterm_by_ontology(self, feature_id: int, ontology_ids: List[int]) -> sqlalchemy.orm.Query:
+    def query_feature_cvterm_by_ontology(self, feature_id: int, ontology_id: int) -> sqlalchemy.orm.Query:
         """Creates a query to select entries related to a specific 'dbxref.db_id' from the feature_cvterm table"""
         return self.session.query(sequence.FeatureCvTerm)\
             .join(cv.CvTerm, sequence.FeatureCvTerm.cvterm)\
             .join(general.DbxRef, cv.CvTerm.dbxref)\
             .filter(sequence.FeatureCvTerm.feature_id == feature_id)\
-            .filter(general.DbxRef.db_id.in_(ontology_ids))
+            .filter(general.DbxRef.db_id == ontology_id)
+
+    def query_feature_cvterm_by_ontology_and_organism(self, organism_id: int, ontology_id: int
+                                                      ) -> sqlalchemy.orm.Query:
+        """Creates a query to select ontology terms associated with feature of a given organism"""
+        return self.session.query(sequence.FeatureCvTerm)\
+            .join(sequence.Feature, sequence.FeatureCvTerm.feature)\
+            .join(cv.CvTerm, sequence.FeatureCvTerm.cvterm)\
+            .join(general.DbxRef, cv.CvTerm.dbxref)\
+            .filter(sequence.Feature.organism_id == organism_id)\
+            .filter(general.DbxRef.db_id == ontology_id)
 
     def query_parent_features(self, subject_id: int, type_ids: List[int]) -> sqlalchemy.orm.Query:
         """Creates a query to select the parent feature(s) of a given feature"""
@@ -156,7 +179,7 @@ class IOClient(ddl.ChadoClient):
             .join(cv.CvTerm, sequence.Synonym.type)\
             .filter(sequence.FeatureSynonym.feature_id == feature_id)
 
-    def query_feature_ontology_terms(self, feature_id: int, ontology_ids: List[int]) -> sqlalchemy.orm.Query:
+    def query_feature_ontology_terms(self, feature_id: int, ontology_id: int) -> sqlalchemy.orm.Query:
         """Creates a query to select ontology terms associated with a given feature"""
         return self.session.query(general.Db.name, general.DbxRef.accession)\
             .select_from(sequence.FeatureCvTerm)\
@@ -164,7 +187,53 @@ class IOClient(ddl.ChadoClient):
             .join(general.DbxRef, cv.CvTerm.dbxref)\
             .join(general.Db, general.DbxRef.db)\
             .filter(sequence.FeatureCvTerm.feature_id == feature_id)\
-            .filter(general.Db.db_id.in_(ontology_ids))
+            .filter(general.Db.db_id == ontology_id)
+
+    def query_feature_cvterm_properties(self, feature_cvterm_id: int) -> sqlalchemy.orm.Query:
+        """Creates a query to select key-value pairs from the 'feature_cvtermprop' table"""
+        return self.session.query(cv.CvTerm.name, sequence.FeatureCvTermProp.value)\
+            .select_from(sequence.FeatureCvTermProp)\
+            .join(cv.CvTerm, sequence.FeatureCvTermProp.type)\
+            .filter(sequence.FeatureCvTermProp.feature_cvterm_id == feature_cvterm_id)
+
+    def query_feature_cvterm_pubs(self, feature_cvterm_id: int) -> sqlalchemy.orm.Query:
+        """Creates a query to select entries from the 'pub' table associated with a given feature_cvterm"""
+        return self.session.query(pub.Pub.uniquename)\
+            .select_from(sequence.FeatureCvTerm)\
+            .join(pub.Pub, sequence.FeatureCvTerm.pub)\
+            .filter(sequence.FeatureCvTerm.feature_cvterm_id == feature_cvterm_id)
+
+    def query_feature_cvterm_secondary_pubs(self, feature_cvterm_id: int) -> sqlalchemy.orm.Query:
+        """Creates a query to select entries from the 'pub' table associated with a given feature_cvterm"""
+        return self.session.query(pub.Pub.uniquename)\
+            .select_from(sequence.FeatureCvTermPub)\
+            .join(pub.Pub, sequence.FeatureCvTermPub.pub)\
+            .filter(sequence.FeatureCvTermPub.feature_cvterm_id == feature_cvterm_id)
+
+    def query_feature_cvterm_dbxrefs(self, feature_cvterm_id: int) -> sqlalchemy.orm.Query:
+        """Creates a query to select dbxrefs associated with a given feature_cvterm"""
+        return self.session.query(general.Db.name, general.DbxRef.accession)\
+            .select_from(sequence.FeatureCvTermDbxRef)\
+            .join(general.DbxRef, sequence.FeatureCvTermDbxRef.dbxref)\
+            .join(general.Db, general.DbxRef.db)\
+            .filter(sequence.FeatureCvTermDbxRef.feature_cvterm_id == feature_cvterm_id)
+
+    def query_feature_cvterm_ontology_terms(self, feature_cvterm_id: int, ontology_id: int
+                                            ) -> sqlalchemy.orm.Query:
+        """Creates a query to select ontology terms associated with a given feature_cvterm"""
+        return self.session.query(general.Db.name, general.DbxRef.accession)\
+            .select_from(sequence.FeatureCvTerm)\
+            .join(cv.CvTerm, sequence.FeatureCvTerm.cvterm)\
+            .join(general.DbxRef, cv.CvTerm.dbxref)\
+            .join(general.Db, general.DbxRef.db)\
+            .filter(sequence.FeatureCvTerm.feature_cvterm_id == feature_cvterm_id)\
+            .filter(general.Db.db_id == ontology_id)
+
+    def query_cvterm_namespace(self, cvterm_id: int) -> sqlalchemy.orm.Query:
+        """Creates a query to select the namespace/vocabulary of a CV term"""
+        return self.session.query(cv.Cv.name).select_from(cv.CvTerm)\
+            .join(cv.Cv, cv.CvTerm.cv)\
+            .filter(cv.CvTerm.cvterm_id == cvterm_id)
 
     def query_all_organisms(self, query_version: bool) -> sqlalchemy.orm.Query:
         """Creates a query to select organisms in the database"""
@@ -279,19 +348,6 @@ class IOClient(ddl.ChadoClient):
                 organism_id=organism_entry.organism_id):
             all_feature_names.append(feature_name)
         return all_feature_names
-
-
-class ImportClient(IOClient):
-    """Base class for importing data into a CHADO database"""
-
-    def __init__(self, uri: str, verbose=False):
-        """Constructor"""
-
-        # Connect to database
-        super().__init__(uri)
-
-        # Set up printer
-        self.printer = utils.VerbosePrinter(verbose)
 
     def _handle_db(self, new_entry: general.Db) -> general.Db:
         """Inserts or updates an entry in the 'db' table, and returns it"""
@@ -705,7 +761,7 @@ class ImportClient(IOClient):
         return deleted_entries
 
     def _handle_feature_cvtermprop(self, new_entry: sequence.FeatureCvTermProp,
-                                   existing_entries: List[sequence.FeatureCvTermProp], key=""
+                                   existing_entries: List[sequence.FeatureCvTermProp], key="", feature_name=""
                                    ) -> sequence.FeatureCvTermProp:
         """Inserts or updates an entry in the 'feature_cvtermprop' table, and returns it"""
 
@@ -717,17 +773,19 @@ class ImportClient(IOClient):
             # Nothing to update, return existing entry
             matching_entry = matching_entries[0]
             if self.update_feature_cvtermprop_properties(matching_entry, new_entry):
-                self.printer.print("Updated property '" + key + "' = '" + new_entry.value + "'")
+                self.printer.print("Updated CV term property '" + key + "' = '" + new_entry.value
+                                   + "' for feature '" + feature_name + "'")
             return matching_entry
         else:
 
             # Insert a new feature_cvtermprop entry
             self.add_and_flush(new_entry)
-            self.printer.print("Inserted property '" + key + "' = '" + new_entry.value + "'")
+            self.printer.print("Inserted CV term property '" + key + "' = '" + new_entry.value
+                               + "' for feature '" + feature_name + "'")
             return new_entry
 
     def _handle_feature_cvterm_dbxref(self, new_entry: sequence.FeatureCvTermDbxRef,
-                                      existing_entries: List[sequence.FeatureCvTermDbxRef], crossref=""
+                                      existing_entries: List[sequence.FeatureCvTermDbxRef], crossref="", feature_name=""
                                       ) -> sequence.FeatureCvTermDbxRef:
         """Inserts or updates an entry in the 'feature_cvterm_dbxref' table, and returns it"""
 
@@ -742,11 +800,11 @@ class ImportClient(IOClient):
 
             # Insert a new feature_cvterm_dbxref entry
             self.add_and_flush(new_entry)
-            self.printer.print("Inserted cross reference '" + crossref + "'")
+            self.printer.print("Inserted CV term cross reference '" + crossref + "' for feature '" + feature_name + "'")
             return new_entry
 
     def _handle_feature_cvterm_pub(self, new_entry: sequence.FeatureCvTermPub,
-                                   existing_entries: List[sequence.FeatureCvTermPub], publication=""
+                                   existing_entries: List[sequence.FeatureCvTermPub], publication="", feature_name=""
                                    ) -> sequence.FeatureCvTermPub:
         """Inserts or updates an entry in the 'feature_cvterm_pub' table, and returns it"""
 
@@ -761,7 +819,7 @@ class ImportClient(IOClient):
 
             # Insert a new feature_cvterm_pub entry
             self.add_and_flush(new_entry)
-            self.printer.print("Inserted publication '" + publication + "'")
+            self.printer.print("Inserted CV term publication '" + publication + "' for feature '" + feature_name + "'")
             return new_entry
 
     def _mark_feature_as_obsolete(self, organism_entry: organism.Organism, uniquename: str) -> sequence.Feature:
@@ -854,16 +912,3 @@ class ImportClient(IOClient):
             if utils.copy_attribute(existing_entry, new_entry, attribute):
                 updated = True
         return updated
-
-
-class ExportClient(IOClient):
-    """Base class for exporting data from a CHADO database"""
-
-    def __init__(self, uri: str, verbose=False):
-        """Constructor"""
-
-        # Connect to database
-        super().__init__(uri)
-
-        # Set up printer
-        self.printer = utils.VerbosePrinter(verbose)

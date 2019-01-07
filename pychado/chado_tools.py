@@ -116,7 +116,8 @@ def export_commands() -> dict:
     """Lists the available sub-commands of the 'chado export' command with corresponding descriptions"""
     return {
         "fasta": "export genome/protein sequences from the CHADO database to a FASTA file",
-        "gff": "export genomic data from the CHADO database to a GFF3 file"
+        "gff": "export genomic data from the CHADO database to a GFF3 file",
+        "gaf": "export gene annotation data from the CHADO database to a GAF file"
     }
 
 
@@ -174,7 +175,7 @@ def add_general_extract_arguments(parser: argparse.ArgumentParser):
     parser.add_argument("-d", "--delimiter", default="\t",
                         help="Character delimiting fields in CSV output (default: tab)")
     parser.add_argument("-o", "--output_file", default="", help="file into which data are exported (default: stdout)")
-    parser.add_argument("-F", "--format", default="csv", choices={"csv", "json"},
+    parser.add_argument("-F", "--format", default="csv", choices=["csv", "json"],
                         help="format of the file (default: csv)")
 
 
@@ -246,7 +247,7 @@ def add_restore_arguments(parser: argparse.ArgumentParser):
 def add_setup_arguments(parser: argparse.ArgumentParser):
     """Defines formal arguments for the 'chado admin setup' sub-command"""
     group = parser.add_mutually_exclusive_group()
-    group.add_argument("-s", "--schema", choices={"gmod", "basic", "audit", "audit_backup"}, default="gmod",
+    group.add_argument("-s", "--schema", choices=["gmod", "basic", "audit", "audit_backup"], default="gmod",
                        help="Database schema (default: GMOD schema 1.31)")
     group.add_argument("-f", "--schema_file", default="", help="File with database schema")
 
@@ -439,7 +440,7 @@ def add_import_ontology_arguments(parser: argparse.ArgumentParser):
     group.add_argument("-u", "--input_url", default="", help="URL to a file containing CV terms")
     parser.add_argument("-A", "--database_authority", required=True,
                         help="database authority of the terms in the file, e.g. 'GO'")
-    parser.add_argument("-F", "--format", default="obo", choices={"obo", "owl"},
+    parser.add_argument("-F", "--format", default="obo", choices=["obo", "owl"],
                         help="format of the file (default: obo)")
 
 
@@ -449,7 +450,7 @@ def add_import_gff_arguments(parser: argparse.ArgumentParser):
     parser.add_argument("-a", "--abbreviation", required=True, dest="organism",
                         help="abbreviation/short name of the organism")
     parser.add_argument("--fasta", help="FASTA input file with sequences")
-    parser.add_argument("-t", "--sequence_type", choices={"chromosome", "supercontig", "contig", "region"},
+    parser.add_argument("-t", "--sequence_type", choices=["chromosome", "supercontig", "contig", "region"],
                         default="region", help="type of the FASTA sequences, if present (default: region)")
     parser.add_argument("--fresh_load", action="store_true",
                         help="load a genome from scratch (default: load an update to an existing genome)")
@@ -464,7 +465,7 @@ def add_import_fasta_arguments(parser: argparse.ArgumentParser):
     parser.add_argument("-f", "--input_file", required=True, help="FASTA input file")
     parser.add_argument("-a", "--abbreviation", required=True, dest="organism",
                         help="abbreviation/short name of the organism")
-    parser.add_argument("-t", "--sequence_type", choices={"chromosome", "supercontig", "contig", "region"},
+    parser.add_argument("-t", "--sequence_type", choices=["chromosome", "supercontig", "contig", "region"],
                         default="region", help="type of the sequences (default: region)")
 
 
@@ -473,6 +474,9 @@ def add_import_gaf_arguments(parser: argparse.ArgumentParser):
     parser.add_argument("-f", "--input_file", required=True, help="GFF3 input file")
     parser.add_argument("-a", "--abbreviation", required=True, dest="organism",
                         help="abbreviation/short name of the organism")
+    parser.add_argument("-L", "--annotation_level", choices=["default", "gene", "transcript", "protein"],
+                        default="default", help="level to which GO terms are related in the database (default: "
+                                                "same level as in the input file)")
 
 
 def add_export_arguments(parser: argparse.ArgumentParser):
@@ -492,6 +496,8 @@ def add_export_arguments_by_command(command: str, parser: argparse.ArgumentParse
         add_export_fasta_arguments(parser)
     elif command == "gff":
         add_export_gff_arguments(parser)
+    elif command == "gaf":
+        add_export_gaf_arguments(parser)
     else:
         print("Command '" + parser.prog + "' is not available.")
 
@@ -501,7 +507,7 @@ def add_export_fasta_arguments(parser: argparse.ArgumentParser):
     parser.add_argument("-f", "--output_file", required=True, help="FASTA output file")
     parser.add_argument("-a", "--abbreviation", required=True, dest="organism",
                         help="abbreviation/short name of the organism")
-    parser.add_argument("-t", "--sequence_type", required=True, choices={"contigs", "genes", "proteins"},
+    parser.add_argument("-t", "--sequence_type", required=True, choices=["contigs", "genes", "proteins"],
                         help="type of the sequences to be exported")
     parser.add_argument("-r", "--release", help="name of the FASTA release")
     parser.add_argument("--extract_version", action="store_true", help="extract the genome version, if available")
@@ -514,3 +520,15 @@ def add_export_gff_arguments(parser: argparse.ArgumentParser):
                         help="abbreviation/short name of the organism")
     parser.add_argument("--export_fasta", action="store_true", help="export FASTA sequences along with annotations")
     parser.add_argument("--fasta_file", help="FASTA output file with sequences (default: paste to end of GFF file)")
+
+
+def add_export_gaf_arguments(parser: argparse.ArgumentParser):
+    """Defines formal arguments for the 'chado export gff' sub-command"""
+    parser.add_argument("-f", "--output_file", required=True, help="GAF output file")
+    parser.add_argument("-a", "--abbreviation", required=True, dest="organism",
+                        help="abbreviation/short name of the organism")
+    parser.add_argument("-A", "--database_authority", required=True,
+                        help="database from which the file is created, e.g. 'UniProtKB'")
+    parser.add_argument("-L", "--annotation_level", choices=["default", "gene", "transcript", "protein"],
+                        default="default", help="level to which GO terms are related in the output file (default: "
+                                                "same level as in the database)")

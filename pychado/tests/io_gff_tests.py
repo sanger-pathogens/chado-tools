@@ -43,7 +43,7 @@ class TestGFFImport(unittest.TestCase):
         cls.client._synonym_type_ids = [31, 32, 33]
         cls.client._feature_property_type_ids = [51, 52, 53]
         cls.client._parent_type_ids = [62, 63]
-        cls.client._ontology_ids = [131, 132]
+        cls.client._go_db = general.Db(db_id=131, name="GO")
 
     def setUp(self):
         # Creates a default GFF record
@@ -416,7 +416,7 @@ class TestGFFImport(unittest.TestCase):
                                         utils.EmptyObject(cvterm_id=55, name="")]
 
         all_ontology_terms = self.client._handle_ontology_terms(self.default_gff_record, feature_entry)
-        mock_query.assert_called_with(12, [131, 132])
+        mock_query.assert_called_with(12, 131)
         mock_query_first.assert_any_call(general.Db, name="GO")
         mock_query_first.assert_any_call(general.DbxRef, db_id=33, accession="7890")
         mock_query_first.assert_any_call(cv.CvTerm, dbxref_id=44)
@@ -630,7 +630,7 @@ class TestGFFExport(unittest.TestCase):
         }
         cls.client._top_level_term = cv.CvTerm(cv_id=11, dbxref_id=91, name="top_level_seq", cvterm_id=91)
         cls.client._parent_type_ids = [62, 63]
-        cls.client._ontology_ids = [131, 132]
+        cls.client._go_db = general.Db(db_id=131, name="GO")
 
     @unittest.mock.patch("pychado.io.gff.GFFExportClient._export_gff_record")
     @unittest.mock.patch("pychado.io.gff.GFFExportClient.query_child_features")
@@ -820,7 +820,7 @@ class TestGFFExport(unittest.TestCase):
         mock_query_obj = mock_query.return_value
         mock_query_obj.configure_mock(**{"all.return_value": [("GO", "12345"), ("SO", "54321")]})
         ontology_terms = self.client._extract_feature_ontology_terms(feature_entry)
-        mock_query.assert_called_with(77, [131, 132])
+        mock_query.assert_called_with(77, 131)
         self.assertEqual(ontology_terms, ["GO:12345", "SO:54321"])
 
     def test_add_gff_featuretype(self):

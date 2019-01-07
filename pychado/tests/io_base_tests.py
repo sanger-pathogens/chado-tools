@@ -86,6 +86,38 @@ class TestIOClient(unittest.TestCase):
         full_table = self.client.query_all(Species)
         self.assertEqual(len(full_table), 3)
 
+
+class TestChadoClient(unittest.TestCase):
+    """Test functions for loading data into a CHADO database"""
+
+    connection_parameters = utils.parse_yaml(dbutils.default_configuration_file())
+    connection_uri = dbutils.random_database_uri(connection_parameters)
+
+    @classmethod
+    def setUpClass(cls):
+        # Creates a database, establishes a connection, creates tables and populates them with essential entries
+        dbutils.create_database(cls.connection_uri)
+        schema_base = base.PublicBase
+        schema_metadata = schema_base.metadata
+        essentials_client = essentials.EssentialsClient(cls.connection_uri)
+        schema_metadata.create_all(essentials_client.engine, tables=schema_metadata.sorted_tables)
+        essentials_client.load()
+        cls.client = iobase.ChadoClient(cls.connection_uri)
+
+    @classmethod
+    def tearDownClass(cls):
+        # Drops the database
+        dbutils.drop_database(cls.connection_uri, True)
+
+    def setUp(self):
+        # Inserts default entries into database tables
+        (self.default_db, self.default_dbxref, self.default_cv, self.default_cvterm, self.default_organism,
+         self.default_feature, self.default_pub, self.default_synonym) = self.insert_default_entries()
+
+    def tearDown(self):
+        # Rolls back all changes to the database
+        self.client.session.rollback()
+
     def test_query_feature_relationship_by_type(self):
         # Tests the function that creates a query against the feature_relationship table
         query = self.client.query_feature_relationship_by_type(12, [300, 400])
@@ -113,13 +145,24 @@ class TestIOClient(unittest.TestCase):
 
     def test_query_feature_cvterm_by_ontology(self):
         # Tests the function that creates a query against the feature_cvterm table
-        query = self.client.query_feature_cvterm_by_ontology(12, [300, 400])
+        query = self.client.query_feature_cvterm_by_ontology(12, 300)
         compiled_query = str(query.statement.compile(compile_kwargs={"literal_binds": True}))
         self.assertIn("FROM public.feature_cvterm JOIN public.cvterm ON public.cvterm.cvterm_id = "
                       "public.feature_cvterm.cvterm_id JOIN public.dbxref ON public.dbxref.dbxref_id = "
                       "public.cvterm.dbxref_id", compiled_query)
         self.assertIn("feature_cvterm.feature_id = 12", compiled_query)
-        self.assertIn("dbxref.db_id IN (300, 400)", compiled_query)
+        self.assertIn("dbxref.db_id = 300", compiled_query)
+
+    def test_query_feature_cvterm_by_ontology_and_organism(self):
+        # Tests the function that creates a query against the feature_cvterm table
+        query = self.client.query_feature_cvterm_by_ontology_and_organism(12, 300)
+        compiled_query = str(query.statement.compile(compile_kwargs={"literal_binds": True}))
+        self.assertIn("FROM public.feature_cvterm JOIN public.feature ON public.feature.feature_id = "
+                      "public.feature_cvterm.feature_id JOIN public.cvterm ON public.cvterm.cvterm_id = "
+                      "public.feature_cvterm.cvterm_id JOIN public.dbxref ON public.dbxref.dbxref_id = "
+                      "public.cvterm.dbxref_id", compiled_query)
+        self.assertIn("feature.organism_id = 12", compiled_query)
+        self.assertIn("dbxref.db_id = 300", compiled_query)
 
     def test_query_parent_features(self):
         # Tests the function that creates a query against the feature_relationship table
@@ -206,14 +249,70 @@ class TestIOClient(unittest.TestCase):
 
     def test_query_feature_ontology_terms(self):
         # Tests the function that creates a query against the feature_cvterm, cvterm, dxbref and db tables
-        query = self.client.query_feature_ontology_terms(44, [81, 82])
+        query = self.client.query_feature_ontology_terms(44, 81)
         compiled_query = str(query.statement.compile(compile_kwargs={"literal_binds": True}))
         self.assertIn("SELECT public.db.name, public.dbxref.accession", compiled_query)
         self.assertIn("FROM public.feature_cvterm JOIN public.cvterm "
                       "ON public.cvterm.cvterm_id = public.feature_cvterm.cvterm_id JOIN public.dbxref "
                       "ON public.dbxref.dbxref_id = public.cvterm.dbxref_id JOIN public.db "
                       "ON public.db.db_id = public.dbxref.db_id", compiled_query)
-        self.assertIn("WHERE public.feature_cvterm.feature_id = 44 AND public.db.db_id IN (81, 82)", compiled_query)
+        self.assertIn("WHERE public.feature_cvterm.feature_id = 44 AND public.db.db_id = 81", compiled_query)
+
+    def test_query_feature_cvterm_properties(self):
+        # Tests the function that creates a query against the feature_cvtermprop table
+        query = self.client.query_feature_cvterm_properties(44)
+        compiled_query = str(query.statement.compile(compile_kwargs={"literal_binds": True}))
+        self.assertIn("SELECT public.cvterm.name, public.feature_cvtermprop.value", compiled_query)
+        self.assertIn("FROM public.feature_cvtermprop JOIN public.cvterm "
+                      "ON public.cvterm.cvterm_id = public.feature_cvtermprop.type_id", compiled_query)
+        self.assertIn("WHERE public.feature_cvtermprop.feature_cvterm_id = 44", compiled_query)
+
+    def test_query_feature_cvterm_pubs(self):
+        # Tests the function that creates a query against the feature_cvterm and pub tables
+        query = self.client.query_feature_cvterm_pubs(44)
+        compiled_query = str(query.statement.compile(compile_kwargs={"literal_binds": True}))
+        self.assertIn("SELECT public.pub.uniquename", compiled_query)
+        self.assertIn("FROM public.feature_cvterm JOIN public.pub "
+                      "ON public.pub.pub_id = public.feature_cvterm.pub_id", compiled_query)
+        self.assertIn("WHERE public.feature_cvterm.feature_cvterm_id = 44", compiled_query)
+
+    def test_query_feature_cvterm_secondary_pubs(self):
+        # Tests the function that creates a query against the feature_cvterm_pub and pub tables
+        query = self.client.query_feature_cvterm_secondary_pubs(44)
+        compiled_query = str(query.statement.compile(compile_kwargs={"literal_binds": True}))
+        self.assertIn("SELECT public.pub.uniquename", compiled_query)
+        self.assertIn("FROM public.feature_cvterm_pub JOIN public.pub "
+                      "ON public.pub.pub_id = public.feature_cvterm_pub.pub_id", compiled_query)
+        self.assertIn("WHERE public.feature_cvterm_pub.feature_cvterm_id = 44", compiled_query)
+
+    def test_query_feature_cvterm_dbxrefs(self):
+        # Tests the function that creates a query against the feature_cvterm_dbxref, dxbref and db tables
+        query = self.client.query_feature_cvterm_dbxrefs(44)
+        compiled_query = str(query.statement.compile(compile_kwargs={"literal_binds": True}))
+        self.assertIn("SELECT public.db.name, public.dbxref.accession", compiled_query)
+        self.assertIn("FROM public.feature_cvterm_dbxref JOIN public.dbxref "
+                      "ON public.dbxref.dbxref_id = public.feature_cvterm_dbxref.dbxref_id JOIN public.db "
+                      "ON public.db.db_id = public.dbxref.db_id", compiled_query)
+        self.assertIn("WHERE public.feature_cvterm_dbxref.feature_cvterm_id = 44", compiled_query)
+
+    def test_query_feature_cvterm_ontology_terms(self):
+        # Tests the function that creates a query against the feature_cvterm, cvterm, dxbref and db tables
+        query = self.client.query_feature_cvterm_ontology_terms(44, 81)
+        compiled_query = str(query.statement.compile(compile_kwargs={"literal_binds": True}))
+        self.assertIn("SELECT public.db.name, public.dbxref.accession", compiled_query)
+        self.assertIn("FROM public.feature_cvterm JOIN public.cvterm "
+                      "ON public.cvterm.cvterm_id = public.feature_cvterm.cvterm_id JOIN public.dbxref "
+                      "ON public.dbxref.dbxref_id = public.cvterm.dbxref_id JOIN public.db "
+                      "ON public.db.db_id = public.dbxref.db_id", compiled_query)
+        self.assertIn("WHERE public.feature_cvterm.feature_cvterm_id = 44 AND public.db.db_id = 81", compiled_query)
+
+    def test_query_cvterm_namespace(self):
+        # Tests the function that creates a query against the cvterm and cv tables
+        query = self.client.query_cvterm_namespace(44)
+        compiled_query = str(query.statement.compile(compile_kwargs={"literal_binds": True}))
+        self.assertIn("SELECT public.cv.name", compiled_query)
+        self.assertIn("FROM public.cvterm JOIN public.cv ON public.cv.cv_id = public.cvterm.cv_id", compiled_query)
+        self.assertIn("WHERE public.cvterm.cvterm_id = 44", compiled_query)
 
     def test_query_all_organisms(self):
         # Tests the function that creates a query against the organism table
@@ -232,38 +331,6 @@ class TestIOClient(unittest.TestCase):
         self.assertIn("FROM public.organismprop JOIN public.organism "
                       "ON public.organism.organism_id = public.organismprop.organism_id", compiled_query)
         self.assertIn("WHERE public.organismprop.type_id = 44", compiled_query)
-
-
-class TestImportClient(unittest.TestCase):
-    """Test functions for loading data into a CHADO database"""
-
-    connection_parameters = utils.parse_yaml(dbutils.default_configuration_file())
-    connection_uri = dbutils.random_database_uri(connection_parameters)
-
-    @classmethod
-    def setUpClass(cls):
-        # Creates a database, establishes a connection, creates tables and populates them with essential entries
-        dbutils.create_database(cls.connection_uri)
-        schema_base = base.PublicBase
-        schema_metadata = schema_base.metadata
-        essentials_client = essentials.EssentialsClient(cls.connection_uri)
-        schema_metadata.create_all(essentials_client.engine, tables=schema_metadata.sorted_tables)
-        essentials_client.load()
-        cls.client = iobase.ImportClient(cls.connection_uri)
-
-    @classmethod
-    def tearDownClass(cls):
-        # Drops the database
-        dbutils.drop_database(cls.connection_uri, True)
-
-    def setUp(self):
-        # Inserts default entries into database tables
-        (self.default_db, self.default_dbxref, self.default_cv, self.default_cvterm, self.default_organism,
-         self.default_feature, self.default_pub, self.default_synonym) = self.insert_default_entries()
-
-    def tearDown(self):
-        # Rolls back all changes to the database
-        self.client.session.rollback()
 
     def insert_default_entries(self):
         # Inserts CV terms needed as basis for virtually all tests

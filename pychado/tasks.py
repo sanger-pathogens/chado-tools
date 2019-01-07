@@ -210,7 +210,7 @@ def run_import_command(specifier: str, arguments, uri: str) -> None:
         client.load(file, arguments.organism, arguments.sequence_type)
     elif specifier == "gaf":
         client = gaf.GAFImportClient(uri, arguments.verbose)
-        client.load(file, arguments.organism)
+        client.load(file, arguments.organism, arguments.annotation_level)
     else:
         print("Functionality 'import " + specifier + "' is not yet implemented.")
 
@@ -224,5 +224,9 @@ def run_export_command(specifier: str, arguments, uri: str) -> None:
     elif specifier == "gff":
         client = gff.GFFExportClient(uri, arguments.verbose)
         client.export(arguments.output_file, arguments.organism, arguments.export_fasta, arguments.fasta_file)
+    elif specifier == "gaf":
+        client = gaf.GAFExportClient(uri, arguments.verbose)
+        client.export(arguments.output_file, arguments.organism, arguments.database_authority,
+                      arguments.annotation_level)
     else:
         print("Functionality 'export " + specifier + "' is not yet implemented.")

@@ -3,7 +3,7 @@ from . import iobase
 from ..orm import organism
 
 
-class DirectIOClient(iobase.IOClient):
+class DirectIOClient(iobase.ChadoClient):
     """Class for inserting, updating or deleting database entries"""
 
     def select_organisms(self, public_only: bool, query_version: bool) -> sqlalchemy.sql.Select:

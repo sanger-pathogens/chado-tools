@@ -7,7 +7,7 @@ from .. import utils
 from ..orm import cv, organism, sequence
 
 
-class FastaImportClient(iobase.ImportClient):
+class FastaImportClient(iobase.ChadoClient):
     """Class for importing genomic data from FASTA files into Chado"""
 
     def __init__(self, uri: str, verbose=False, test_environment=False):
@@ -102,7 +102,7 @@ class FastaImportClient(iobase.ImportClient):
         return None
 
 
-class FastaExportClient(iobase.ExportClient):
+class FastaExportClient(iobase.ChadoClient):
     """Class for exporting genomic data from Chado to FASTA files"""
 
     def __init__(self, uri: str, verbose=False, test_environment=False):

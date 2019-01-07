@@ -1,11 +1,114 @@
-from typing import List, Dict, Union
+from typing import List, Set, Dict, Union
 from Bio.UniProt import GOA
 from . import iobase, ontology
 from .. import utils
 from ..orm import general, cv, organism, pub, sequence
 
 
-class GAFClient(object):
+class GAFClient(iobase.ChadoClient):
+
+    def __init__(self, uri: str, verbose=False, test_environment=False):
+        """Constructor"""
+
+        # Connect to database
+        self.test_environment = test_environment
+        if not self.test_environment:
+            super().__init__(uri, verbose)
+
+        # Load essentials
+        if not self.test_environment:
+            self._load_essentials()
+
+    def __del__(self):
+        """Destructor - disconnect from database"""
+        if not self.test_environment:
+            super().__del__()
+
+    def _load_essentials(self) -> None:
+        """Loads essential database entries"""
+        self._part_of_term = self._load_cvterm_from_cv("part_of", "relationship")
+        self._derives_from_term = self._load_cvterm_from_cv("derives_from", "sequence")
+        self._date_term = self._load_cvterm("date")
+        self._evidence_term = self._load_cvterm("evidence")
+        self._synonym_term = self._load_cvterm("synonym")
+        self._taxon_term = self._load_cvterm("taxonId")
+        self._default_pub = self._load_pub("null")
+        self._go_db = self._load_db("GO")
+        self._product_db = self._load_db("PRODUCT")
+
+    def _extract_feature_type(self, feature_entry: sequence.Feature) -> str:
+        """Extracts the type of a feature by a database query"""
+        cvterm_entry = self.query_first(cv.CvTerm, cvterm_id=feature_entry.type_id)
+        return cvterm_entry.name
+
+    def _extract_requested_feature(self, feature_entry: sequence.Feature, annotation_level: str
+                                   ) -> sequence.Feature:
+        """Extracts a gene, transcript or protein entry from the database, depending on the desired annotation level"""
+        if annotation_level == "gene":
+            requested_entry = self._extract_gene_of_feature(feature_entry)
+        elif annotation_level == "transcript":
+            requested_entry = self._extract_transcript_of_feature(feature_entry)
+        elif annotation_level == "protein":
+            requested_entry = self._extract_polypeptide_of_feature(feature_entry)
+        else:
+            requested_entry = feature_entry
+        if not requested_entry:
+            self.printer.print("WARNING: No " + annotation_level + " associated with feature '"
+                               + feature_entry.uniquename + "' available in the database.")
+            requested_entry = feature_entry
+        return requested_entry
+
+    def _extract_gene_of_feature(self, feature_entry: sequence.Feature) -> Union[None, sequence.Feature]:
+        """Extracts the gene entry for a given feature, which can be a gene, transcript or polypeptide"""
+        featuretype = self._extract_feature_type(feature_entry)
+        if featuretype.lower() in self._gene_types():
+            gene_entry = feature_entry
+        elif featuretype.lower() in self._transcript_types():
+            gene_entry = self.query_parent_features(feature_entry.feature_id, [self._part_of_term.cvterm_id]).first()
+        elif featuretype.lower() in self._protein_types():
+            transcript_entry = self.query_parent_features(
+                feature_entry.feature_id, [self._derives_from_term.cvterm_id]).first()
+            if transcript_entry:
+                gene_entry = self.query_parent_features(
+                    transcript_entry.feature_id, [self._part_of_term.cvterm_id]).first()
+            else:
+                gene_entry = None
+        else:
+            gene_entry = None
+        return gene_entry
+
+    def _extract_transcript_of_feature(self, feature_entry: sequence.Feature) -> Union[None, sequence.Feature]:
+        """Extracts the transcript entry for a given feature, which can be a gene, transcript or polypeptide"""
+        featuretype = self._extract_feature_type(feature_entry)
+        if featuretype.lower() in self._gene_types():
+            transcript_entry = self.query_child_features(feature_entry.feature_id, self._part_of_term.cvterm_id).first()
+        elif featuretype.lower() in self._transcript_types():
+            transcript_entry = feature_entry
+        elif featuretype.lower() in self._protein_types():
+            transcript_entry = self.query_parent_features(
+                feature_entry.feature_id, [self._derives_from_term.cvterm_id]).first()
+        else:
+            transcript_entry = None
+        return transcript_entry
+
+    def _extract_polypeptide_of_feature(self, feature_entry: sequence.Feature) -> Union[None, sequence.Feature]:
+        """Extracts the polypeptide entry for a given feature, which can be a gene, transcript or polypeptide"""
+        featuretype = self._extract_feature_type(feature_entry)
+        if featuretype.lower() in self._gene_types():
+            transcript_entry = self.query_child_features(feature_entry.feature_id, self._part_of_term.cvterm_id).first()
+            if transcript_entry:
+                polypeptide_entry = self.query_child_features(
+                    transcript_entry.feature_id, self._derives_from_term.cvterm_id).first()
+            else:
+                polypeptide_entry = None
+        elif featuretype.lower() in self._transcript_types():
+            polypeptide_entry = self.query_child_features(
+                feature_entry.feature_id, self._derives_from_term.cvterm_id).first()
+        elif featuretype.lower() in self._protein_types():
+            polypeptide_entry = feature_entry
+        else:
+            polypeptide_entry = None
+        return polypeptide_entry
 
     def _convert_evidence_code(self, abbreviation: str) -> str:
         """Converts the abbreviation for an evidence code into the spelled-out version, if applicable"""
@@ -100,70 +203,59 @@ class GAFClient(object):
         return ["polypeptide"]
 
 
-class GAFImportClient(iobase.ImportClient, GAFClient):
+class GAFImportClient(GAFClient):
     """Class for importing genomic data from GAF files into Chado"""
 
-    def __init__(self, uri: str, verbose=False, test_environment=False):
-        """Constructor"""
-
-        # Connect to database
-        self.test_environment = test_environment
-        if not self.test_environment:
-            super().__init__(uri, verbose)
-
-        # Load essentials
-        if not self.test_environment:
-            self._load_essentials()
-
-    def __del__(self):
-        """Destructor - disconnect from database"""
-        if not self.test_environment:
-            super().__del__()
-
-    def _load_essentials(self) -> None:
-        """Loads essential database entries"""
-        self._date_term = self._load_cvterm("date")
-        self._evidence_term = self._load_cvterm("evidence")
-        self._default_pub = self._load_pub("null")
-        self._go_db = self._load_db("GO")
-
-    def load(self, filename: str, organism_name: str):
+    def load(self, filename: str, organism_name: str, annotation_level: str):
         """Import data from a GAF file into a Chado database"""
 
         # Load dependencies
         default_organism = self._load_organism(organism_name)
         features_with_product = set()
 
-        # Loop over all entries in the GAF file
+        # Loop over all records in the GAF file
         with open(filename) as f:
             for gaf_record in GOA.gafiterator(f):
 
-                # Get the feature entry
-                feature_entry = self._load_feature(gaf_record, default_organism)
-                if not feature_entry:
-                    continue
-
-                # Update/insert a feature_cvterm entry for the gene product
-                if feature_entry.uniquename not in features_with_product:
-                    self._handle_product_term(gaf_record, feature_entry)
-                    features_with_product.add(feature_entry.uniquename)
-
-                # Update/insert a feature_cvterm entry for the ontology term
-                feature_cvterm_entry = self._handle_ontology_term(gaf_record, feature_entry)
-                if not feature_cvterm_entry:
-                    continue
-
-                # Update/insert feature_cvtermprop entries for date and evidence code
-                self._handle_properties(gaf_record, feature_cvterm_entry)
-
-                # Update/insert feature_cvterm_dbxref entries
-                self._handle_crossrefs(gaf_record, feature_cvterm_entry)
-
-                # Update/insert feature_cvterm_pub entries
-                self._handle_publications(gaf_record, feature_cvterm_entry)
+                # Import this record into the database
+                self._load_gaf_record(gaf_record, default_organism, annotation_level, features_with_product)
 
         # Commit changes
         self.session.commit()
+
+    def _load_gaf_record(self, gaf_record: dict, organism_entry: organism.Organism, annotation_level: str,
+                         features_with_product: Set[str]) -> None:
+        """Imports data from a GAF record into a Chado database"""
+
+        # Get the feature entries
+        gaf_feature_entry = self._load_feature(gaf_record, organism_entry)
+        if not gaf_feature_entry:
+            return
+        requested_feature_entry = self._extract_requested_feature(gaf_feature_entry, annotation_level)
+        gene_feature_entry = self._extract_gene_of_feature(requested_feature_entry)
+
+        # Update/insert gene name and synonym(s)
+        self._handle_name(gaf_record, gene_feature_entry)
+        self._handle_synonyms(gaf_record, gene_feature_entry)
+
+        # Update/insert a feature_cvterm entry for the gene product
+        if requested_feature_entry.uniquename not in features_with_product:
+            self._handle_product_term(gaf_record, requested_feature_entry)
+            features_with_product.add(requested_feature_entry.uniquename)
+
+        # Update/insert a feature_cvterm entry for the ontology term
+        feature_cvterm_entry = self._handle_ontology_term(gaf_record, requested_feature_entry)
+        if not feature_cvterm_entry:
+            return
+
+        # Update/insert feature_cvtermprop entries for date and evidence code
+        self._handle_properties(gaf_record, feature_cvterm_entry, requested_feature_entry)
+
+        # Update/insert feature_cvterm_dbxref entries
+        self._handle_crossrefs(gaf_record, feature_cvterm_entry, requested_feature_entry)
+
+        # Update/insert feature_cvterm_pub entries
+        self._handle_publications(gaf_record, feature_cvterm_entry, requested_feature_entry)
 
     def _load_feature(self, gaf_record: dict, organism_entry: organism.Organism) -> Union[None, sequence.Feature]:
         """Loads a feature entry from the database"""
@@ -174,6 +266,43 @@ class GAFImportClient(iobase.ImportClient, GAFClient):
                                          uniquename=feature_name)
         return feature_entry
 
+    def _handle_name(self, gaf_record: dict, feature_entry: sequence.Feature) -> None:
+        """Inserts or updates the name of a feature"""
+        name = gaf_record["DB_Object_Symbol"].strip()
+        if name and name != feature_entry.uniquename and name != feature_entry.name:
+            feature_entry.name = name
+            self.printer.print("Updated name '" + feature_entry.name + "' for feature '"
+                               + feature_entry.uniquename + "'")
+
+    def _handle_synonyms(self, gaf_record: dict, feature_entry: sequence.Feature) -> List[sequence.FeatureSynonym]:
+        """Inserts or updates entries in the 'synonym' and 'feature_synonym' tables and returns the latter"""
+
+        # Extract existing synonyms for this feature from the database
+        existing_feature_synonyms = self.query_feature_synonym_by_type(
+            feature_entry.feature_id, [self._synonym_term.cvterm_id]).all()
+        all_feature_synonyms = []
+
+        # Loop over all synonyms for this feature in the GFF record
+        synonyms = gaf_record["Synonym"]
+        for synonym in synonyms:
+
+            # Insert/update entry in the 'synonym' table
+            if not synonym.strip():
+                continue
+            new_synonym_entry = sequence.Synonym(name=synonym, type_id=self._synonym_term.cvterm_id,
+                                                 synonym_sgml=synonym)
+            synonym_entry = self._handle_synonym(new_synonym_entry)
+
+            # Insert/update entry in the 'feature_synonym' table
+            new_feature_synonym_entry = sequence.FeatureSynonym(
+                synonym_id=synonym_entry.synonym_id, feature_id=feature_entry.feature_id,
+                pub_id=self._default_pub.pub_id)
+            feature_synonym_entry = self._handle_feature_synonym(new_feature_synonym_entry, existing_feature_synonyms,
+                                                                 synonym, feature_entry.uniquename)
+            all_feature_synonyms.append(feature_synonym_entry)
+
+        return all_feature_synonyms
+
     def _handle_ontology_term(self, gaf_record: dict, feature_entry: sequence.Feature
                               ) -> Union[None, sequence.FeatureCvTerm]:
         """Inserts or updates an entry in the 'feature_cvterm' table and returns it"""
@@ -181,7 +310,7 @@ class GAFImportClient(iobase.ImportClient, GAFClient):
         # Extract ontology identifier from the GAF record and split it into db, accession, version
         ontology_term = gaf_record["GO_ID"].strip()
         (db_authority, accession, version) = ontology.split_dbxref(ontology_term)
-        publication = gaf_record["DB:Reference"][0].strip()
+        publication = self._extract_primary_publication(gaf_record)
 
         # Get entry from 'db' table
         db_entry = self.query_first(general.Db, name=db_authority)
@@ -230,7 +359,7 @@ class GAFImportClient(iobase.ImportClient, GAFClient):
         product = gaf_record["DB_Object_Name"].strip()
         if not product:
             return None
-        publication = gaf_record["DB:Reference"][0].strip()
+        publication = self._extract_primary_publication(gaf_record)
 
         # Insert/update entry in the 'db' table
         new_db_entry = general.Db(name="PRODUCT")
@@ -267,8 +396,8 @@ class GAFImportClient(iobase.ImportClient, GAFClient):
                                                            cvterm_entry.name, feature_entry.uniquename)
         return feature_cvterm_entry
 
-    def _handle_properties(self, gaf_record: dict, feature_cvterm_entry: sequence.FeatureCvTerm
-                           ) -> List[sequence.FeatureCvTermProp]:
+    def _handle_properties(self, gaf_record: dict, feature_cvterm_entry: sequence.FeatureCvTerm,
+                           feature_entry: sequence.Feature) -> List[sequence.FeatureCvTermProp]:
         """Inserts or updates entries in the 'feature_cvtermprop' table and returns them"""
 
         # Extract existing properties for this feature_cvterm from the database
@@ -280,7 +409,7 @@ class GAFImportClient(iobase.ImportClient, GAFClient):
         new_feature_cvtermprop_entry = sequence.FeatureCvTermProp(
             feature_cvterm_id=feature_cvterm_entry.feature_cvterm_id, type_id=self._date_term.cvterm_id, value=date)
         date_feature_cvtermprop_entry = self._handle_feature_cvtermprop(
-            new_feature_cvtermprop_entry, existing_feature_cvtermprops, "date")
+            new_feature_cvtermprop_entry, existing_feature_cvtermprops, "date", feature_entry.uniquename)
 
         # Insert/update entry for 'evidence'
         evidence_code = self._convert_evidence_code(gaf_record["Evidence"])
@@ -288,12 +417,12 @@ class GAFImportClient(iobase.ImportClient, GAFClient):
             feature_cvterm_id=feature_cvterm_entry.feature_cvterm_id, type_id=self._evidence_term.cvterm_id,
             value=evidence_code)
         evidence_feature_cvtermprop_entry = self._handle_feature_cvtermprop(
-            new_feature_cvtermprop_entry, existing_feature_cvtermprops, "evidence")
+            new_feature_cvtermprop_entry, existing_feature_cvtermprops, "evidence", feature_entry.uniquename)
 
         return [date_feature_cvtermprop_entry, evidence_feature_cvtermprop_entry]
 
-    def _handle_crossrefs(self, gaf_record: dict, feature_cvterm_entry: sequence.FeatureCvTerm
-                          ) -> List[sequence.FeatureCvTermDbxRef]:
+    def _handle_crossrefs(self, gaf_record: dict, feature_cvterm_entry: sequence.FeatureCvTerm,
+                          feature_entry: sequence.Feature) -> List[sequence.FeatureCvTermDbxRef]:
         """Inserts or updates an entry in the 'feature_cvterm_dbxref' table and returns it"""
 
         # Extract existing cross references for this feature_cvterm from the database
@@ -302,11 +431,10 @@ class GAFImportClient(iobase.ImportClient, GAFClient):
         all_feature_cvterm_dbxrefs = []
 
         # Loop over all cross references of the given GAF record
-        for crossref in gaf_record["With"]:
+        crossrefs = self._extract_cross_references(gaf_record)
+        for crossref in crossrefs:
 
             # Split database cross reference (dbxref) into db, accession, version
-            if not crossref.strip():
-                continue
             (db_authority, accession, version) = ontology.split_dbxref(crossref)
 
             # Insert/update entry in the 'db' table
@@ -321,13 +449,13 @@ class GAFImportClient(iobase.ImportClient, GAFClient):
             new_feature_cvterm_dbxref_entry = sequence.FeatureCvTermDbxRef(
                 feature_cvterm_id=feature_cvterm_entry.feature_cvterm_id, dbxref_id=dbxref_entry.dbxref_id)
             feature_cvterm_dbxref_entry = self._handle_feature_cvterm_dbxref(
-                new_feature_cvterm_dbxref_entry, existing_feature_cvterm_dbxrefs, crossref)
+                new_feature_cvterm_dbxref_entry, existing_feature_cvterm_dbxrefs, crossref, feature_entry.uniquename)
             all_feature_cvterm_dbxrefs.append(feature_cvterm_dbxref_entry)
 
         return all_feature_cvterm_dbxrefs
 
-    def _handle_publications(self, gaf_record: dict, feature_cvterm_entry: sequence.FeatureCvTerm
-                             ) -> List[sequence.FeatureCvTermPub]:
+    def _handle_publications(self, gaf_record: dict, feature_cvterm_entry: sequence.FeatureCvTerm,
+                             feature_entry: sequence.Feature) -> List[sequence.FeatureCvTermPub]:
         """Inserts or updates entries in the 'feature_cvterm_pub' table and returns them"""
 
         # Extract existing publications for this feature_cvterm from the database
@@ -336,7 +464,7 @@ class GAFImportClient(iobase.ImportClient, GAFClient):
         all_feature_cvterm_pubs = []
 
         # Loop over all publications of the given GAF record
-        publications = gaf_record["DB:Reference"][1:]
+        publications = self._extract_secondary_publications(gaf_record)
         for publication in publications:
 
             # Insert/update entry in the 'pub' table
@@ -347,41 +475,55 @@ class GAFImportClient(iobase.ImportClient, GAFClient):
             new_feature_cvterm_pub_entry = sequence.FeatureCvTermPub(
                 feature_cvterm_id=feature_cvterm_entry.feature_cvterm_id, pub_id=pub_entry.pub_id)
             feature_cvterm_pub_entry = self._handle_feature_cvterm_pub(
-                new_feature_cvterm_pub_entry, existing_feature_cvterm_pubs, publication)
+                new_feature_cvterm_pub_entry, existing_feature_cvterm_pubs, publication, feature_entry.uniquename)
             all_feature_cvterm_pubs.append(feature_cvterm_pub_entry)
 
         return all_feature_cvterm_pubs
 
+    def _extract_cross_references(self, gaf_record: dict) -> List[str]:
+        """Extracts the database cross references of a GAF record"""
+        potential_crossrefs = gaf_record["With"] + gaf_record["DB:Reference"]
+        crossrefs = []
+        pubs = [self._extract_primary_publication(gaf_record)] + self._extract_secondary_publications(gaf_record)
+        for crossref in potential_crossrefs:
+            if crossref.strip() and crossref not in pubs:
+                crossrefs.append(crossref)
+        return crossrefs
 
-class GAFExportClient(iobase.ExportClient, GAFClient):
+    @staticmethod
+    def _extract_primary_publication(gaf_record: dict) -> Union[None, str]:
+        """Extracts the primary publication of a GAF record"""
+        potential_publications = gaf_record["DB:Reference"]
+        for publication in potential_publications:
+            if ":" not in publication:
+                return publication.strip()
+            (db_authority, accession, version) = ontology.split_dbxref(publication)
+            if db_authority == "PMID":
+                return publication.strip()
+        return None
+
+    @staticmethod
+    def _extract_secondary_publications(gaf_record: dict) -> List[str]:
+        """Extracts the secondary publications of a GAF record"""
+        potential_publications = gaf_record["DB:Reference"]
+        secondary_publications = []
+        for publication in potential_publications:
+            if ":" not in publication:
+                secondary_publications.append(publication.strip())
+                continue
+            (db_authority, accession, version) = ontology.split_dbxref(publication)
+            if db_authority == "PMID":
+                secondary_publications.append(publication.strip())
+        if secondary_publications:
+            return secondary_publications[1:]
+        else:
+            return secondary_publications
+
+
+class GAFExportClient(GAFClient):
     """Class for exporting gene annotation data from Chado to GAF files"""
 
-    def __init__(self, uri: str, verbose=False, test_environment=False):
-        """Constructor"""
-
-        # Connect to database
-        self.test_environment = test_environment
-        if not self.test_environment:
-            super().__init__(uri, verbose)
-
-        # Load essential database entries
-        if not self.test_environment:
-            self._load_essentials()
-
-    def __del__(self):
-        """Destructor - disconnect from database"""
-        if not self.test_environment:
-            super().__del__()
-
-    def _load_essentials(self) -> None:
-        """Loads essential database entries"""
-        self._part_of_term = self._load_cvterm_from_cv("part_of", "relationship")
-        self._derives_from_term = self._load_cvterm_from_cv("derives_from", "sequence")
-        self._taxon_term = self._load_cvterm("taxonId")
-        self._go_db = self._load_db("GO")
-        self._product_db = self._load_db("PRODUCT")
-
-    def export(self, gaf_filename: str, organism_name: str, database_authority: str, requested_type: str) -> None:
+    def export(self, gaf_filename: str, organism_name: str, database_authority: str, annotation_level: str) -> None:
 
         # Load dependencies
         organism_entry = self._load_organism(organism_name)
@@ -400,7 +542,7 @@ class GAFExportClient(iobase.ExportClient, GAFClient):
             for go_feature_cvterm_entry in go_feature_cvterm_entries:
 
                 # Create a GFF record for this feature_cvterm
-                self._export_gaf_record(go_feature_cvterm_entry, database_authority, taxon_id, requested_type,
+                self._export_gaf_record(go_feature_cvterm_entry, database_authority, taxon_id, annotation_level,
                                         gaf_handle)
 
         # Information
@@ -412,12 +554,12 @@ class GAFExportClient(iobase.ExportClient, GAFClient):
         file_handle.write("!gaf-version: 1.0\n")
 
     def _export_gaf_record(self, feature_cvterm_entry: sequence.FeatureCvTerm, database_authority: str, taxon_id: str,
-                           requested_feature_type: str, file_handle):
+                           annotation_level: str, file_handle):
         """Exports a GAF record for a given feature and GO term"""
 
         # Create GAF record
         go_feature = self.query_first(sequence.Feature, feature_id=feature_cvterm_entry.feature_id)
-        requested_feature = self._extract_requested_feature(go_feature, requested_feature_type)
+        requested_feature = self._extract_requested_feature(go_feature, annotation_level)
         gene_feature = self._extract_gene_of_feature(requested_feature)
         gaf_record = self._create_gaf_record(feature_cvterm_entry, requested_feature, database_authority, taxon_id)
 
@@ -484,75 +626,6 @@ class GAFExportClient(iobase.ExportClient, GAFClient):
             taxon_id = "taxon:" + organismprop_entry.value
         return taxon_id
 
-    def _extract_requested_feature(self, feature_entry: sequence.Feature, requested_feature_type: str
-                                   ) -> sequence.Feature:
-        """Extracts a gene, transcript or polypeptide entry from the database, depending on the request"""
-        if requested_feature_type == "gene":
-            requested_entry = self._extract_gene_of_feature(feature_entry)
-        elif requested_feature_type == "transcript":
-            requested_entry = self._extract_transcript_of_feature(feature_entry)
-        elif requested_feature_type == "protein":
-            requested_entry = self._extract_polypeptide_of_feature(feature_entry)
-        else:
-            requested_entry = feature_entry
-        if not requested_entry:
-            self.printer.print("WARNING: No " + requested_feature_type + " associated with feature '"
-                               + feature_entry.uniquename + "' available in the database.")
-            requested_entry = feature_entry
-        return requested_entry
-
-    def _extract_gene_of_feature(self, feature_entry: sequence.Feature) -> Union[None, sequence.Feature]:
-        """Extracts the gene entry for a given feature, which can be a gene, transcript or polypeptide"""
-        featuretype = self._extract_feature_type(feature_entry)
-        if featuretype.lower() in self._gene_types():
-            gene_entry = feature_entry
-        elif featuretype.lower() in self._transcript_types():
-            gene_entry = self.query_parent_features(feature_entry.feature_id, [self._part_of_term.cvterm_id]).first()
-        elif featuretype.lower() in self._protein_types():
-            transcript_entry = self.query_parent_features(
-                feature_entry.feature_id, [self._derives_from_term.cvterm_id]).first()
-            if transcript_entry:
-                gene_entry = self.query_parent_features(
-                    transcript_entry.feature_id, [self._part_of_term.cvterm_id]).first()
-            else:
-                gene_entry = None
-        else:
-            gene_entry = None
-        return gene_entry
-
-    def _extract_transcript_of_feature(self, feature_entry: sequence.Feature) -> Union[None, sequence.Feature]:
-        """Extracts the transcript entry for a given feature, which can be a gene, transcript or polypeptide"""
-        featuretype = self._extract_feature_type(feature_entry)
-        if featuretype.lower() in self._gene_types():
-            transcript_entry = self.query_child_features(feature_entry.feature_id, self._part_of_term.cvterm_id).first()
-        elif featuretype.lower() in self._transcript_types():
-            transcript_entry = feature_entry
-        elif featuretype.lower() in self._protein_types():
-            transcript_entry = self.query_parent_features(
-                feature_entry.feature_id, [self._derives_from_term.cvterm_id]).first()
-        else:
-            transcript_entry = None
-        return transcript_entry
-
-    def _extract_polypeptide_of_feature(self, feature_entry: sequence.Feature) -> Union[None, sequence.Feature]:
-        """Extracts the polypeptide entry for a given feature, which can be a gene, transcript or polypeptide"""
-        featuretype = self._extract_feature_type(feature_entry)
-        if featuretype.lower() in self._gene_types():
-            transcript_entry = self.query_child_features(feature_entry.feature_id, self._part_of_term.cvterm_id).first()
-            if transcript_entry:
-                polypeptide_entry = self.query_child_features(
-                    transcript_entry.feature_id, self._derives_from_term.cvterm_id).first()
-            else:
-                polypeptide_entry = None
-        elif featuretype.lower() in self._transcript_types():
-            polypeptide_entry = self.query_child_features(
-                feature_entry.feature_id, self._derives_from_term.cvterm_id).first()
-        elif featuretype.lower() in self._protein_types():
-            polypeptide_entry = feature_entry
-        else:
-            polypeptide_entry = None
-        return polypeptide_entry
-
     def _extract_feature_cvterm_ontology_term(self, feature_cvterm_entry: sequence.FeatureCvTerm) -> str:
         """Extracts the ontology term associated with a feature_cvterm by a database query"""
         db_and_accession = self.query_feature_cvterm_ontology_terms(
@@ -590,11 +663,6 @@ class GAFExportClient(iobase.ExportClient, GAFClient):
     def _extract_go_namespace(self, feature_cvterm_entry: sequence.FeatureCvTerm) -> str:
         """Extracts the namespace of a feature_cvterm by a database query"""
         return self.query_cvterm_namespace(feature_cvterm_entry.cvterm_id).scalar()
-
-    def _extract_feature_type(self, feature_entry: sequence.Feature) -> str:
-        """Extracts the type of a feature by a database query"""
-        cvterm_entry = self.query_first(cv.CvTerm, cvterm_id=feature_entry.type_id)
-        return cvterm_entry.name
 
     @staticmethod
     def _extract_feature_name(feature_entry: sequence.Feature) -> str:

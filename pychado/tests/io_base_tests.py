@@ -86,6 +86,38 @@ class TestIOClient(unittest.TestCase):
         full_table = self.client.query_all(Species)
         self.assertEqual(len(full_table), 3)
 
+
+class TestChadoClient(unittest.TestCase):
+    """Test functions for loading data into a CHADO database"""
+
+    connection_parameters = utils.parse_yaml(dbutils.default_configuration_file())
+    connection_uri = dbutils.random_database_uri(connection_parameters)
+
+    @classmethod
+    def setUpClass(cls):
+        # Creates a database, establishes a connection, creates tables and populates them with essential entries
+        dbutils.create_database(cls.connection_uri)
+        schema_base = base.PublicBase
+        schema_metadata = schema_base.metadata
+        essentials_client = essentials.EssentialsClient(cls.connection_uri)
+        schema_metadata.create_all(essentials_client.engine, tables=schema_metadata.sorted_tables)
+        essentials_client.load()
+        cls.client = iobase.ChadoClient(cls.connection_uri)
+
+    @classmethod
+    def tearDownClass(cls):
+        # Drops the database
+        dbutils.drop_database(cls.connection_uri, True)
+
+    def setUp(self):
+        # Inserts default entries into database tables
+        (self.default_db, self.default_dbxref, self.default_cv, self.default_cvterm, self.default_organism,
+         self.default_feature, self.default_pub, self.default_synonym) = self.insert_default_entries()
+
+    def tearDown(self):
+        # Rolls back all changes to the database
+        self.client.session.rollback()
+
     def test_query_feature_relationship_by_type(self):
         # Tests the function that creates a query against the feature_relationship table
         query = self.client.query_feature_relationship_by_type(12, [300, 400])
@@ -299,38 +331,6 @@ class TestIOClient(unittest.TestCase):
         self.assertIn("FROM public.organismprop JOIN public.organism "
                       "ON public.organism.organism_id = public.organismprop.organism_id", compiled_query)
         self.assertIn("WHERE public.organismprop.type_id = 44", compiled_query)
-
-
-class TestImportClient(unittest.TestCase):
-    """Test functions for loading data into a CHADO database"""
-
-    connection_parameters = utils.parse_yaml(dbutils.default_configuration_file())
-    connection_uri = dbutils.random_database_uri(connection_parameters)
-
-    @classmethod
-    def setUpClass(cls):
-        # Creates a database, establishes a connection, creates tables and populates them with essential entries
-        dbutils.create_database(cls.connection_uri)
-        schema_base = base.PublicBase
-        schema_metadata = schema_base.metadata
-        essentials_client = essentials.EssentialsClient(cls.connection_uri)
-        schema_metadata.create_all(essentials_client.engine, tables=schema_metadata.sorted_tables)
-        essentials_client.load()
-        cls.client = iobase.ImportClient(cls.connection_uri)
-
-    @classmethod
-    def tearDownClass(cls):
-        # Drops the database
-        dbutils.drop_database(cls.connection_uri, True)
-
-    def setUp(self):
-        # Inserts default entries into database tables
-        (self.default_db, self.default_dbxref, self.default_cv, self.default_cvterm, self.default_organism,
-         self.default_feature, self.default_pub, self.default_synonym) = self.insert_default_entries()
-
-    def tearDown(self):
-        # Rolls back all changes to the database
-        self.client.session.rollback()
 
     def insert_default_entries(self):
         # Inserts CV terms needed as basis for virtually all tests

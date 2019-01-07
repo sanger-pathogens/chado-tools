@@ -9,8 +9,8 @@ from . import utils
 from .orm import base, general, cv, organism, pub, sequence, companalysis, audit
 
 
-class ChadoClient(object):
-    """Base Class for access to a CHADO database"""
+class DatabaseAccessClient(object):
+    """Base class for access to a database"""
 
     def __init__(self, uri: str):
         """Constructor - connect to database"""
@@ -23,7 +23,7 @@ class ChadoClient(object):
         pass
 
 
-class DDLClient(ChadoClient):
+class DDLClient(DatabaseAccessClient):
     """Base class for all classes using DDL"""
 
     def __init__(self, uri: str):

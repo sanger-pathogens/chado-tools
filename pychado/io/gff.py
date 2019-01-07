@@ -73,7 +73,7 @@ class GFFClient(object):
         return ["alias", "synonym", "previous_systematic_id"]
 
 
-class GFFImportClient(iobase.ImportClient, GFFClient):
+class GFFImportClient(iobase.ChadoClient, GFFClient):
     """Class for importing genomic data from GFF files into Chado"""
 
     def __init__(self, uri: str, verbose=False, test_environment=False):
@@ -749,7 +749,7 @@ class GFFImportClient(iobase.ImportClient, GFFClient):
                "protein_source_id"]
 
 
-class GFFExportClient(iobase.ExportClient, GFFClient):
+class GFFExportClient(iobase.ChadoClient, GFFClient):
     """Class for exporting genomic data from Chado to GFF files"""
 
     def __init__(self, uri: str, verbose=False, test_environment=False):

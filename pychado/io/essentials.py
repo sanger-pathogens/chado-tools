@@ -2,7 +2,7 @@ from ..io import iobase
 from ..orm import general, cv, pub
 
 
-class EssentialsClient(iobase.ImportClient):
+class EssentialsClient(iobase.ChadoClient):
     """Class for importing essential basic entries into the Chado tables"""
     
     def load(self):

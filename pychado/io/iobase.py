@@ -12,8 +12,8 @@ class InputFileError(Exception):
     pass
 
 
-class IOClient(ddl.ChadoClient):
-    """Base class for read-write access to a CHADO database"""
+class IOClient(ddl.DatabaseAccessClient):
+    """Base class for read-write access to a database"""
 
     def __init__(self, uri: str):
         """Constructor - connect to database"""
@@ -58,6 +58,19 @@ class IOClient(ddl.ChadoClient):
         if not entry:
             entry = self.insert_into_table(table, **kwargs)
         return entry
+
+
+class ChadoClient(IOClient):
+    """Class for import/export operations on Chado databases"""
+
+    def __init__(self, uri: str, verbose=False):
+        """Constructor"""
+
+        # Connect to database
+        super().__init__(uri)
+
+        # Set up printer
+        self.printer = utils.VerbosePrinter(verbose)
 
     def query_feature_relationship_by_type(self, subject_id: int, type_ids: List[int]) -> sqlalchemy.orm.Query:
         """Creates a query to select entries with specific 'type_id' from the feature_relationship table"""
@@ -335,19 +348,6 @@ class IOClient(ddl.ChadoClient):
                 organism_id=organism_entry.organism_id):
             all_feature_names.append(feature_name)
         return all_feature_names
-
-
-class ImportClient(IOClient):
-    """Base class for importing data into a CHADO database"""
-
-    def __init__(self, uri: str, verbose=False):
-        """Constructor"""
-
-        # Connect to database
-        super().__init__(uri)
-
-        # Set up printer
-        self.printer = utils.VerbosePrinter(verbose)
 
     def _handle_db(self, new_entry: general.Db) -> general.Db:
         """Inserts or updates an entry in the 'db' table, and returns it"""
@@ -761,7 +761,7 @@ class ImportClient(IOClient):
         return deleted_entries
 
     def _handle_feature_cvtermprop(self, new_entry: sequence.FeatureCvTermProp,
-                                   existing_entries: List[sequence.FeatureCvTermProp], key=""
+                                   existing_entries: List[sequence.FeatureCvTermProp], key="", feature_name=""
                                    ) -> sequence.FeatureCvTermProp:
         """Inserts or updates an entry in the 'feature_cvtermprop' table, and returns it"""
 
@@ -773,17 +773,19 @@ class ImportClient(IOClient):
             # Nothing to update, return existing entry
             matching_entry = matching_entries[0]
             if self.update_feature_cvtermprop_properties(matching_entry, new_entry):
-                self.printer.print("Updated property '" + key + "' = '" + new_entry.value + "'")
+                self.printer.print("Updated CV term property '" + key + "' = '" + new_entry.value
+                                   + "' for feature '" + feature_name + "'")
             return matching_entry
         else:
 
             # Insert a new feature_cvtermprop entry
             self.add_and_flush(new_entry)
-            self.printer.print("Inserted property '" + key + "' = '" + new_entry.value + "'")
+            self.printer.print("Inserted CV term property '" + key + "' = '" + new_entry.value
+                               + "' for feature '" + feature_name + "'")
             return new_entry
 
     def _handle_feature_cvterm_dbxref(self, new_entry: sequence.FeatureCvTermDbxRef,
-                                      existing_entries: List[sequence.FeatureCvTermDbxRef], crossref=""
+                                      existing_entries: List[sequence.FeatureCvTermDbxRef], crossref="", feature_name=""
                                       ) -> sequence.FeatureCvTermDbxRef:
         """Inserts or updates an entry in the 'feature_cvterm_dbxref' table, and returns it"""
 
@@ -798,11 +800,11 @@ class ImportClient(IOClient):
 
             # Insert a new feature_cvterm_dbxref entry
             self.add_and_flush(new_entry)
-            self.printer.print("Inserted cross reference '" + crossref + "'")
+            self.printer.print("Inserted CV term cross reference '" + crossref + "' for feature '" + feature_name + "'")
             return new_entry
 
     def _handle_feature_cvterm_pub(self, new_entry: sequence.FeatureCvTermPub,
-                                   existing_entries: List[sequence.FeatureCvTermPub], publication=""
+                                   existing_entries: List[sequence.FeatureCvTermPub], publication="", feature_name=""
                                    ) -> sequence.FeatureCvTermPub:
         """Inserts or updates an entry in the 'feature_cvterm_pub' table, and returns it"""
 
@@ -817,7 +819,7 @@ class ImportClient(IOClient):
 
             # Insert a new feature_cvterm_pub entry
             self.add_and_flush(new_entry)
-            self.printer.print("Inserted publication '" + publication + "'")
+            self.printer.print("Inserted CV term publication '" + publication + "' for feature '" + feature_name + "'")
             return new_entry
 
     def _mark_feature_as_obsolete(self, organism_entry: organism.Organism, uniquename: str) -> sequence.Feature:
@@ -910,16 +912,3 @@ class ImportClient(IOClient):
             if utils.copy_attribute(existing_entry, new_entry, attribute):
                 updated = True
         return updated
-
-
-class ExportClient(IOClient):
-    """Base class for exporting data from a CHADO database"""
-
-    def __init__(self, uri: str, verbose=False):
-        """Constructor"""
-
-        # Connect to database
-        super().__init__(uri)
-
-        # Set up printer
-        self.printer = utils.VerbosePrinter(verbose)

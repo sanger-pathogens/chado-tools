@@ -149,6 +149,28 @@ class ChadoClient(IOClient):
             .filter(sequence.Feature.organism_id == organism_id)\
             .filter(sequence.Feature.type_id.in_(type_ids))
 
+    def query_protein_features(self, organism_id: int, gene_type_id: int, part_of_id: int, derives_from_id: int
+                               ) -> sqlalchemy.orm.Query:
+        """Creates a query to select protein features of a given organism"""
+        transcript_feature = sqlalchemy.orm.aliased(sequence.Feature, name="transcript_feature")
+        protein_feature = sqlalchemy.orm.aliased(sequence.Feature, name="protein_feature")
+        gene_feature = sqlalchemy.orm.aliased(sequence.Feature, name="gene_feature")
+        transcript_gene_relationship = sqlalchemy.orm.aliased(
+            sequence.FeatureRelationship, name="transcript_gene_relationship")
+        protein_transcript_relationship = sqlalchemy.orm.aliased(
+            sequence.FeatureRelationship, name="protein_transcript_relationship")
+        return self.session.query(protein_feature)\
+            .join(protein_transcript_relationship,
+                  protein_transcript_relationship.subject_id == protein_feature.feature_id)\
+            .join(transcript_feature, protein_transcript_relationship.object)\
+            .join(transcript_gene_relationship,
+                  transcript_gene_relationship.subject_id == transcript_feature.feature_id)\
+            .join(gene_feature, transcript_gene_relationship.object)\
+            .filter(protein_feature.organism_id == organism_id)\
+            .filter(protein_transcript_relationship.type_id == derives_from_id)\
+            .filter(transcript_gene_relationship.type_id == part_of_id)\
+            .filter(gene_feature.type_id == gene_type_id)
+
     def query_feature_properties(self, feature_id: int) -> sqlalchemy.orm.Query:
         """Creates a query to select key-value pairs from the 'featureprop' table"""
         return self.session.query(cv.CvTerm.name, sequence.FeatureProp.value)\

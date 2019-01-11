@@ -95,6 +95,10 @@ class TestFastaExport(unittest.TestCase):
             "pseudogene": cv.CvTerm(cv_id=4, dbxref_id=42, name="pseudogene", cvterm_id=42),
             "polypeptide": cv.CvTerm(cv_id=4, dbxref_id=43, name="polypeptide", cvterm_id=43)
         }
+        cls.client._part_of_term = cv.CvTerm(cv_id=11, dbxref_id=91, name="part_of", is_relationshiptype=1,
+                                             cvterm_id=91)
+        cls.client._derives_from_term = cv.CvTerm(cv_id=11, dbxref_id=92, name="derives_from",
+                                                  is_relationshiptype=1, cvterm_id=92)
         cls.client._top_level_term = cv.CvTerm(cv_id=11, dbxref_id=91, name="top_level_seq", cvterm_id=91)
 
     @unittest.mock.patch("pychado.io.fasta.FastaExportClient._extract_nucleotide_sequence")
@@ -112,6 +116,21 @@ class TestFastaExport(unittest.TestCase):
         residues = self.client._extract_residues_by_type(feature_entry, [], "contigs")
         mock_extract_nucleotides.assert_not_called()
         self.assertEqual(residues, "CTGA")
+
+    def test_are_residues_valid(self):
+        # Tests the function that checks if a sequence of nucleotides/amino acids is composed of valid IUPAC codes
+        valid = self.client._are_residues_valid("", "genes")
+        self.assertFalse(valid)
+        valid = self.client._are_residues_valid("AGCT", "genes")
+        self.assertTrue(valid)
+        valid = self.client._are_residues_valid("AGCTXX", "genes")
+        self.assertFalse(valid)
+        valid = self.client._are_residues_valid("MRAB*", "proteins")
+        self.assertTrue(valid)
+        valid = self.client._are_residues_valid("RMAB*", "proteins")
+        self.assertFalse(valid)
+        valid = self.client._are_residues_valid("MR*AB*", "proteins")
+        self.assertFalse(valid)
 
     @unittest.mock.patch("pychado.io.fasta.FastaExportClient.query_first")
     def test_extract_nucleotide_sequences(self, mock_query: unittest.mock.Mock):
@@ -166,30 +185,37 @@ class TestFastaExport(unittest.TestCase):
         self.client._extract_srcfeatures_by_type(organism_entry, "genes")
         mock_query.assert_called_with(44, 91)
 
+    @unittest.mock.patch("pychado.io.fasta.FastaExportClient.query_protein_features")
     @unittest.mock.patch("pychado.io.fasta.FastaExportClient.query_features_by_property_type")
     @unittest.mock.patch("pychado.io.fasta.FastaExportClient.query_features_by_type")
-    def test_extract_features_by_type(self, mock_query_by_type: unittest.mock.Mock,
-                                      mock_query_contigs: unittest.mock.Mock):
+    def test_extract_features_by_type(self, mock_query_genes: unittest.mock.Mock,
+                                      mock_query_contigs: unittest.mock.Mock, mock_query_proteins: unittest.mock.Mock):
         # Tests that the feature table is correctly queried depending on the type of features of interest
-        self.assertIs(mock_query_by_type, self.client.query_features_by_type)
+        self.assertIs(mock_query_genes, self.client.query_features_by_type)
         self.assertIs(mock_query_contigs, self.client.query_features_by_property_type)
+        self.assertIs(mock_query_proteins, self.client.query_protein_features)
 
         organism_entry = organism.Organism(genus="testgenus", species="testspecies", organism_id=44)
         self.client._extract_features_by_type(organism_entry, "contigs")
-        mock_query_by_type.assert_not_called()
+        mock_query_genes.assert_not_called()
         mock_query_contigs.assert_called_with(44, 91)
+        mock_query_proteins.assert_not_called()
 
-        mock_query_by_type.reset_mock()
+        mock_query_genes.reset_mock()
         mock_query_contigs.reset_mock()
+        mock_query_proteins.reset_mock()
         self.client._extract_features_by_type(organism_entry, "proteins")
-        mock_query_by_type.assert_called_with(44, [43])
+        mock_query_genes.assert_not_called()
         mock_query_contigs.assert_not_called()
+        mock_query_proteins.assert_called_with(44, 41, 91, 92)
 
-        mock_query_by_type.reset_mock()
+        mock_query_genes.reset_mock()
         mock_query_contigs.reset_mock()
+        mock_query_proteins.reset_mock()
         self.client._extract_features_by_type(organism_entry, "genes")
-        mock_query_by_type.assert_called_with(44, [41, 42])
+        mock_query_genes.assert_called_with(44, [41])
         mock_query_contigs.assert_not_called()
+        mock_query_proteins.assert_not_called()
 
     @unittest.mock.patch("pychado.io.fasta.FastaExportClient._release_key_value_pair")
     @unittest.mock.patch("pychado.io.fasta.FastaExportClient._genome_version_key_value_pair")

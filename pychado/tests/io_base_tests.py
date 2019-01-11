@@ -209,6 +209,24 @@ class TestChadoClient(unittest.TestCase):
         self.assertIn("public.feature.organism_id = 12", compiled_query)
         self.assertIn("public.feature.type_id IN (300, 400)", compiled_query)
 
+    def test_query_protein_features(self):
+        # Tests the function that creates a query against the feature table
+        query = self.client.query_protein_features(12, 222, 55, 66)
+        compiled_query = str(query.statement.compile(compile_kwargs={"literal_binds": True}))
+        self.assertIn("FROM public.feature AS protein_feature "
+                      "JOIN public.feature_relationship AS protein_transcript_relationship "
+                      "ON protein_transcript_relationship.subject_id = protein_feature.feature_id "
+                      "JOIN public.feature AS transcript_feature "
+                      "ON transcript_feature.feature_id = protein_transcript_relationship.object_id "
+                      "JOIN public.feature_relationship AS transcript_gene_relationship "
+                      "ON transcript_gene_relationship.subject_id = transcript_feature.feature_id "
+                      "JOIN public.feature AS gene_feature "
+                      "ON gene_feature.feature_id = transcript_gene_relationship.object_id", compiled_query)
+        self.assertIn("protein_feature.organism_id = 12", compiled_query)
+        self.assertIn("protein_transcript_relationship.type_id = 66", compiled_query)
+        self.assertIn("transcript_gene_relationship.type_id = 55", compiled_query)
+        self.assertIn("gene_feature.type_id = 222", compiled_query)
+
     def test_query_feature_properties(self):
         # Tests the function that creates a query against the featureprop and cvterm tables
         query = self.client.query_feature_properties(44)

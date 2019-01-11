@@ -125,7 +125,9 @@ class FastaExportClient(iobase.ChadoClient):
     def _load_essentials(self) -> None:
         """Loads essential database entries"""
         self._sequence_terms = self._load_terms_from_cv_dict(
-            "sequence", ["gene", "pseudogene", "polypeptide"])
+            "sequence", ["gene", "polypeptide"])
+        self._part_of_term = self._load_cvterm_from_cv("part_of", "relationship")
+        self._derives_from_term = self._load_cvterm_from_cv("derives_from", "sequence")
         self._top_level_term = self._load_cvterm("top_level_seq")
 
     def export(self, filename: str, organism_name: str, sequence_type: str, release: str, extract_version=False):
@@ -145,7 +147,7 @@ class FastaExportClient(iobase.ChadoClient):
 
             # Create FASTA record
             residues = self._extract_residues_by_type(feature_entry, srcfeature_entries, sequence_type)
-            if residues:
+            if self._are_residues_valid(residues, sequence_type):
                 record = self._create_fasta_record(feature_entry, organism_entry, type_entry, residues, release,
                                                    extract_version)
                 records.append(record)
@@ -175,12 +177,11 @@ class FastaExportClient(iobase.ChadoClient):
                                   ) -> List[sequence.Feature]:
         """Extract features from the database"""
         if sequence_type == "proteins":
-            query = self.query_features_by_type(
-                organism_entry.organism_id, [self._sequence_terms["polypeptide"].cvterm_id])
+            query = self.query_protein_features(organism_entry.organism_id, self._sequence_terms["gene"].cvterm_id,
+                                                self._part_of_term.cvterm_id, self._derives_from_term.cvterm_id)
         elif sequence_type == "genes":
             query = self.query_features_by_type(
-                organism_entry.organism_id, [self._sequence_terms["gene"].cvterm_id,
-                                             self._sequence_terms["pseudogene"].cvterm_id])
+                organism_entry.organism_id, [self._sequence_terms["gene"].cvterm_id])
         else:
             query = self.query_features_by_property_type(organism_entry.organism_id, self._top_level_term.cvterm_id)
         return query.all()
@@ -193,6 +194,23 @@ class FastaExportClient(iobase.ChadoClient):
         else:
             residues = feature_entry.residues
         return residues
+
+    @staticmethod
+    def _are_residues_valid(residues: str, sequence_type: str) -> bool:
+        """Checks if the sequences of nucleotides/amino acids are composed of valid IUPAC codes"""
+        if not residues:
+            return False
+        if sequence_type == "proteins":
+            if residues[0].upper() != "M":
+                return False
+            for residue in residues[:-1]:                               # Exclude last element - might be an asterisk
+                if residue not in Seq.IUPAC.ExtendedIUPACProtein.letters:
+                    return False
+        else:
+            for residue in residues:
+                if residue not in Seq.IUPAC.IUPACAmbiguousDNA.letters:
+                    return False
+        return True
 
     def _extract_nucleotide_sequence(self, feature_entry: sequence.Feature, srcfeature_entries: List[sequence.Feature]
                                      ) -> Union[None, str]:

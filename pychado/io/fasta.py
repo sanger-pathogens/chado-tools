@@ -203,12 +203,14 @@ class FastaExportClient(iobase.ChadoClient):
         if sequence_type == "proteins":
             if residues[0].upper() != "M":
                 return False
-            for residue in residues[:-1]:                               # Exclude last element - might be an asterisk
-                if residue not in Seq.IUPAC.ExtendedIUPACProtein.letters:
+            if residues[-1].upper() not in Seq.IUPAC.ExtendedIUPACProtein.letters and residues[-1].upper() != "*":
+                return False
+            for residue in residues[1:-1]:
+                if residue.upper() not in Seq.IUPAC.ExtendedIUPACProtein.letters:
                     return False
         else:
             for residue in residues:
-                if residue not in Seq.IUPAC.IUPACAmbiguousDNA.letters:
+                if residue.upper() not in Seq.IUPAC.IUPACAmbiguousDNA.letters:
                     return False
         return True
 

@@ -121,7 +121,7 @@ class TestFastaExport(unittest.TestCase):
         # Tests the function that checks if a sequence of nucleotides/amino acids is composed of valid IUPAC codes
         valid = self.client._are_residues_valid("", "genes")
         self.assertFalse(valid)
-        valid = self.client._are_residues_valid("AGCT", "genes")
+        valid = self.client._are_residues_valid("agct", "genes")
         self.assertTrue(valid)
         valid = self.client._are_residues_valid("AGCTXX", "genes")
         self.assertFalse(valid)

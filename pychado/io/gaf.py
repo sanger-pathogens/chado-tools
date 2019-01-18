@@ -12,7 +12,9 @@ class GAFClient(iobase.ChadoClient):
 
         # Connect to database
         self.test_environment = test_environment
-        if not self.test_environment:
+        if self.test_environment:
+            self.printer = utils.VerbosePrinter(verbose)
+        else:
             super().__init__(uri, verbose)
 
         # Load essentials
@@ -704,13 +706,14 @@ class GAFExportClient(GAFClient):
                                        + gaf_record["GO_ID"] + "'")
         gaf_record["Aspect"] = aspect
 
-    @staticmethod
-    def _add_gaf_annotation_date(gaf_record: dict, properties: Dict[str, str]) -> None:
+    def _add_gaf_annotation_date(self, gaf_record: dict, properties: Dict[str, str]) -> None:
         """Adds the annotation date to a GAF record"""
         if "date" not in properties:
-            raise iobase.DatabaseError("Missing annotation date for feature '" + gaf_record["DB_Object_ID"]
+            self.printer.print("Missing annotation date for feature '" + gaf_record["DB_Object_ID"]
                                        + "' and GO term '" + gaf_record["GO_ID"] + "'")
-        gaf_record["Date"] = properties["date"]
+            gaf_record["Date"] = utils.current_date()
+        else:
+            gaf_record["Date"] = properties["date"]
 
     def _add_gaf_evidence_code(self, gaf_record: dict, properties: Dict[str, str]) -> None:
         """Adds the GO evidence code to a GAF record"""

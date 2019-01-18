@@ -471,8 +471,8 @@ class TestGAFExport(unittest.TestCase):
         gaf_record = {"DB_Object_ID": "objid", "GO_ID": "GO:12345"}
         self.client._add_gaf_annotation_date(gaf_record, {"date": "20180101"})
         self.assertEqual(gaf_record["Date"], "20180101")
-        with self.assertRaises(iobase.DatabaseError):
-            self.client._add_gaf_annotation_date(gaf_record, {})
+        self.client._add_gaf_annotation_date(gaf_record, {})
+        self.assertEqual(gaf_record["Date"], utils.current_date())
 
     def test_add_gaf_evidence_code(self):
         # Tests the function that adds a GO evidence code to a GAF record

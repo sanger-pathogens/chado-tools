@@ -153,7 +153,13 @@ class FastaExportClient(iobase.ChadoClient):
                 records.append(record)
 
         # Write all FASTA records to file
+        records.sort(key=self._sort_record_key)
         SeqIO.write(records, filename, "fasta")
+
+    @staticmethod
+    def _sort_record_key(record: SeqIO.SeqRecord):
+        """Helper function for sorting records"""
+        return record.id
 
     def _create_fasta_record(self, feature_entry: sequence.Feature, organism_entry: organism.Organism,
                              type_entry: cv.CvTerm, residues: str, release: str, extract_version: bool
@@ -236,6 +242,11 @@ class FastaExportClient(iobase.ChadoClient):
             residues = matching_entry.residues[featureloc_entry.fmin:featureloc_entry.fmax].upper()
         else:
             residues = None
+
+        # Compute the complementary sequence, if necessary
+        if residues and featureloc_entry.strand < 0:
+            sequence_object = Seq.Seq(residues, alphabet=Seq.IUPAC.ambiguous_dna)
+            residues = str(sequence_object.reverse_complement())
         return residues
 
     def _create_fasta_attributes(self, organism_entry: organism.Organism, type_entry: cv.CvTerm, release: str,

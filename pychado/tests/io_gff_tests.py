@@ -313,22 +313,39 @@ class TestGFFImport(unittest.TestCase):
     @unittest.mock.patch("pychado.io.gff.GFFImportClient._delete_feature_relationship")
     @unittest.mock.patch("pychado.io.gff.GFFImportClient._handle_feature_relationship")
     @unittest.mock.patch("pychado.orm.sequence.FeatureRelationship")
+    @unittest.mock.patch("pychado.io.gff.GFFImportClient.query_first")
     @unittest.mock.patch("pychado.io.gff.GFFImportClient.query_feature_relationship_by_type")
-    def test_handle_relationships(self, mock_query: unittest.mock.Mock, mock_relationship: unittest.mock.Mock,
+    def test_handle_relationships(self, mock_query: unittest.mock.Mock, mock_query_first: unittest.mock.Mock,
+                                  mock_relationship: unittest.mock.Mock,
                                   mock_insert_relationship: unittest.mock.Mock,
                                   mock_delete_relationship: unittest.mock.Mock):
         # Tests the function transferring data from a GFF record to the 'feature_relationship' table
         self.assertIs(mock_query, self.client.query_feature_relationship_by_type)
+        self.assertIs(mock_query_first, self.client.query_first)
         self.assertIs(mock_relationship, sequence.FeatureRelationship)
         self.assertIs(mock_insert_relationship, self.client._handle_feature_relationship)
         self.assertIs(mock_delete_relationship, self.client._delete_feature_relationship)
 
         subject_entry = sequence.Feature(organism_id=11, type_id=300, uniquename="testid", feature_id=33)
         object_entry = sequence.Feature(organism_id=11, type_id=400, uniquename="testparent", feature_id=44)
-        all_features = {object_entry.uniquename: object_entry}
+        mock_query_first.return_value = object_entry
 
+        all_features = {object_entry.uniquename: object_entry}
         all_relationships = self.client._handle_relationships(self.default_gff_record, subject_entry, all_features)
         mock_query.assert_called_with(33, [62, 63])
+        mock_query_first.assert_not_called()
+        mock_relationship.assert_any_call(subject_id=33, object_id=44, type_id=62)
+        self.assertEqual(mock_insert_relationship.call_count, 1)
+        mock_delete_relationship.assert_called()
+        self.assertEqual(len(all_relationships), 1)
+
+        mock_relationship.reset_mock()
+        mock_insert_relationship.reset_mock()
+        mock_delete_relationship.reset_mock()
+        all_features = {}
+        all_relationships = self.client._handle_relationships(self.default_gff_record, subject_entry, all_features)
+        mock_query.assert_called_with(33, [62, 63])
+        mock_query_first.assert_called_with(sequence.Feature, organism_id=11, uniquename="testparent")
         mock_relationship.assert_any_call(subject_id=33, object_id=44, type_id=62)
         self.assertEqual(mock_insert_relationship.call_count, 1)
         mock_delete_relationship.assert_called()

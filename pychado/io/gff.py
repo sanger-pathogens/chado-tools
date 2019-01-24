@@ -406,10 +406,15 @@ class GFFImportClient(iobase.ChadoClient, GFFClient):
             for parent in parents:
 
                 # Get database entry for object
-                if parent not in all_features:
-                    self.printer.print("WARNING: Feature '" + parent + "' not present in input file.")
+                if parent in all_features:
+                    object_entry = all_features[parent]
+                else:
+                    object_entry = self.query_first(sequence.Feature, organism_id=subject_entry.organism_id,
+                                                    uniquename=parent)
+                if not object_entry:
+                    self.printer.print("WARNING: Feature '" + parent +
+                                       "' neither present in input file nor in database.")
                     continue
-                object_entry = all_features[parent]
 
                 # Insert/update entry in the 'feature_relationship' table
                 new_relationship_entry = sequence.FeatureRelationship(subject_id=subject_entry.feature_id,

@@ -138,7 +138,7 @@ class TestFastaExport(unittest.TestCase):
         self.assertIs(mock_query, self.client.query_first)
         feature_entry = sequence.Feature(organism_id=1, type_id=2, uniquename="test", residues="CTGA", feature_id=33)
 
-        mock_query.return_value = sequence.FeatureLoc(feature_id=33, srcfeature_id=34, fmin=1, fmax=3)
+        mock_query.return_value = sequence.FeatureLoc(feature_id=33, srcfeature_id=34, fmin=1, fmax=3, strand=1)
         residues = self.client._extract_nucleotide_sequence(feature_entry, [])
         mock_query.assert_called_with(sequence.FeatureLoc, feature_id=33)
         self.assertIsNone(residues)
@@ -147,6 +147,10 @@ class TestFastaExport(unittest.TestCase):
                                                feature_id=34)]
         residues = self.client._extract_nucleotide_sequence(feature_entry, srcfeature_entries)
         self.assertEqual(residues, "CT")
+
+        mock_query.return_value = sequence.FeatureLoc(feature_id=33, srcfeature_id=34, fmin=0, fmax=6, strand=-1)
+        residues = self.client._extract_nucleotide_sequence(feature_entry, srcfeature_entries)
+        self.assertEqual(residues, "ACCAGT")
 
         mock_query.return_value = sequence.FeatureLoc(feature_id=33, srcfeature_id=34, fmin=1, fmax=300)
         residues = self.client._extract_nucleotide_sequence(feature_entry, srcfeature_entries)

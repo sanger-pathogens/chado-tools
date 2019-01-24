@@ -43,6 +43,14 @@ class GAFClient(iobase.ChadoClient):
         cvterm_entry = self.query_first(cv.CvTerm, cvterm_id=feature_entry.type_id)
         return cvterm_entry.name
 
+    def _is_featuretype_valid(self, feature_entry: sequence.Feature) -> bool:
+        """Checks if a feature has a valid type"""
+        featuretype = self._extract_feature_type(feature_entry)
+        valid_featuretypes = self._gene_types() + self._transcript_types() + self._protein_types()
+        if featuretype.lower() not in valid_featuretypes:
+            return False
+        return True
+
     def _extract_requested_feature(self, feature_entry: sequence.Feature, annotation_level: str
                                    ) -> sequence.Feature:
         """Extracts a gene, transcript or protein entry from the database, depending on the desired annotation level"""
@@ -122,6 +130,8 @@ class GAFClient(iobase.ChadoClient):
         """Converts a spelled-out evidence code into its abbreviation, if applicable"""
         if evidence_code.lower() in self._evidence_codes_to_abbreviations():
             return self._evidence_codes_to_abbreviations()[evidence_code.lower()]
+        if evidence_code.upper() in self._abbreviations_to_evidence_codes():
+            return evidence_code.upper()
         return ""
 
     def _convert_namespace(self, namespace: str) -> str:
@@ -159,8 +169,14 @@ class GAFClient(iobase.ChadoClient):
             "NAS": "Non-traceable Author Statement",
             "IC": "Inferred by Curator",
             "ND": "No biological Data available",
-            "IEA": "Inferred from Electronic Annotation"
+            "IEA": "Inferred from Electronic Annotation",
+            "NR": "Not recorded"
         }
+
+    @staticmethod
+    def _default_evidence_code() -> str:
+        """Yields the default GO evidence code"""
+        return "NR"
 
     def _evidence_codes_to_abbreviations(self) -> Dict[str, str]:
         """Lists the GO evidence codes and their respective abbreviations"""
@@ -559,37 +575,43 @@ class GAFExportClient(GAFClient):
                            annotation_level: str, file_handle):
         """Exports a GAF record for a given feature and GO term"""
 
-        # Create GAF record
-        go_feature = self.query_first(sequence.Feature, feature_id=feature_cvterm_entry.feature_id)
-        requested_feature = self._extract_requested_feature(go_feature, annotation_level)
-        gene_feature = self._extract_gene_of_feature(requested_feature)
-        gaf_record = self._create_gaf_record(feature_cvterm_entry, requested_feature, database_authority, taxon_id)
+        try:
+            # Create GAF record
+            go_feature = self.query_first(sequence.Feature, feature_id=feature_cvterm_entry.feature_id)
+            if not self._is_featuretype_valid(go_feature):
+                return
+            requested_feature = self._extract_requested_feature(go_feature, annotation_level)
+            gene_feature = self._extract_gene_of_feature(requested_feature)
+            gaf_record = self._create_gaf_record(feature_cvterm_entry, requested_feature, database_authority, taxon_id)
 
-        # Query various tables to gather information related to the feature_cvterm
-        go_id = self._extract_feature_cvterm_ontology_term(feature_cvterm_entry)
-        go_namespace = self._extract_go_namespace(feature_cvterm_entry)
-        feature_cvterm_properties = self._extract_feature_cvterm_properties(feature_cvterm_entry)
-        feature_cvterm_dbxrefs = self._extract_feature_cvterm_dbxrefs(feature_cvterm_entry)
-        feature_cvterm_publications = self._extract_feature_cvterm_publications(feature_cvterm_entry)
-        featuretype = self._extract_feature_type(requested_feature)
-        gene_name = self._extract_feature_name(gene_feature)
-        gene_synonyms = self._extract_feature_synonyms(gene_feature)
-        product_name = self._extract_product_name(go_feature)
+            # Query various tables to gather information related to the feature_cvterm
+            go_id = self._extract_feature_cvterm_ontology_term(feature_cvterm_entry)
+            go_namespace = self._extract_go_namespace(feature_cvterm_entry)
+            feature_cvterm_properties = self._extract_feature_cvterm_properties(feature_cvterm_entry)
+            feature_cvterm_dbxrefs = self._extract_feature_cvterm_dbxrefs(feature_cvterm_entry)
+            feature_cvterm_publications = self._extract_feature_cvterm_publications(feature_cvterm_entry)
+            featuretype = self._extract_feature_type(requested_feature)
+            gene_name = self._extract_feature_name(gene_feature)
+            gene_synonyms = self._extract_feature_synonyms(gene_feature)
+            product_name = self._extract_product_name(go_feature)
 
-        # Add attributes to the GAF record
-        self._add_gaf_go_id(gaf_record, go_id)
-        self._add_gaf_aspect(gaf_record, go_namespace)
-        self._add_gaf_annotation_date(gaf_record, feature_cvterm_properties)
-        self._add_gaf_evidence_code(gaf_record, feature_cvterm_properties)
-        self._add_gaf_withfrom_info(gaf_record, feature_cvterm_dbxrefs)
-        self._add_gaf_db_references(gaf_record, feature_cvterm_publications, feature_cvterm_dbxrefs)
-        self._add_gaf_object_type(gaf_record, featuretype)
-        self._add_gaf_object_symbol(gaf_record, gene_name)
-        self._add_gaf_synonyms(gaf_record, gene_synonyms)
-        self._add_gaf_object_name(gaf_record, product_name)
+            # Add attributes to the GAF record
+            self._add_gaf_go_id(gaf_record, go_id)
+            self._add_gaf_aspect(gaf_record, go_namespace)
+            self._add_gaf_annotation_date(gaf_record, feature_cvterm_properties)
+            self._add_gaf_evidence_code(gaf_record, feature_cvterm_properties)
+            self._add_gaf_withfrom_info(gaf_record, feature_cvterm_dbxrefs)
+            self._add_gaf_db_references(gaf_record, feature_cvterm_publications, feature_cvterm_dbxrefs)
+            self._add_gaf_object_type(gaf_record, featuretype)
+            self._add_gaf_object_symbol(gaf_record, gene_name)
+            self._add_gaf_synonyms(gaf_record, gene_synonyms)
+            self._add_gaf_object_name(gaf_record, product_name)
 
-        # Write the generated GAF record to file
-        self._print_gaf_record(file_handle, gaf_record)
+            # Write the generated GAF record to file
+            self._print_gaf_record(file_handle, gaf_record)
+
+        except iobase.DatabaseError as err:
+            self.printer.print(err.args)
 
     def _print_gaf_record(self, file_handle, gaf_record: dict):
         """Prints a GAF record to file"""
@@ -710,7 +732,7 @@ class GAFExportClient(GAFClient):
         """Adds the annotation date to a GAF record"""
         if "date" not in properties:
             self.printer.print("Missing annotation date for feature '" + gaf_record["DB_Object_ID"]
-                                       + "' and GO term '" + gaf_record["GO_ID"] + "'")
+                               + "' and GO term '" + gaf_record["GO_ID"] + "'")
             gaf_record["Date"] = utils.current_date()
         else:
             gaf_record["Date"] = properties["date"]
@@ -718,13 +740,17 @@ class GAFExportClient(GAFClient):
     def _add_gaf_evidence_code(self, gaf_record: dict, properties: Dict[str, str]) -> None:
         """Adds the GO evidence code to a GAF record"""
         if "evidence" not in properties:
-            raise iobase.DatabaseError("Missing evidence code for feature '" + gaf_record["DB_Object_ID"]
-                                       + "' and GO term '" + gaf_record["GO_ID"] + "'")
-        evidence = self._back_convert_evidence_code(properties["evidence"])
-        if not evidence:
-            raise iobase.DatabaseError("Unrecognized evidence code: '" + gaf_record["GO_ID"] + "' for feature '"
-                                       + gaf_record["DB_Object_ID"] + "' and GO term '" + gaf_record["GO_ID"] + "'")
-        gaf_record["Evidence"] = evidence
+            self.printer.print("Missing evidence code for feature '" + gaf_record["DB_Object_ID"] + "' and GO term '"
+                               + gaf_record["GO_ID"] + "'")
+            gaf_record["Evidence"] = self._default_evidence_code()
+        else:
+            evidence_code = self._back_convert_evidence_code(properties["evidence"])
+            if not evidence_code:
+                self.printer.print("Unrecognized evidence code: '" + properties["evidence"] + "' for feature '"
+                                   + gaf_record["DB_Object_ID"] + "' and GO term '" + gaf_record["GO_ID"] + "'")
+                gaf_record["Evidence"] = self._default_evidence_code()
+            else:
+                gaf_record["Evidence"] = evidence_code
 
     def _add_gaf_db_references(self, gaf_record: dict, publications: List[str], dbxrefs: List[str]) -> None:
         """Adds reference IDs to a GAF record"""

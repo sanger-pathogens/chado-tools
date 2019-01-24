@@ -479,10 +479,10 @@ class TestGAFExport(unittest.TestCase):
         gaf_record = {"DB_Object_ID": "objid", "GO_ID": "GO:12345"}
         self.client._add_gaf_evidence_code(gaf_record, {"evidence": "Inferred from High Throughput Experiment"})
         self.assertEqual(gaf_record["Evidence"], "HTP")
-        with self.assertRaises(iobase.DatabaseError):
-            self.client._add_gaf_evidence_code(gaf_record, {})
-        with self.assertRaises(iobase.DatabaseError):
-            self.client._add_gaf_evidence_code(gaf_record, {"evidence": "inexistent_evidence_code"})
+        self.client._add_gaf_evidence_code(gaf_record, {"evidence": "inexistent_evidence_code"})
+        self.assertEqual(gaf_record["Evidence"], "NR")
+        self.client._add_gaf_evidence_code(gaf_record, {})
+        self.assertEqual(gaf_record["Evidence"], "NR")
 
     def test_add_gaf_withfrom_info(self):
         # Tests the functions that adds references for a GO evidence code to a GAF record
@@ -548,6 +548,16 @@ class TestGAFFunctions(unittest.TestCase):
         featuretype = self.client._extract_feature_type(feature_entry)
         mock_query.assert_called_with(cv.CvTerm, cvterm_id=200)
         self.assertEqual(featuretype, "sometype")
+
+    @unittest.mock.patch("pychado.io.gaf.GAFClient._extract_feature_type")
+    def test_is_featuretype_valid(self, mock_extract: unittest.mock.Mock):
+        # Tests the function that checks whether the type of a feature is valid
+        self.assertIs(mock_extract, self.client._extract_feature_type)
+        feature_entry = sequence.Feature(organism_id=11, type_id=200, uniquename="testname", feature_id=12)
+        mock_extract.return_value = "mRNA"
+        self.assertTrue(self.client._is_featuretype_valid(feature_entry))
+        mock_extract.return_value = "chromosome"
+        self.assertFalse(self.client._is_featuretype_valid(feature_entry))
 
     @unittest.mock.patch("pychado.io.gaf.GAFClient._extract_polypeptide_of_feature")
     @unittest.mock.patch("pychado.io.gaf.GAFClient._extract_transcript_of_feature")
@@ -722,6 +732,8 @@ class TestGAFFunctions(unittest.TestCase):
         # Tests the function converting a GO evidence code into its abbreviation
         code = self.client._back_convert_evidence_code("Inferred from High Throughput Experiment")
         self.assertEqual(code, "HTP")
+        code = self.client._back_convert_evidence_code("tas")
+        self.assertEqual(code, "TAS")
         code = self.client._back_convert_evidence_code("non_existent evidence code")
         self.assertEqual(code, "")
 

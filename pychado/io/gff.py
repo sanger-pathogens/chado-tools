@@ -788,7 +788,8 @@ class GFFExportClient(iobase.ChadoClient, GFFClient):
         self._top_level_term = self._load_cvterm("top_level_seq")
         self._go_db = self._load_db("GO")
 
-    def export(self, gff_filename: str, organism_name: str, export_fasta: bool, fasta_filename: str) -> None:
+    def export(self, gff_filename: str, organism_name: str, export_fasta: bool, fasta_filename: str,
+               include_obsolete_features=False) -> None:
         """Exports sequences from Chado to a GFF file"""
 
         # Load dependencies
@@ -812,12 +813,10 @@ class GFFExportClient(iobase.ChadoClient, GFFClient):
             feature_entries = self.query_features_by_srcfeature(chromosome_entry.feature_id).all()
             for feature_entry in feature_entries:
 
-                # Check if the feature has parents, and ignore it if this is the case
-                if self._has_feature_parents(feature_entry):
-                    continue
-
-                # Load all attributes associated with this feature
-                self._export_gff_record(feature_entry, chromosome_entry.uniquename, {}, gff_handle)
+                # Create a GFF record for this feature, if it fulfills certain requirements
+                if not self._has_feature_parents(feature_entry) \
+                        and (include_obsolete_features or not feature_entry.is_obsolete):
+                    self._export_gff_record(feature_entry, chromosome_entry.uniquename, {}, gff_handle)
 
         # Close GFF file
         utils.close(gff_handle)
@@ -904,7 +903,8 @@ class GFFExportClient(iobase.ChadoClient, GFFClient):
             child_entries = self.query_child_features(feature_entry.feature_id, relationship_term.cvterm_id).all()
             parent_relationships = {relationship_type: feature_entry.uniquename}
             for child_entry in child_entries:
-                self._export_gff_record(child_entry, chromosome_name, parent_relationships, file_handle)
+                if not child_entry.is_obsolete:
+                    self._export_gff_record(child_entry, chromosome_name, parent_relationships, file_handle)
 
     def _has_feature_parents(self, feature_entry: sequence.Feature) -> bool:
         """Checks if a given Feature has parents in the database"""

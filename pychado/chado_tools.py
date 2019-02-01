@@ -511,6 +511,7 @@ def add_export_fasta_arguments(parser: argparse.ArgumentParser):
                         help="type of the sequences to be exported")
     parser.add_argument("-r", "--release", help="name of the FASTA release")
     parser.add_argument("--extract_version", action="store_true", help="extract the genome version, if available")
+    parser.add_argument("--include_obsolete", action="store_true", help="export all features, including obsoletes")
 
 
 def add_export_gff_arguments(parser: argparse.ArgumentParser):
@@ -520,6 +521,7 @@ def add_export_gff_arguments(parser: argparse.ArgumentParser):
                         help="abbreviation/short name of the organism")
     parser.add_argument("--export_fasta", action="store_true", help="export FASTA sequences along with annotations")
     parser.add_argument("--fasta_file", help="FASTA output file with sequences (default: paste to end of GFF file)")
+    parser.add_argument("--include_obsolete", action="store_true", help="export all features, including obsoletes")
 
 
 def add_export_gaf_arguments(parser: argparse.ArgumentParser):
@@ -532,3 +534,4 @@ def add_export_gaf_arguments(parser: argparse.ArgumentParser):
     parser.add_argument("-L", "--annotation_level", choices=["default", "gene", "transcript", "protein"],
                         default="default", help="level to which GO terms are related in the output file (default: "
                                                 "same level as in the database)")
+    parser.add_argument("--include_obsolete", action="store_true", help="export all features, including obsoletes")

@@ -130,7 +130,8 @@ class FastaExportClient(iobase.ChadoClient):
         self._derives_from_term = self._load_cvterm_from_cv("derives_from", "sequence")
         self._top_level_term = self._load_cvterm("top_level_seq")
 
-    def export(self, filename: str, organism_name: str, sequence_type: str, release: str, extract_version=False):
+    def export(self, filename: str, organism_name: str, sequence_type: str, release: str, extract_version=False,
+               include_obsolete_features=False):
         """Exports sequences from Chado to a FASTA file"""
 
         # Load dependencies and features of interest
@@ -147,7 +148,8 @@ class FastaExportClient(iobase.ChadoClient):
 
             # Create FASTA record
             residues = self._extract_residues_by_type(feature_entry, srcfeature_entries, sequence_type)
-            if self._are_residues_valid(residues, sequence_type):
+            if self._are_residues_valid(residues, sequence_type) and \
+                    (include_obsolete_features or not feature_entry.is_obsolete):
                 record = self._create_fasta_record(feature_entry, organism_entry, type_entry, residues, release,
                                                    extract_version)
                 records.append(record)

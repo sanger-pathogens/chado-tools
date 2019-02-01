@@ -220,13 +220,14 @@ def run_export_command(specifier: str, arguments, uri: str) -> None:
     if specifier == "fasta":
         client = fasta.FastaExportClient(uri, arguments.verbose)
         client.export(arguments.output_file, arguments.organism, arguments.sequence_type, arguments.release,
-                      arguments.extract_version)
+                      arguments.extract_version, arguments.include_obsolete)
     elif specifier == "gff":
         client = gff.GFFExportClient(uri, arguments.verbose)
-        client.export(arguments.output_file, arguments.organism, arguments.export_fasta, arguments.fasta_file)
+        client.export(arguments.output_file, arguments.organism, arguments.export_fasta, arguments.fasta_file,
+                      arguments.include_obsolete)
     elif specifier == "gaf":
         client = gaf.GAFExportClient(uri, arguments.verbose)
         client.export(arguments.output_file, arguments.organism, arguments.database_authority,
-                      arguments.annotation_level)
+                      arguments.annotation_level, arguments.include_obsolete)
     else:
         print("Functionality 'export " + specifier + "' is not yet implemented.")

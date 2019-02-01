@@ -349,6 +349,7 @@ class TestArguments(unittest.TestCase):
         self.assertEqual(parsed_args["sequence_type"], "proteins")
         self.assertEqual(parsed_args["release"], "testrelease")
         self.assertFalse(parsed_args["extract_version"])
+        self.assertFalse(parsed_args["include_obsolete"])
         self.assertEqual(parsed_args["dbname"], "testdb")
 
     def test_export_gff_args(self):
@@ -360,6 +361,7 @@ class TestArguments(unittest.TestCase):
         self.assertEqual(parsed_args["organism"], "testorganism")
         self.assertTrue(parsed_args["export_fasta"])
         self.assertEqual(parsed_args["fasta_file"], "testfasta")
+        self.assertFalse(parsed_args["include_obsolete"])
         self.assertEqual(parsed_args["dbname"], "testdb")
 
     def test_export_gaf_args(self):
@@ -371,6 +373,7 @@ class TestArguments(unittest.TestCase):
         self.assertEqual(parsed_args["organism"], "testorganism")
         self.assertEqual(parsed_args["database_authority"], "testauthority")
         self.assertEqual(parsed_args["annotation_level"], "protein")
+        self.assertFalse(parsed_args["include_obsolete"])
         self.assertEqual(parsed_args["dbname"], "testdb")
 
 

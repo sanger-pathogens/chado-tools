@@ -512,7 +512,7 @@ class TestTasks(unittest.TestCase):
         parsed_args = chado_tools.parse_arguments(args)
         tasks.run_export_command(args[2], parsed_args, self.uri)
         mock_client.assert_called_with(self.uri, False)
-        self.assertIn(unittest.mock.call().export("testfile", "testorganism", "proteins", "testrelease", False),
+        self.assertIn(unittest.mock.call().export("testfile", "testorganism", "proteins", "testrelease", False, False),
                       mock_client.mock_calls)
 
     @unittest.mock.patch('pychado.io.gff.GFFExportClient')
@@ -524,7 +524,7 @@ class TestTasks(unittest.TestCase):
         parsed_args = chado_tools.parse_arguments(args)
         tasks.run_export_command(args[2], parsed_args, self.uri)
         mock_client.assert_called_with(self.uri, False)
-        self.assertIn(unittest.mock.call().export("testfile", "testorganism", True, "testfasta"),
+        self.assertIn(unittest.mock.call().export("testfile", "testorganism", True, "testfasta", False),
                       mock_client.mock_calls)
 
     @unittest.mock.patch('pychado.io.gaf.GAFExportClient')
@@ -536,7 +536,7 @@ class TestTasks(unittest.TestCase):
         parsed_args = chado_tools.parse_arguments(args)
         tasks.run_export_command(args[2], parsed_args, self.uri)
         mock_client.assert_called_with(self.uri, False)
-        self.assertIn(unittest.mock.call().export("testfile", "testorganism", "testauthority", "protein"),
+        self.assertIn(unittest.mock.call().export("testfile", "testorganism", "testauthority", "protein", False),
                       mock_client.mock_calls)
 
 

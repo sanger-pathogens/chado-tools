@@ -541,7 +541,8 @@ class GAFImportClient(GAFClient):
 class GAFExportClient(GAFClient):
     """Class for exporting gene annotation data from Chado to GAF files"""
 
-    def export(self, gaf_filename: str, organism_name: str, database_authority: str, annotation_level: str) -> None:
+    def export(self, gaf_filename: str, organism_name: str, database_authority: str, annotation_level: str,
+               include_obsolete_features=False) -> None:
 
         # Load dependencies
         organism_entry = self._load_organism(organism_name)
@@ -560,8 +561,11 @@ class GAFExportClient(GAFClient):
             for go_feature_cvterm_entry in go_feature_cvterm_entries:
 
                 # Create a GFF record for this feature_cvterm
-                self._export_gaf_record(go_feature_cvterm_entry, database_authority, taxon_id, annotation_level,
-                                        gaf_handle)
+                go_feature_entry = self.query_first(sequence.Feature, feature_id=go_feature_cvterm_entry.feature_id)
+                if self._is_featuretype_valid(go_feature_entry) \
+                        and (include_obsolete_features or not go_feature_entry.is_obsolete):
+                    self._export_gaf_record(go_feature_entry, go_feature_cvterm_entry, database_authority, taxon_id,
+                                            annotation_level, gaf_handle)
 
         # Information
         self.printer.print("Exported GAF data for organism " + organism_name + " to " + gaf_filename + ".")
@@ -571,16 +575,13 @@ class GAFExportClient(GAFClient):
         """Prints the header of a GAF file"""
         file_handle.write("!gaf-version: 1.0\n")
 
-    def _export_gaf_record(self, feature_cvterm_entry: sequence.FeatureCvTerm, database_authority: str, taxon_id: str,
-                           annotation_level: str, file_handle):
+    def _export_gaf_record(self, feature_entry: sequence.Feature, feature_cvterm_entry: sequence.FeatureCvTerm,
+                           database_authority: str, taxon_id: str, annotation_level: str, file_handle):
         """Exports a GAF record for a given feature and GO term"""
 
         try:
             # Create GAF record
-            go_feature = self.query_first(sequence.Feature, feature_id=feature_cvterm_entry.feature_id)
-            if not self._is_featuretype_valid(go_feature):
-                return
-            requested_feature = self._extract_requested_feature(go_feature, annotation_level)
+            requested_feature = self._extract_requested_feature(feature_entry, annotation_level)
             gene_feature = self._extract_gene_of_feature(requested_feature)
             gaf_record = self._create_gaf_record(feature_cvterm_entry, requested_feature, database_authority, taxon_id)
 
@@ -593,7 +594,7 @@ class GAFExportClient(GAFClient):
             featuretype = self._extract_feature_type(requested_feature)
             gene_name = self._extract_feature_name(gene_feature)
             gene_synonyms = self._extract_feature_synonyms(gene_feature)
-            product_name = self._extract_product_name(go_feature)
+            product_name = self._extract_product_name(feature_entry)
 
             # Add attributes to the GAF record
             self._add_gaf_go_id(gaf_record, go_id)

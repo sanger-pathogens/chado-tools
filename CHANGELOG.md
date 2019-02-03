@@ -1,8 +1,7 @@
 # Change Log
 
-## [Unreleased](https://github.com/sanger-pathogens/chado-tools/tree/HEAD)
-
-[Full Changelog](https://github.com/sanger-pathogens/chado-tools/compare/v0.2.4...HEAD)
+## [v0.2.5](https://github.com/sanger-pathogens/chado-tools/tree/v0.2.5) (2019-02-01)
+[Full Changelog](https://github.com/sanger-pathogens/chado-tools/compare/v0.2.4...v0.2.5)
 
 **Merged pull requests:**
 

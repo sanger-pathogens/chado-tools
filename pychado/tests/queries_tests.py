@@ -28,6 +28,9 @@ class TestQueries(unittest.TestCase):
         query = queries.load_query("stats")
         self.assertIn("SELECT", query)
 
+        query = queries.load_query("comments")
+        self.assertIn("SELECT", query)
+
         query = queries.load_query("non_existent_specifier")
         self.assertEqual(query, "")
 

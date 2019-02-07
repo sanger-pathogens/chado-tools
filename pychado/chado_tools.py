@@ -83,7 +83,8 @@ def extract_commands() -> dict:
         "organisms": "list all organisms in the CHADO database",
         "cvterms": "list all CV terms in the CHADO database",
         "genedb_products": "list all products of transcripts in the CHADO database",
-        "stats": "obtain statistics to updates in a CHADO database"
+        "stats": "obtain statistics to updates in a CHADO database",
+        "comments": "list curator comments to genes and gene products in a CHADO database"
     }
 
 
@@ -320,6 +321,8 @@ def add_extract_arguments_by_command(command: str, parser: argparse.ArgumentPars
         add_extract_genedb_product_arguments(parser)
     elif command == "stats":
         add_extract_stats_arguments(parser)
+    elif command == "comments":
+        add_extract_comments_arguments(parser)
     else:
         print("Command '" + parser.prog + "' is not available.")
 
@@ -349,6 +352,11 @@ def add_extract_stats_arguments(parser: argparse.ArgumentParser):
     parser.add_argument("--start_date", required=True, help="date for maximum age of updates, format 'YYYYMMDD'")
     parser.add_argument("--end_date", default="", help="date for minimum age of updates, format 'YYYYMMDD' "
                                                        "(default: today)")
+
+def add_extract_comments_arguments(parser: argparse.ArgumentParser):
+    """Defines formal arguments for the 'chado extract comments' sub-command"""
+    parser.add_argument("-a", "--abbreviation", dest="organism",
+                        help="restrict to a certain organism, defined by its abbreviation/short name (default: all)")
 
 
 def add_insert_arguments(parser: argparse.ArgumentParser):

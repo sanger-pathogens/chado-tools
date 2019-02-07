@@ -41,11 +41,12 @@ class TestCommands(unittest.TestCase):
 
     def test_extract_commands(self):
         commands = chado_tools.extract_commands()
-        self.assertEqual(len(commands), 4)
+        self.assertEqual(len(commands), 5)
         self.assertIn("organisms", commands)
         self.assertIn("cvterms", commands)
         self.assertIn("genedb_products", commands)
         self.assertIn("stats", commands)
+        self.assertIn("comments", commands)
 
     def test_insert_commands(self):
         commands = chado_tools.insert_commands()
@@ -245,6 +246,18 @@ class TestArguments(unittest.TestCase):
     def test_extract_genedb_products_args(self):
         # Tests if the command line arguments for the subcommand 'chado extract genedb_products' are parsed correctly
         args = ["chado", "extract", "genedb_products", "-H", "-d", ";", "-o", "testfile", "-a", "testorganism",
+                "testdb"]
+        parsed_args = vars(chado_tools.parse_arguments(args))
+        self.assertTrue(parsed_args["include_header"])
+        self.assertEqual(parsed_args["delimiter"], ";")
+        self.assertEqual(parsed_args["output_file"], "testfile")
+        self.assertEqual(parsed_args["format"], "csv")
+        self.assertEqual(parsed_args["organism"], "testorganism")
+        self.assertEqual(parsed_args["dbname"], "testdb")
+
+    def test_extract_comments_args(self):
+        # Tests if the command line arguments for the subcommand 'chado extract comments' are parsed correctly
+        args = ["chado", "extract", "comments", "-H", "-d", ";", "-o", "testfile", "-a", "testorganism",
                 "testdb"]
         parsed_args = vars(chado_tools.parse_arguments(args))
         self.assertTrue(parsed_args["include_header"])

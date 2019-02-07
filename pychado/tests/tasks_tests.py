@@ -368,6 +368,26 @@ class TestTasks(unittest.TestCase):
         mock_set.assert_called_with("testquery", organism="testorganism")
         mock_query.assert_called_with(self.uri, "testquery_with_params", "", "csv", False, "\t")
 
+    @unittest.mock.patch('pychado.dbutils.query_and_print')
+    @unittest.mock.patch('pychado.queries.set_query_conditions')
+    @unittest.mock.patch('pychado.queries.load_query')
+    def test_extract_comments(self, mock_load, mock_set, mock_query):
+        # Checks that the function extracting comments on features is correctly called
+        self.assertIs(mock_load, queries.load_query)
+        self.assertIs(mock_set, queries.set_query_conditions)
+        self.assertIs(mock_query, dbutils.query_and_print)
+
+        args = ["chado", "extract", "comments", "-a", "testorganism", "testdb"]
+        parsed_args = chado_tools.parse_arguments(args)
+        mock_load.return_value = "testquery"
+        mock_set.return_value = "testquery_with_params"
+        mock_query.return_value = ['a', 'b', 'c']
+
+        tasks.run_select_command(args[2], parsed_args, self.uri)
+        mock_load.assert_called_with("comments")
+        mock_set.assert_called_with("testquery", organism="testorganism")
+        mock_query.assert_called_with(self.uri, "testquery_with_params", "", "csv", False, "\t")
+
     @unittest.mock.patch('pychado.tasks.run_insert_command')
     def test_run_insert(self, mock_run):
         # Checks that database inserts are correctly run

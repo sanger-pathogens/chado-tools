@@ -31,4 +31,5 @@ WHERE
 	feature2.is_obsolete = 'f'														-- ignore obsolete features
 ORDER BY
 	gene_id,
-	transcript_id
+	transcript_id,
+	curator_comment

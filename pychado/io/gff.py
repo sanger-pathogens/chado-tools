@@ -7,6 +7,37 @@ from .. import utils
 from ..orm import general, cv, organism, pub, sequence
 
 
+class ArtemisGffAttribute:
+    """Helper class for complex GFF attributes in files created by Artemis"""
+
+    def __init__(self):
+        """Initializes the object"""
+        self.value = ""                      # type: str
+        self.list_params = []                # type: List[str]
+        self.dict_params = {}                # type: Dict[str, Union[str, int, float, bool]]
+
+
+def parse_artemis_gff_attribute(attribute: str) -> ArtemisGffAttribute:
+    """Function to parse a GFF attribute into its constituents"""
+    artemis_attribute = ArtemisGffAttribute()
+    elements = attribute.split(";")
+    for element in elements:
+        if not element:
+            continue
+        key_value_pair = element.split("=", 1)
+        if len(key_value_pair) == 2:
+            k = key_value_pair[0]
+            v = utils.parse_string(key_value_pair[1])
+            artemis_attribute.dict_params[k] = v
+        else:
+            artemis_attribute.list_params.append(element)
+    if artemis_attribute.list_params:
+        artemis_attribute.value = artemis_attribute.list_params[0]
+    elif "term" in artemis_attribute.dict_params:
+        artemis_attribute.value = artemis_attribute.dict_params["term"]
+    return artemis_attribute
+
+
 class GFFClient(object):
     """Helper class for GFF-related operations"""
 
@@ -346,13 +377,17 @@ class GFFImportClient(iobase.ChadoClient, GFFClient):
             for alias in aliases:
 
                 # Insert/update entry in the 'synonym' table
-                new_synonym_entry = sequence.Synonym(name=alias, type_id=type_entry.cvterm_id, synonym_sgml=alias)
+                new_synonym_entry = sequence.Synonym(name=alias.value, type_id=type_entry.cvterm_id,
+                                                     synonym_sgml=alias.value)
                 synonym_entry = self._handle_synonym(new_synonym_entry)
 
                 # Insert/update entry in the 'feature_synonym' table
+                is_current = None
+                if "current" in alias.dict_params:
+                    is_current = alias.dict_params["current"]
                 new_feature_synonym_entry = sequence.FeatureSynonym(
                     synonym_id=synonym_entry.synonym_id, feature_id=feature_entry.feature_id,
-                    pub_id=self._default_pub.pub_id)
+                    pub_id=self._default_pub.pub_id, is_current=is_current)
                 feature_synonym_entry = self._handle_feature_synonym(new_feature_synonym_entry,
                                                                      existing_feature_synonyms)
                 all_feature_synonyms.append(feature_synonym_entry)
@@ -667,7 +702,7 @@ class GFFImportClient(iobase.ChadoClient, GFFClient):
                     relationships[chado_key] = value
         return relationships
 
-    def _extract_gff_synonyms(self, gff_record: gffutils.Feature) -> Dict[str, List[str]]:
+    def _extract_gff_synonyms(self, gff_record: gffutils.Feature) -> Dict[str, List[ArtemisGffAttribute]]:
         """Extracts synonyms/alias names from a GFF record"""
         aliases = {}
         for gff_key, value in gff_record.attributes.items():
@@ -678,9 +713,9 @@ class GFFImportClient(iobase.ChadoClient, GFFClient):
 
             if chado_key:
                 if isinstance(value, str):
-                    aliases[gff_key.lower()] = [value]
+                    aliases[gff_key.lower()] = [parse_artemis_gff_attribute(value)]
                 elif isinstance(value, list):
-                    aliases[gff_key.lower()] = value
+                    aliases[gff_key.lower()] = [parse_artemis_gff_attribute(v) for v in value]
         return aliases
 
     @staticmethod

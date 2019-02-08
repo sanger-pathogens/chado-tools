@@ -13,6 +13,35 @@ modules_dir = os.path.dirname(os.path.abspath(gff.__file__))
 data_dir = os.path.abspath(os.path.join(modules_dir, '..', 'tests', 'data'))
 
 
+class TestArtemisGffAttribute(unittest.TestCase):
+    """Tests functions related to GFF attributes in files created by Artemis"""
+
+    def test_parse(self):
+        # Tests the parsing of complex GFF attributes
+        text_attribute = "sar1;current=false"
+        parsed_attribute = gff.parse_artemis_gff_attribute(text_attribute)
+        self.assertEqual(parsed_attribute.value, "sar1")
+        self.assertEqual(len(parsed_attribute.list_params), 1)
+        self.assertEqual(len(parsed_attribute.dict_params), 1)
+        self.assertIn("current", parsed_attribute.dict_params)
+        self.assertFalse(parsed_attribute.dict_params["current"])
+
+        text_attribute = "term=reticulocyte binding protein 2b, putative"
+        parsed_attribute = gff.parse_artemis_gff_attribute(text_attribute)
+        self.assertEqual(parsed_attribute.value, "reticulocyte binding protein 2b, putative")
+        self.assertEqual(len(parsed_attribute.list_params), 0)
+        self.assertEqual(len(parsed_attribute.dict_params), 1)
+
+        text_attribute = "signalp;;query 1-22;cleavage_site_probability=0.387"
+        parsed_attribute = gff.parse_artemis_gff_attribute(text_attribute)
+        self.assertEqual(parsed_attribute.value, "signalp")
+        self.assertEqual(len(parsed_attribute.list_params), 2)
+        self.assertEqual(len(parsed_attribute.dict_params), 1)
+        self.assertIn("query 1-22", parsed_attribute.list_params)
+        self.assertIn("cleavage_site_probability", parsed_attribute.dict_params)
+        self.assertEqual(parsed_attribute.dict_params["cleavage_site_probability"], 0.387)
+
+
 class TestGFFImport(unittest.TestCase):
     """Tests various functions used to load a GFF file into a database"""
 
@@ -275,10 +304,16 @@ class TestGFFImport(unittest.TestCase):
         mock_query.assert_called_with(1, [31, 32, 33])
         mock_synonym.assert_any_call(name="testalias", type_id=33, synonym_sgml="testalias")
         self.assertEqual(mock_insert_synonym.call_count, 2)
-        mock_feature_synonym.assert_any_call(synonym_id=12, feature_id=1, pub_id=33)
+        mock_feature_synonym.assert_any_call(synonym_id=12, feature_id=1, pub_id=33, is_current=None)
         self.assertEqual(mock_insert_feature_synonym.call_count, 2)
         mock_delete_feature_synonym.assert_called()
         self.assertEqual(len(all_synonyms), 2)
+
+        self.default_gff_record.attributes["synonym"] = "abcd;current=false"
+        all_synonyms = self.client._handle_synonyms(self.default_gff_record, feature_entry)
+        mock_synonym.assert_any_call(name="abcd", type_id=31, synonym_sgml="abcd")
+        mock_feature_synonym.assert_any_call(synonym_id=12, feature_id=1, pub_id=33, is_current=False)
+        self.assertEqual(len(all_synonyms), 3)
 
     @unittest.mock.patch("pychado.io.gff.GFFImportClient._delete_feature_pub")
     @unittest.mock.patch("pychado.io.gff.GFFImportClient._handle_feature_pub")
@@ -555,11 +590,14 @@ class TestGFFImport(unittest.TestCase):
 
     def test_extract_gff_synonyms(self):
         # Tests the function that extracts the synonyms from a GFF record
-        feature = gffutils.Feature(attributes={"Alias": "testalias", "previous_systematic_id": ["testsynonym"]})
+        feature = gffutils.Feature(attributes={"Alias": "testalias;current=False",
+                                               "previous_systematic_id": ["testsynonym"]})
         synonyms = self.client._extract_gff_synonyms(feature)
         self.assertEqual(len(synonyms), 2)
-        self.assertEqual(synonyms["alias"], ["testalias"])
-        self.assertEqual(synonyms["previous_systematic_id"], ["testsynonym"])
+        self.assertEqual(len(synonyms["alias"]), 1)
+        self.assertEqual(synonyms["alias"][0].value, "testalias")
+        self.assertEqual(len(synonyms["previous_systematic_id"]), 1)
+        self.assertEqual(synonyms["previous_systematic_id"][0].value, "testsynonym")
 
     def test_extract_gff_residues(self):
         # Tests the function that extracts an amino acid sequence from a GFF record

@@ -89,6 +89,19 @@ class TestUtils(unittest.TestCase):
         self.assertIn("parasites and microbes", content["faculties"])
         self.assertNotIn("zebrafish genetics", content["faculties"])
 
+    def test_parse_string(self):
+        # checks if a string is parsed correctly
+        parsed = utils.parse_string("true")
+        self.assertTrue(parsed)
+        parsed = utils.parse_string("FALSE")
+        self.assertFalse(parsed)
+        parsed = utils.parse_string("765")
+        self.assertEqual(parsed, 765)
+        parsed = utils.parse_string("76.5")
+        self.assertEqual(parsed, 76.5)
+        parsed = utils.parse_string("ture")
+        self.assertEqual(parsed, "ture")
+
     def test_list_to_string(self):
         # checks if a list is correctly concatenated
         test_list = [1.123, None, 'hello', True, 'A', 8, False]

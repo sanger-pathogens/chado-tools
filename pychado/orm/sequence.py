@@ -493,7 +493,7 @@ class FeatureSynonym(base.PublicBase):
     pub = sqlalchemy.orm.relationship(pub.Pub, foreign_keys=pub_id, backref="feature_synonym_pub")
 
     # Initialisation
-    def __init__(self, synonym_id, feature_id, pub_id, is_current=True, is_internal=False, feature_synonym_id=None):
+    def __init__(self, synonym_id, feature_id, pub_id, is_current=None, is_internal=None, feature_synonym_id=None):
         for key, val in locals().items():
             if key != self:
                 setattr(self, key, val)

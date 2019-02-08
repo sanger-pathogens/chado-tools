@@ -11,7 +11,7 @@ except FileNotFoundError or FileExistsError:
 
 setuptools.setup(
     name="chado-tools",
-    version="0.2.6",
+    version="0.2.7",
     author="Christoph Puethe",
     author_email="path-help@sanger.ac.uk",
     description="Tools to access CHADO databases",

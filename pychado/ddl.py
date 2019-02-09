@@ -318,9 +318,8 @@ class AuditSchemaSetupClient(SchemaSetupClient):
             function_definition = self.generic_audit_function(self.schema, table.name, data_column_names)
             function_creator = self.create_trigger_function(self.schema, function_name, function_definition)
 
-            # Create trigger function, if it doesn't exist yet
-            if not self.function_exists(self.schema, function_name):
-                self.execute_ddl(function_creator)
+            # Create/replace trigger function
+            self.execute_ddl(function_creator)
 
             # Define trigger
             trigger_name = table.name + "_audit_tr"
@@ -333,7 +332,15 @@ class AuditSchemaSetupClient(SchemaSetupClient):
 
     @staticmethod
     def generic_audit_function(schema: str, table: str, columns: list) -> str:
-        return "IF TG_OP = 'INSERT' OR TG_OP = 'UPDATE' THEN\n" \
+        return "IF TG_OP = 'INSERT' THEN\n" \
+               + "\tINSERT INTO " + schema + "." + table + "(type, " + utils.list_to_string(columns, ", ") + ")" \
+               + " VALUES (CAST(TG_OP AS " + base.operation_type.name + "), " \
+               + utils.list_to_string(columns, ", ", "NEW") + ");\n" \
+               + "\tRETURN NEW;\n" \
+               + "ELSIF TG_OP = 'UPDATE' THEN\n" \
+               + "\tINSERT INTO " + schema + "." + table + "(type, " + utils.list_to_string(columns, ", ") + ")" \
+               + " VALUES (CAST('BEFORE' AS " + base.operation_type.name + "), " \
+               + utils.list_to_string(columns, ", ", "OLD") + ");\n" \
                + "\tINSERT INTO " + schema + "." + table + "(type, " + utils.list_to_string(columns, ", ") + ")" \
                + " VALUES (CAST(TG_OP AS " + base.operation_type.name + "), " \
                + utils.list_to_string(columns, ", ", "NEW") + ");\n" \

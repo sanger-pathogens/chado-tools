@@ -6,4 +6,4 @@ AuditBase = sqlalchemy.ext.declarative.declarative_base(metadata=sqlalchemy.sche
 
 # Define data types
 BIGINT = sqlalchemy.BIGINT().with_variant(sqlalchemy.INTEGER(), 'sqlite')
-operation_type = sqlalchemy.Enum('INSERT', 'UPDATE', 'DELETE', name='operation_type')
+operation_type = sqlalchemy.Enum('INSERT', 'UPDATE', 'DELETE', 'BEFORE', name='operation_type')

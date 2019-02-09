@@ -142,7 +142,13 @@ class SetupTests(unittest.TestCase):
     def test_generic_audit_function(self):
         # Tests the syntax of an audit function
         fct = self.client.generic_audit_function("testschema", "testtable", ["col1", "col2"])
-        self.assertEqual(fct, "IF TG_OP = 'INSERT' OR TG_OP = 'UPDATE' THEN\n"
+        self.assertEqual(fct, "IF TG_OP = 'INSERT' THEN\n"
+                              "\tINSERT INTO testschema.testtable(type, col1, col2) "
+                              "VALUES (CAST(TG_OP AS operation_type), NEW.col1, NEW.col2);\n"
+                              "\tRETURN NEW;\n"
+                              "ELSIF TG_OP = 'UPDATE' THEN\n"
+                              "\tINSERT INTO testschema.testtable(type, col1, col2) "
+                              "VALUES (CAST('BEFORE' AS operation_type), OLD.col1, OLD.col2);\n"
                               "\tINSERT INTO testschema.testtable(type, col1, col2) "
                               "VALUES (CAST(TG_OP AS operation_type), NEW.col1, NEW.col2);\n"
                               "\tRETURN NEW;\n"

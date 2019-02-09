@@ -206,7 +206,7 @@ def run_import_command(specifier: str, arguments, uri: str) -> None:
     elif specifier == "gff":
         client = gff.GFFImportClient(uri, arguments.verbose)
         client.load(file, arguments.organism, arguments.fasta, arguments.sequence_type, arguments.fresh_load,
-                    arguments.force, arguments.full_genome)
+                    arguments.force, arguments.full_genome, arguments.full_attributes)
     elif specifier == "fasta":
         client = fasta.FastaImportClient(uri, arguments.verbose)
         client.load(file, arguments.organism, arguments.sequence_type)

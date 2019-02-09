@@ -491,8 +491,8 @@ class TestTasks(unittest.TestCase):
         parsed_args = chado_tools.parse_arguments(args)
         tasks.run_import_command(args[2], parsed_args, self.uri)
         mock_client.assert_called_with(self.uri, False)
-        self.assertIn(unittest.mock.call().load("testfile", "testorganism", "testfasta", "contig", True, True, True),
-                      mock_client.mock_calls)
+        self.assertIn(unittest.mock.call().load("testfile", "testorganism", "testfasta", "contig",
+                                                True, True, True, False), mock_client.mock_calls)
 
     @unittest.mock.patch('pychado.io.fasta.FastaImportClient')
     def test_import_fasta(self, mock_client):

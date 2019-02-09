@@ -17,29 +17,29 @@ class ArtemisGffAttribute:
         self.dict_params = {}                # type: Dict[str, Union[str, int, float, bool]]
 
 
-def parse_artemis_gff_attribute(attribute: str) -> ArtemisGffAttribute:
-    """Function to parse a GFF attribute into its constituents"""
-    artemis_attribute = ArtemisGffAttribute()
-    elements = attribute.split(";")
-    for element in elements:
-        if not element:
-            continue
-        key_value_pair = element.split("=", 1)
-        if len(key_value_pair) == 2:
-            k = key_value_pair[0]
-            v = utils.parse_string(key_value_pair[1])
-            artemis_attribute.dict_params[k] = v
-        else:
-            artemis_attribute.list_params.append(element)
-    if artemis_attribute.list_params:
-        artemis_attribute.value = artemis_attribute.list_params[0]
-    elif "term" in artemis_attribute.dict_params:
-        artemis_attribute.value = artemis_attribute.dict_params["term"]
-    return artemis_attribute
-
-
 class GFFClient(object):
     """Helper class for GFF-related operations"""
+
+    @staticmethod
+    def parse_artemis_gff_attribute(attribute: str) -> ArtemisGffAttribute:
+        """Function to parse a GFF attribute into its constituents"""
+        artemis_attribute = ArtemisGffAttribute()
+        elements = attribute.split(";")
+        for element in elements:
+            if not element:
+                continue
+            key_value_pair = element.split("=", 1)
+            if len(key_value_pair) == 2:
+                k = key_value_pair[0]
+                v = utils.parse_string(key_value_pair[1])
+                artemis_attribute.dict_params[k] = v
+            else:
+                artemis_attribute.list_params.append(element)
+        if artemis_attribute.list_params:
+            artemis_attribute.value = artemis_attribute.list_params[0]
+        elif "term" in artemis_attribute.dict_params:
+            artemis_attribute.value = artemis_attribute.dict_params["term"]
+        return artemis_attribute
 
     @staticmethod
     def convert_strand(strand: str) -> Union[None, int]:
@@ -126,6 +126,12 @@ class GFFImportClient(iobase.ChadoClient, GFFClient):
         if not self.test_environment:
             self._load_essentials()
 
+        # Set default values for global options
+        self.fresh_load = False
+        self.force_purge = False
+        self.full_genome = False
+        self.full_attributes = False
+
     def __del__(self):
         """Destructor"""
 
@@ -164,8 +170,14 @@ class GFFImportClient(iobase.ChadoClient, GFFClient):
         self._go_db = self._load_db("GO")
 
     def load(self, filename: str, organism_name: str, fasta_filename: str, sequence_type: str, fresh_load=False,
-             force_purge=False, full_genome=False):
+             force_purge=False, full_genome=False, full_attributes=False):
         """Import data from a GFF3 file into a Chado database"""
+
+        # Update global options
+        self.fresh_load = fresh_load
+        self.force_purge = force_purge
+        self.full_genome = full_genome
+        self.full_attributes = full_attributes
 
         # Check for file existence
         if not os.path.exists(filename):
@@ -173,7 +185,7 @@ class GFFImportClient(iobase.ChadoClient, GFFClient):
 
         # Remove existing database entries, if applicable
         default_organism = self._load_organism(organism_name)
-        self._handle_existing_features(default_organism, fresh_load, force_purge)
+        self._handle_existing_features(default_organism)
 
         # Import FASTA sequences, if present
         self._import_fasta(filename, fasta_filename, organism_name, sequence_type)
@@ -191,7 +203,7 @@ class GFFImportClient(iobase.ChadoClient, GFFClient):
             self._insert_gff_record_into_database(gff_record, default_organism, all_feature_entries)
 
         # Mark obsolete features
-        if full_genome and not fresh_load:
+        if self.full_genome and not self.fresh_load:
             top_level_entries = self._extract_gff_sequence_names(gff_db)
             self._mark_obsolete_features(default_organism, all_feature_entries, top_level_entries)
 
@@ -261,11 +273,11 @@ class GFFImportClient(iobase.ChadoClient, GFFClient):
         database = gffutils.FeatureDB(database_name)
         return database
 
-    def _handle_existing_features(self, organism_entry: organism.Organism, fresh_load: bool, force_purge: bool) -> None:
+    def _handle_existing_features(self, organism_entry: organism.Organism) -> None:
         """Checks if there are existing features for the organism, and deletes them if required"""
 
         # Check if this is an import "from scratch". If not, there is no need to take any action
-        if not fresh_load:
+        if not self.fresh_load:
             return
 
         # Check if the database already contains features for this organism. If not, there is no need to take any action
@@ -274,7 +286,7 @@ class GFFImportClient(iobase.ChadoClient, GFFClient):
             return
 
         # Check if the '--force' option was used
-        if not force_purge:
+        if not self.force_purge:
 
             # Abort the operation
             raise iobase.DatabaseError("The database already contains features for organism '"
@@ -388,12 +400,13 @@ class GFFImportClient(iobase.ChadoClient, GFFClient):
                 new_feature_synonym_entry = sequence.FeatureSynonym(
                     synonym_id=synonym_entry.synonym_id, feature_id=feature_entry.feature_id,
                     pub_id=self._default_pub.pub_id, is_current=is_current)
-                feature_synonym_entry = self._handle_feature_synonym(new_feature_synonym_entry,
-                                                                     existing_feature_synonyms)
+                feature_synonym_entry = self._handle_feature_synonym(
+                    new_feature_synonym_entry, existing_feature_synonyms, alias.value, feature_entry.uniquename)
                 all_feature_synonyms.append(feature_synonym_entry)
 
         # Delete obsolete entries
-        self._delete_feature_synonym(all_feature_synonyms, existing_feature_synonyms, feature_entry.uniquename)
+        if self.full_attributes:
+            self._delete_feature_synonym(all_feature_synonyms, existing_feature_synonyms, feature_entry.uniquename)
         return all_feature_synonyms
 
     def _handle_publications(self, gff_record: gffutils.Feature, feature_entry: sequence.Feature
@@ -419,7 +432,8 @@ class GFFImportClient(iobase.ChadoClient, GFFClient):
             all_feature_pubs.append(feature_pub_entry)
 
         # Delete obsolete entries
-        self._delete_feature_pub(all_feature_pubs, existing_feature_pubs, feature_entry.uniquename)
+        if self.full_attributes:
+            self._delete_feature_pub(all_feature_pubs, existing_feature_pubs, feature_entry.uniquename)
         return all_feature_pubs
 
     def _handle_relationships(self, gff_record: gffutils.Feature, subject_entry: sequence.Feature,
@@ -461,8 +475,9 @@ class GFFImportClient(iobase.ChadoClient, GFFClient):
                 all_feature_relationships.append(feature_relationship_entry)
 
         # Delete obsolete entries
-        self._delete_feature_relationship(all_feature_relationships, existing_feature_relationships,
-                                          subject_entry.uniquename)
+        if self.full_attributes:
+            self._delete_feature_relationship(all_feature_relationships, existing_feature_relationships,
+                                              subject_entry.uniquename)
         return all_feature_relationships
 
     def _handle_properties(self, gff_record: gffutils.Feature, feature_entry: sequence.Feature
@@ -493,7 +508,8 @@ class GFFImportClient(iobase.ChadoClient, GFFClient):
                 all_featureprops.append(featureprop_entry)
 
         # Delete obsolete entries
-        self._delete_featureprop(all_featureprops, existing_featureprops, feature_entry.uniquename)
+        if self.full_attributes:
+            self._delete_featureprop(all_featureprops, existing_featureprops, feature_entry.uniquename)
         return all_featureprops
 
     def _handle_cross_references(self, gff_record: gffutils.Feature, feature_entry: sequence.Feature
@@ -527,7 +543,8 @@ class GFFImportClient(iobase.ChadoClient, GFFClient):
             all_feature_dbxrefs.append(feature_dbxref_entry)
 
         # Delete obsolete entries
-        self._delete_feature_dbxref(all_feature_dbxrefs, existing_feature_dbxrefs, feature_entry.uniquename)
+        if self.full_attributes:
+            self._delete_feature_dbxref(all_feature_dbxrefs, existing_feature_dbxrefs, feature_entry.uniquename)
         return all_feature_dbxrefs
 
     def _handle_ontology_terms(self, gff_record: gffutils.Feature, feature_entry: sequence.Feature
@@ -574,7 +591,8 @@ class GFFImportClient(iobase.ChadoClient, GFFClient):
             all_feature_cvterms.append(feature_cvterm_entry)
 
         # Delete obsolete entries
-        self._delete_feature_cvterm(all_feature_cvterms, existing_feature_cvterms, feature_entry.uniquename)
+        if self.full_attributes:
+            self._delete_feature_cvterm(all_feature_cvterms, existing_feature_cvterms, feature_entry.uniquename)
         return all_feature_cvterms
 
     def _handle_protein(self, gff_record: gffutils.Feature, feature_entry: sequence.Feature,
@@ -713,9 +731,9 @@ class GFFImportClient(iobase.ChadoClient, GFFClient):
 
             if chado_key:
                 if isinstance(value, str):
-                    aliases[gff_key.lower()] = [parse_artemis_gff_attribute(value)]
+                    aliases[gff_key.lower()] = [self.parse_artemis_gff_attribute(value)]
                 elif isinstance(value, list):
-                    aliases[gff_key.lower()] = [parse_artemis_gff_attribute(v) for v in value]
+                    aliases[gff_key.lower()] = [self.parse_artemis_gff_attribute(v) for v in value]
         return aliases
 
     @staticmethod

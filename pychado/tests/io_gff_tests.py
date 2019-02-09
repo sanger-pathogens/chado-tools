@@ -13,35 +13,6 @@ modules_dir = os.path.dirname(os.path.abspath(gff.__file__))
 data_dir = os.path.abspath(os.path.join(modules_dir, '..', 'tests', 'data'))
 
 
-class TestArtemisGffAttribute(unittest.TestCase):
-    """Tests functions related to GFF attributes in files created by Artemis"""
-
-    def test_parse(self):
-        # Tests the parsing of complex GFF attributes
-        text_attribute = "sar1;current=false"
-        parsed_attribute = gff.parse_artemis_gff_attribute(text_attribute)
-        self.assertEqual(parsed_attribute.value, "sar1")
-        self.assertEqual(len(parsed_attribute.list_params), 1)
-        self.assertEqual(len(parsed_attribute.dict_params), 1)
-        self.assertIn("current", parsed_attribute.dict_params)
-        self.assertFalse(parsed_attribute.dict_params["current"])
-
-        text_attribute = "term=reticulocyte binding protein 2b, putative"
-        parsed_attribute = gff.parse_artemis_gff_attribute(text_attribute)
-        self.assertEqual(parsed_attribute.value, "reticulocyte binding protein 2b, putative")
-        self.assertEqual(len(parsed_attribute.list_params), 0)
-        self.assertEqual(len(parsed_attribute.dict_params), 1)
-
-        text_attribute = "signalp;;query 1-22;cleavage_site_probability=0.387"
-        parsed_attribute = gff.parse_artemis_gff_attribute(text_attribute)
-        self.assertEqual(parsed_attribute.value, "signalp")
-        self.assertEqual(len(parsed_attribute.list_params), 2)
-        self.assertEqual(len(parsed_attribute.dict_params), 1)
-        self.assertIn("query 1-22", parsed_attribute.list_params)
-        self.assertIn("cleavage_site_probability", parsed_attribute.dict_params)
-        self.assertEqual(parsed_attribute.dict_params["cleavage_site_probability"], 0.387)
-
-
 class TestGFFImport(unittest.TestCase):
     """Tests various functions used to load a GFF file into a database"""
 
@@ -73,6 +44,7 @@ class TestGFFImport(unittest.TestCase):
         cls.client._feature_property_type_ids = [51, 52, 53]
         cls.client._parent_type_ids = [62, 63]
         cls.client._go_db = general.Db(db_id=131, name="GO")
+        cls.client.full_attributes = True
 
     def setUp(self):
         # Creates a default GFF record
@@ -161,29 +133,37 @@ class TestGFFImport(unittest.TestCase):
         mock_query.return_value = unittest.mock.Mock(sqlalchemy.orm.Query)
 
         # update import - should not query
-        self.client._handle_existing_features(organism_entry, False, False)
+        self.client.fresh_load = False
+        self.client.force_purge = False
+        self.client._handle_existing_features(organism_entry)
         mock_query.assert_not_called()
 
         # from-scratch import on empty table - should not call delete
+        self.client.fresh_load = True
+        self.client.force_purge = False
         mock_query_object = mock_query.return_value
         mock_query_object.configure_mock(**{"count.return_value": 0})
-        self.client._handle_existing_features(organism_entry, True, False)
+        self.client._handle_existing_features(organism_entry)
         mock_query.assert_called_with(sequence.Feature, organism_id=organism_entry.organism_id)
         self.assertIn(unittest.mock.call.count(), mock_query_object.method_calls)
         self.assertEqual(len(mock_query_object.mock_calls), 1)
 
         # from-scratch import on full table without 'force' - should throw an exception
+        self.client.fresh_load = True
+        self.client.force_purge = False
         mock_query_object.reset_mock()
         mock_query_object.configure_mock(**{"count.return_value": 1})
         with self.assertRaises(iobase.DatabaseError):
-            self.client._handle_existing_features(organism_entry, True, False)
+            self.client._handle_existing_features(organism_entry)
         self.assertIn(unittest.mock.call.count(), mock_query_object.method_calls)
         self.assertEqual(len(mock_query_object.mock_calls), 1)
 
         # from-scratch import on full table with 'force' - should call delete
+        self.client.fresh_load = True
+        self.client.force_purge = True
         mock_query_object.reset_mock()
         mock_query_object.configure_mock(**{"count.return_value": 1})
-        self.client._handle_existing_features(organism_entry, True, True)
+        self.client._handle_existing_features(organism_entry)
         self.assertIn(unittest.mock.call.count(), mock_query_object.method_calls)
         self.assertIn(unittest.mock.call.delete(), mock_query_object.method_calls)
         self.assertEqual(len(mock_query_object.mock_calls), 2)
@@ -943,6 +923,31 @@ class TestGFFFunctions(unittest.TestCase):
     def setUpClass(cls):
         # Creates an instance of the base class to be tested
         cls.client = gff.GFFClient()
+
+    def test_parse_artemis_gff_attribute(self):
+        # Tests the parsing of complex GFF attributes
+        text_attribute = "sar1;current=false"
+        parsed_attribute = self.client.parse_artemis_gff_attribute(text_attribute)
+        self.assertEqual(parsed_attribute.value, "sar1")
+        self.assertEqual(len(parsed_attribute.list_params), 1)
+        self.assertEqual(len(parsed_attribute.dict_params), 1)
+        self.assertIn("current", parsed_attribute.dict_params)
+        self.assertFalse(parsed_attribute.dict_params["current"])
+
+        text_attribute = "term=reticulocyte binding protein 2b, putative"
+        parsed_attribute = self.client.parse_artemis_gff_attribute(text_attribute)
+        self.assertEqual(parsed_attribute.value, "reticulocyte binding protein 2b, putative")
+        self.assertEqual(len(parsed_attribute.list_params), 0)
+        self.assertEqual(len(parsed_attribute.dict_params), 1)
+
+        text_attribute = "signalp;;query 1-22;cleavage_site_probability=0.387"
+        parsed_attribute = self.client.parse_artemis_gff_attribute(text_attribute)
+        self.assertEqual(parsed_attribute.value, "signalp")
+        self.assertEqual(len(parsed_attribute.list_params), 2)
+        self.assertEqual(len(parsed_attribute.dict_params), 1)
+        self.assertIn("query 1-22", parsed_attribute.list_params)
+        self.assertIn("cleavage_site_probability", parsed_attribute.dict_params)
+        self.assertEqual(parsed_attribute.dict_params["cleavage_site_probability"], 0.387)
 
     def test_convert_strand(self):
         # Tests the function converting the 'strand' attribute from string notation to integer notation

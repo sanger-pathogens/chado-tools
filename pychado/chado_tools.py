@@ -353,6 +353,7 @@ def add_extract_stats_arguments(parser: argparse.ArgumentParser):
     parser.add_argument("--end_date", default="", help="date for minimum age of updates, format 'YYYYMMDD' "
                                                        "(default: today)")
 
+
 def add_extract_comments_arguments(parser: argparse.ArgumentParser):
     """Defines formal arguments for the 'chado extract comments' sub-command"""
     parser.add_argument("-a", "--abbreviation", dest="organism",
@@ -465,7 +466,9 @@ def add_import_gff_arguments(parser: argparse.ArgumentParser):
     parser.add_argument("--force", action="store_true",
                         help="in case of a fresh load, purge all existing features of the organism")
     parser.add_argument("--full_genome", action="store_true",
-                        help="in case of an update, assume that the GFF file contains all features of the organism")
+                        help="in case of an update, mark features not present in the input file as obsolete")
+    parser.add_argument("--full_attributes", action="store_true",
+                        help="in case of an update, delete feature attributes not present in the input file")
 
 
 def add_import_fasta_arguments(parser: argparse.ArgumentParser):

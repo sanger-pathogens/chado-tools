@@ -44,6 +44,7 @@ class TestGFFImport(unittest.TestCase):
         cls.client._feature_property_type_ids = [51, 52, 53]
         cls.client._parent_type_ids = [62, 63]
         cls.client._go_db = general.Db(db_id=131, name="GO")
+        cls.client.full_attributes = True
 
     def setUp(self):
         # Creates a default GFF record
@@ -132,29 +133,37 @@ class TestGFFImport(unittest.TestCase):
         mock_query.return_value = unittest.mock.Mock(sqlalchemy.orm.Query)
 
         # update import - should not query
-        self.client._handle_existing_features(organism_entry, False, False)
+        self.client.fresh_load = False
+        self.client.force_purge = False
+        self.client._handle_existing_features(organism_entry)
         mock_query.assert_not_called()
 
         # from-scratch import on empty table - should not call delete
+        self.client.fresh_load = True
+        self.client.force_purge = False
         mock_query_object = mock_query.return_value
         mock_query_object.configure_mock(**{"count.return_value": 0})
-        self.client._handle_existing_features(organism_entry, True, False)
+        self.client._handle_existing_features(organism_entry)
         mock_query.assert_called_with(sequence.Feature, organism_id=organism_entry.organism_id)
         self.assertIn(unittest.mock.call.count(), mock_query_object.method_calls)
         self.assertEqual(len(mock_query_object.mock_calls), 1)
 
         # from-scratch import on full table without 'force' - should throw an exception
+        self.client.fresh_load = True
+        self.client.force_purge = False
         mock_query_object.reset_mock()
         mock_query_object.configure_mock(**{"count.return_value": 1})
         with self.assertRaises(iobase.DatabaseError):
-            self.client._handle_existing_features(organism_entry, True, False)
+            self.client._handle_existing_features(organism_entry)
         self.assertIn(unittest.mock.call.count(), mock_query_object.method_calls)
         self.assertEqual(len(mock_query_object.mock_calls), 1)
 
         # from-scratch import on full table with 'force' - should call delete
+        self.client.fresh_load = True
+        self.client.force_purge = True
         mock_query_object.reset_mock()
         mock_query_object.configure_mock(**{"count.return_value": 1})
-        self.client._handle_existing_features(organism_entry, True, True)
+        self.client._handle_existing_features(organism_entry)
         self.assertIn(unittest.mock.call.count(), mock_query_object.method_calls)
         self.assertIn(unittest.mock.call.delete(), mock_query_object.method_calls)
         self.assertEqual(len(mock_query_object.mock_calls), 2)
@@ -275,10 +284,16 @@ class TestGFFImport(unittest.TestCase):
         mock_query.assert_called_with(1, [31, 32, 33])
         mock_synonym.assert_any_call(name="testalias", type_id=33, synonym_sgml="testalias")
         self.assertEqual(mock_insert_synonym.call_count, 2)
-        mock_feature_synonym.assert_any_call(synonym_id=12, feature_id=1, pub_id=33)
+        mock_feature_synonym.assert_any_call(synonym_id=12, feature_id=1, pub_id=33, is_current=None)
         self.assertEqual(mock_insert_feature_synonym.call_count, 2)
         mock_delete_feature_synonym.assert_called()
         self.assertEqual(len(all_synonyms), 2)
+
+        self.default_gff_record.attributes["synonym"] = "abcd;current=false"
+        all_synonyms = self.client._handle_synonyms(self.default_gff_record, feature_entry)
+        mock_synonym.assert_any_call(name="abcd", type_id=31, synonym_sgml="abcd")
+        mock_feature_synonym.assert_any_call(synonym_id=12, feature_id=1, pub_id=33, is_current=False)
+        self.assertEqual(len(all_synonyms), 3)
 
     @unittest.mock.patch("pychado.io.gff.GFFImportClient._delete_feature_pub")
     @unittest.mock.patch("pychado.io.gff.GFFImportClient._handle_feature_pub")
@@ -555,11 +570,14 @@ class TestGFFImport(unittest.TestCase):
 
     def test_extract_gff_synonyms(self):
         # Tests the function that extracts the synonyms from a GFF record
-        feature = gffutils.Feature(attributes={"Alias": "testalias", "previous_systematic_id": ["testsynonym"]})
+        feature = gffutils.Feature(attributes={"Alias": "testalias;current=False",
+                                               "previous_systematic_id": ["testsynonym"]})
         synonyms = self.client._extract_gff_synonyms(feature)
         self.assertEqual(len(synonyms), 2)
-        self.assertEqual(synonyms["alias"], ["testalias"])
-        self.assertEqual(synonyms["previous_systematic_id"], ["testsynonym"])
+        self.assertEqual(len(synonyms["alias"]), 1)
+        self.assertEqual(synonyms["alias"][0].value, "testalias")
+        self.assertEqual(len(synonyms["previous_systematic_id"]), 1)
+        self.assertEqual(synonyms["previous_systematic_id"][0].value, "testsynonym")
 
     def test_extract_gff_residues(self):
         # Tests the function that extracts an amino acid sequence from a GFF record
@@ -905,6 +923,31 @@ class TestGFFFunctions(unittest.TestCase):
     def setUpClass(cls):
         # Creates an instance of the base class to be tested
         cls.client = gff.GFFClient()
+
+    def test_parse_artemis_gff_attribute(self):
+        # Tests the parsing of complex GFF attributes
+        text_attribute = "sar1;current=false"
+        parsed_attribute = self.client.parse_artemis_gff_attribute(text_attribute)
+        self.assertEqual(parsed_attribute.value, "sar1")
+        self.assertEqual(len(parsed_attribute.list_params), 1)
+        self.assertEqual(len(parsed_attribute.dict_params), 1)
+        self.assertIn("current", parsed_attribute.dict_params)
+        self.assertFalse(parsed_attribute.dict_params["current"])
+
+        text_attribute = "term=reticulocyte binding protein 2b, putative"
+        parsed_attribute = self.client.parse_artemis_gff_attribute(text_attribute)
+        self.assertEqual(parsed_attribute.value, "reticulocyte binding protein 2b, putative")
+        self.assertEqual(len(parsed_attribute.list_params), 0)
+        self.assertEqual(len(parsed_attribute.dict_params), 1)
+
+        text_attribute = "signalp;;query 1-22;cleavage_site_probability=0.387"
+        parsed_attribute = self.client.parse_artemis_gff_attribute(text_attribute)
+        self.assertEqual(parsed_attribute.value, "signalp")
+        self.assertEqual(len(parsed_attribute.list_params), 2)
+        self.assertEqual(len(parsed_attribute.dict_params), 1)
+        self.assertIn("query 1-22", parsed_attribute.list_params)
+        self.assertIn("cleavage_site_probability", parsed_attribute.dict_params)
+        self.assertEqual(parsed_attribute.dict_params["cleavage_site_probability"], 0.387)
 
     def test_convert_strand(self):
         # Tests the function converting the 'strand' attribute from string notation to integer notation

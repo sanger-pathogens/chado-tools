@@ -117,6 +117,38 @@ def dump_yaml(filename: str, data: dict) -> None:
     close(stream)
 
 
+def parse_string(the_string: str):
+    """Converts a string to an integer/float/boolean, if applicable"""
+    if is_string_float(the_string):
+        return float(the_string)
+    elif is_string_integer(the_string):
+        return int(the_string)
+    elif the_string.lower() == "true":
+        return True
+    elif the_string.lower() == "false":
+        return False
+    else:
+        return the_string
+
+
+def is_string_integer(the_string: str) -> bool:
+    """Tests whether a string can be represented as integer number"""
+    try:
+        int(the_string)
+        return True
+    except ValueError:
+        return False
+
+
+def is_string_float(the_string: str) -> bool:
+    """Tests whether a string can be represented as floating-point number"""
+    try:
+        float(the_string)
+        return True
+    except ValueError:
+        return False
+
+
 def list_to_string(the_list: list, delimiter: str, prefix=None) -> str:
     """Function concatenating all elements of a list"""
     the_string = []

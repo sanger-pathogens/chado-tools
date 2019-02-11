@@ -1,5 +1,20 @@
 # Change Log
 
+## [v0.2.7](https://github.com/sanger-pathogens/chado-tools/tree/v0.2.7) (2019-02-11)
+[Full Changelog](https://github.com/sanger-pathogens/chado-tools/compare/v0.2.6...v0.2.7)
+
+**Merged pull requests:**
+
+- Synonyms [\#37](https://github.com/sanger-pathogens/chado-tools/pull/37) ([puethe](https://github.com/puethe))
+
+## [v0.2.6](https://github.com/sanger-pathogens/chado-tools/tree/v0.2.6) (2019-02-07)
+[Full Changelog](https://github.com/sanger-pathogens/chado-tools/compare/v0.2.5...v0.2.6)
+
+**Merged pull requests:**
+
+- chado extract comments [\#36](https://github.com/sanger-pathogens/chado-tools/pull/36) ([puethe](https://github.com/puethe))
+- Updated changelog [\#35](https://github.com/sanger-pathogens/chado-tools/pull/35) ([puethe](https://github.com/puethe))
+
 ## [v0.2.5](https://github.com/sanger-pathogens/chado-tools/tree/v0.2.5) (2019-02-01)
 [Full Changelog](https://github.com/sanger-pathogens/chado-tools/compare/v0.2.4...v0.2.5)
 

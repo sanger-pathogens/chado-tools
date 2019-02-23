@@ -22,11 +22,17 @@ class DirectIOClient(iobase.ChadoClient):
             genus=genus, species=species, infraspecific_name=infraspecific_name).first()
         abbreviation_entry = self.session.query(organism.Organism).filter_by(abbreviation=abbreviation).first()
         if genus_species_entry:
-            print("An organism with genus '" + genus + "', species '" + species
-                  + "' and strain '" + infraspecific_name + "' is already present in the database.")
+            if infraspecific_name:
+                print("An organism with genus '" + genus + "', species '" + species
+                      + "' and strain '" + infraspecific_name + "' is already present in the database.")
+            else:
+                print("An organism with genus '" + genus + "' and species '" + species
+                      + "' is already present in the database.")
         elif abbreviation_entry:
             print("An organism with abbreviation '" + abbreviation + "' is already present in the database.")
         else:
+            if not common_name:
+                common_name = abbreviation
             organism_entry = organism.Organism(genus=genus, species=species, abbreviation=abbreviation,
                                                common_name=common_name, infraspecific_name=infraspecific_name,
                                                comment=comment, version=genome_version)

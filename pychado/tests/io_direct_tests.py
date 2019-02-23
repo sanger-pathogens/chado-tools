@@ -53,8 +53,13 @@ class TestDirectIO(unittest.TestCase):
 
         # Delete the previously inserted organism and check that it is gone
         self.client.delete_organism('CCC')
-        fifth_result = self.client.query_table(organism.Organism).first()
-        self.assertIsNone(fifth_result)
+        fourth_result = self.client.query_table(organism.Organism).first()
+        self.assertIsNone(fourth_result)
+
+        # Insert an organism without common name and check that the abbreviation is used
+        self.client.insert_organism('AAA', 'BBB', 'CCC', None, 'EEE', 'FFF')
+        fifth_result = self.client.query_table(organism.Organism).all()
+        self.assertEqual(fifth_result[0].common_name, 'CCC')
 
     @unittest.mock.patch("pychado.io.direct.DirectIOClient.query_organisms_by_property_type")
     @unittest.mock.patch("pychado.io.direct.DirectIOClient.query_all_organisms")

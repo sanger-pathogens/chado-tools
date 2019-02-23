@@ -21,6 +21,7 @@ class TestGAFImport(unittest.TestCase):
         cls.client._date_term = cv.CvTerm(cv_id=11, dbxref_id=91, name="date", cvterm_id=91)
         cls.client._evidence_term = cv.CvTerm(cv_id=11, dbxref_id=92, name="evidence", cvterm_id=92)
         cls.client._synonym_term = cv.CvTerm(cv_id=11, dbxref_id=93, name="synonym", cvterm_id=93)
+        cls.client._assigned_by_term = cv.CvTerm(cv_id=11, dbxref_id=94, name="assigned_by", cvterm_id=94)
         cls.client._default_pub = pub.Pub(uniquename="null", type_id=71, pub_id=33)
         cls.client._go_db = general.Db(name="GO", db_id=44)
 
@@ -31,7 +32,7 @@ class TestGAFImport(unittest.TestCase):
                                    'Evidence': 'TAS', 'With': ['evidencedb:evidenceaccession'], 'Aspect': 'C',
                                    'DB_Object_Name': 'testproduct', 'Synonym': ['S1', 'S2'],
                                    'DB_Object_Type': 'transcript', 'Taxon_ID': ['testtaxon'],
-                                   'Date': 'testdate', 'Assigned_By': 'testdb'}
+                                   'Date': 'testdate', 'Assigned_By': 'assigning_db'}
 
     @unittest.mock.patch("pychado.io.gaf.GAFImportClient.query_first")
     def test_load_feature(self, mock_query: unittest.mock.Mock):
@@ -194,8 +195,9 @@ class TestGAFImport(unittest.TestCase):
         mock_query.assert_called_with(sequence.FeatureCvTermProp, feature_cvterm_id=4)
         mock_prop.assert_any_call(feature_cvterm_id=4, type_id=91, value="testdate")
         mock_prop.assert_any_call(feature_cvterm_id=4, type_id=92, value="Traceable Author Statement")
-        self.assertEqual(mock_insert_prop.call_count, 2)
-        self.assertEqual(len(all_properties), 2)
+        mock_prop.assert_any_call(feature_cvterm_id=4, type_id=94, value="assigning_db")
+        self.assertEqual(mock_insert_prop.call_count, 3)
+        self.assertEqual(len(all_properties), 3)
 
     @unittest.mock.patch("pychado.io.gaf.GAFImportClient._handle_feature_cvterm_dbxref")
     @unittest.mock.patch("pychado.orm.sequence.FeatureCvTermDbxRef")
@@ -445,7 +447,6 @@ class TestGAFExport(unittest.TestCase):
         self.assertEqual(len(gaf_record), 15)
         self.assertIn("Evidence", gaf_record)
         self.assertEqual(gaf_record["DB"], "testdb")
-        self.assertEqual(gaf_record["Assigned_By"], "testdb")
         self.assertEqual(gaf_record["DB_Object_ID"], "testname")
         self.assertEqual(gaf_record["Taxon_ID"], "testtaxon")
         self.assertEqual(gaf_record["Qualifier"], "NOT")
@@ -483,6 +484,14 @@ class TestGAFExport(unittest.TestCase):
         self.assertEqual(gaf_record["Evidence"], "NR")
         self.client._add_gaf_evidence_code(gaf_record, {})
         self.assertEqual(gaf_record["Evidence"], "NR")
+
+    def test_add_gaf_assigning_database(self):
+        # Tests the function that adds the assigned_by info to a GAF record
+        gaf_record = {"DB": "testdb", "DB_Object_ID": "objid", "GO_ID": "GO:12345"}
+        self.client._add_gaf_assigning_db(gaf_record, {})
+        self.assertEqual(gaf_record["Assigned_By"], "testdb")
+        self.client._add_gaf_assigning_db(gaf_record, {"assigned_by": "assigning_db"})
+        self.assertEqual(gaf_record["Assigned_By"], "assigning_db")
 
     def test_add_gaf_withfrom_info(self):
         # Tests the functions that adds references for a GO evidence code to a GAF record

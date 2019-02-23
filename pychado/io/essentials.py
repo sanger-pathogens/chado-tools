@@ -121,7 +121,7 @@ class EssentialsClient(iobase.ChadoClient):
         new_misc_cv = cv.Cv(name="genedb_misc")
         misc_cv = self._handle_cv(new_misc_cv)
 
-        for term in ["top_level_seq", "evidence", "genedb_public"]:
+        for term in ["top_level_seq", "evidence", "genedb_public", "assigned_by", "colour"]:
 
             new_dbxref = general.DbxRef(db_id=misc_db.db_id, accession=term)
             dbxref = self._handle_dbxref(new_dbxref, misc_db.name)

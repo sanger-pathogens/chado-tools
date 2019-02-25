@@ -257,31 +257,6 @@ class ChadoClient(IOClient):
             .join(cv.Cv, cv.CvTerm.cv)\
             .filter(cv.CvTerm.cvterm_id == cvterm_id)
 
-    def query_all_organisms(self, query_version: bool) -> sqlalchemy.orm.Query:
-        """Creates a query to select organisms in the database"""
-        if query_version:
-            return self.session.query(organism.Organism.abbreviation, organism.Organism.genus,
-                                      organism.Organism.species, organism.Organism.infraspecific_name.label("strain"),
-                                      organism.Organism.common_name, organism.Organism.version)
-        else:
-            return self.session.query(organism.Organism.abbreviation, organism.Organism.genus,
-                                      organism.Organism.species, organism.Organism.infraspecific_name.label("strain"),
-                                      organism.Organism.common_name)
-
-    def query_organisms_by_property_type(self, type_id: int, query_version: bool) -> sqlalchemy.orm.Query:
-        """Creates a query to select organisms with a specific property in the database"""
-        if query_version:
-            query = self.session.query(organism.Organism.abbreviation, organism.Organism.genus,
-                                       organism.Organism.species, organism.Organism.infraspecific_name.label("strain"),
-                                       organism.Organism.common_name, organism.Organism.version)
-        else:
-            query = self.session.query(organism.Organism.abbreviation, organism.Organism.genus,
-                                       organism.Organism.species, organism.Organism.infraspecific_name.label("strain"),
-                                       organism.Organism.common_name)
-        return query.select_from(organism.OrganismProp)\
-            .join(organism.Organism, organism.OrganismProp.organism)\
-            .filter(organism.OrganismProp.type_id == type_id)
-
     def _load_db(self, name: str) -> general.Db:
         """Loads a specific DB"""
         db_entry = self.query_first(general.Db, name=name)
@@ -370,6 +345,94 @@ class ChadoClient(IOClient):
                 organism_id=organism_entry.organism_id):
             all_feature_names.append(feature_name)
         return all_feature_names
+
+    def _handle_organism(self, new_entry: organism.Organism) -> organism.Organism:
+        """Inserts or updates an entry in the 'organism' table, and returns it"""
+
+        # Check if the organism is already present in the database
+        existing_genus_species_entry = self.query_first(
+            organism.Organism, genus=new_entry.genus, species=new_entry.species,
+            infraspecific_name=new_entry.infraspecific_name)
+        existing_abbreviation_entry = self.query_first(organism.Organism, abbreviation=new_entry.abbreviation)
+
+        if existing_genus_species_entry and existing_abbreviation_entry:
+
+            # Check if the entries in database and file have the same properties, and update if not
+            if self.update_organism_properties(existing_genus_species_entry, new_entry):
+                self.printer.print("Updated organism '" + existing_genus_species_entry.abbreviation + "'")
+            return existing_genus_species_entry
+
+        elif existing_abbreviation_entry:
+
+            # Inconsistent entries - print error message
+            self.printer.print("ERROR: An organism with abbreviation '" + new_entry.abbreviation + "' already exists.")
+            return existing_abbreviation_entry
+
+        elif existing_genus_species_entry:
+
+            # Inconsistent entries - print error message
+            self.printer.print("ERROR: An organism with genus '" + new_entry.genus + "', species '" + new_entry.species
+                               + "' and strain '" + new_entry.infraspecific_name + "' already exists.")
+            return existing_genus_species_entry
+
+        else:
+
+            # Insert new organism entry
+            self.add_and_flush(new_entry)
+            self.printer.print("Inserted organism '" + new_entry.abbreviation + "'")
+            return new_entry
+
+    def _delete_organism(self, abbreviation: str) -> List[organism.Organism]:
+        """Deletes an entry in the 'organism' table"""
+        deleted_entries = []
+        existing_entry = self.query_first(organism.Organism, abbreviation=abbreviation)
+        if existing_entry:
+            self.session.delete(existing_entry)
+            deleted_entries.append(existing_entry)
+            self.printer.print("Organism '" + abbreviation + "' has been deleted from the database.")
+        else:
+            self.printer.print("Organism '" + abbreviation + "' does not exist.")
+        return deleted_entries
+
+    def _handle_organismprop(self, new_entry: organism.OrganismProp, organism_name="", property_name="",
+                             ) -> organism.OrganismProp:
+        """Inserts or updates an entry in the 'organismprop' table, and returns it"""
+
+        # Check if the organismprop is already present in the database
+        existing_entry = self.query_first(organism.OrganismProp, organism_id=new_entry.organism_id,
+                                          type_id=new_entry.type_id)
+        if existing_entry:
+
+            # Check if the entries in database and file have the same properties, and update if not
+            if self.update_organismprop_properties(existing_entry, new_entry):
+                self.printer.print("Updated property '" + property_name + "' = '" + new_entry.value
+                                   + "' for organism '" + organism_name + "'")
+            return existing_entry
+        else:
+
+            # Insert new organismprop entry
+            self.add_and_flush(new_entry)
+            self.printer.print("Inserted property '" + property_name + "' = '" + new_entry.value + "' for organism '"
+                               + organism_name + "'")
+            return new_entry
+
+    def _handle_organism_dbxref(self, new_entry: organism.OrganismDbxRef, organism_name="", dbxref="",
+                                ) -> organism.OrganismDbxRef:
+        """Inserts or updates an entry in the 'organism_dbxref' table, and returns it"""
+
+        # Check if the organism_dbxref is already present in the database
+        existing_entry = self.query_first(organism.OrganismDbxRef, organism_id=new_entry.organism_id,
+                                          dbxref_id=new_entry.dbxref_id)
+        if existing_entry:
+
+            # Nothing to update, return existing entry
+            return existing_entry
+        else:
+
+            # Insert new organism_dbxref entry
+            self.add_and_flush(new_entry)
+            self.printer.print("Inserted dbxref '" + dbxref + "' for organism '" + organism_name + "'")
+            return new_entry
 
     def _handle_db(self, new_entry: general.Db) -> general.Db:
         """Inserts or updates an entry in the 'db' table, and returns it"""
@@ -852,6 +915,23 @@ class ChadoClient(IOClient):
             feature_entry.is_obsolete = True
             self.printer.print("Marked feature '" + feature_entry.uniquename + "' as obsolete")
         return feature_entry
+
+    @staticmethod
+    def update_organism_properties(existing_entry: organism.Organism, new_entry: organism.Organism) -> bool:
+        """Updates the properties of an organism entry in the database"""
+        updated = False
+        for attribute in ["common_name", "comment", "type_id"]:
+            if utils.copy_attribute(existing_entry, new_entry, attribute):
+                updated = True
+        return updated
+
+    @staticmethod
+    def update_organismprop_properties(existing_entry: organism.OrganismProp, new_entry: organism.OrganismProp) -> bool:
+        """Updates the properties of an organismprop entry in the database"""
+        updated = False
+        if utils.copy_attribute(existing_entry, new_entry, "value"):
+            updated = True
+        return updated
 
     @staticmethod
     def update_pub_properties(existing_entry: pub.Pub, new_entry: pub.Pub) -> bool:

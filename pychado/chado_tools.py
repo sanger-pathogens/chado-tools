@@ -82,7 +82,7 @@ def extract_commands() -> dict:
     return {
         "organisms": "list all organisms in the CHADO database",
         "cvterms": "list all CV terms in the CHADO database",
-        "genedb_products": "list all products of transcripts in the CHADO database",
+        "gene_products": "list all products of transcripts in the CHADO database",
         "stats": "obtain statistics to updates in a CHADO database",
         "comments": "list curator comments to genes and gene products in a CHADO database"
     }
@@ -317,8 +317,8 @@ def add_extract_arguments_by_command(command: str, parser: argparse.ArgumentPars
         add_extract_organisms_arguments(parser)
     elif command == "cvterms":
         add_extract_cvterms_arguments(parser)
-    elif command == "genedb_products":
-        add_extract_genedb_product_arguments(parser)
+    elif command == "gene_products":
+        add_extract_gene_product_arguments(parser)
     elif command == "stats":
         add_extract_stats_arguments(parser)
     elif command == "comments":
@@ -330,7 +330,6 @@ def add_extract_arguments_by_command(command: str, parser: argparse.ArgumentPars
 def add_extract_organisms_arguments(parser: argparse.ArgumentParser):
     """Defines formal arguments for the 'chado extract organisms' sub-command"""
     parser.add_argument("--public_only", action="store_true", help="only extract public genomes (default: extract all)")
-    parser.add_argument("--extract_version", action="store_true", help="extract the genome version, if available")
 
 
 def add_extract_cvterms_arguments(parser: argparse.ArgumentParser):
@@ -339,8 +338,8 @@ def add_extract_cvterms_arguments(parser: argparse.ArgumentParser):
     parser.add_argument("--database", help="restrict to a database, e.g. 'GO'")
 
 
-def add_extract_genedb_product_arguments(parser: argparse.ArgumentParser):
-    """Defines formal arguments for the 'chado extract genedb_products' sub-command"""
+def add_extract_gene_product_arguments(parser: argparse.ArgumentParser):
+    """Defines formal arguments for the 'chado extract gene_products' sub-command"""
     parser.add_argument("-a", "--abbreviation", dest="organism",
                         help="restrict to a certain organism, defined by its abbreviation/short name (default: all)")
 
@@ -383,11 +382,14 @@ def add_insert_organism_arguments(parser: argparse.ArgumentParser):
     """Defines formal arguments for the 'chado insert organism' sub-command"""
     parser.add_argument("-g", "--genus", required=True, help="genus of the organism")
     parser.add_argument("-s", "--species", required=True, help="species of the organism")
-    parser.add_argument("-i", "--infraspecific_name", help="infraspecific name (strain) of the organism")
+    parser.add_argument("-i", "--infraspecific_name", default="", help="infraspecific name (strain) of the organism")
     parser.add_argument("-a", "--abbreviation", required=True, help="abbreviation/short name of the organism")
-    parser.add_argument("--common_name", help="common name of the organism (default: use abbreviation, if provided)")
+    parser.add_argument("--common_name", default="",
+                        help="common name of the organism (default: use abbreviation, if provided)")
     parser.add_argument("--comment", help="comment")
-    parser.add_argument("--genome_version", type=int, help="version of the genome (integer)")
+    parser.add_argument("--genome_version", help="version number of the genome")
+    parser.add_argument("--taxon_id", help="NCBI taxon ID")
+    parser.add_argument("--wikidata_id", help="ID of the organism on Wikidata")
 
 
 def add_delete_arguments(parser: argparse.ArgumentParser):
@@ -521,7 +523,6 @@ def add_export_fasta_arguments(parser: argparse.ArgumentParser):
     parser.add_argument("-t", "--sequence_type", required=True, choices=["contigs", "genes", "proteins"],
                         help="type of the sequences to be exported")
     parser.add_argument("-r", "--release", help="name of the FASTA release")
-    parser.add_argument("--extract_version", action="store_true", help="extract the genome version, if available")
     parser.add_argument("--include_obsolete", action="store_true", help="export all features, including obsoletes")
 
 

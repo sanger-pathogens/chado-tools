@@ -420,7 +420,7 @@ class TestPublic(unittest.TestCase):
         organism_obj = organism.Organism(genus=utils.random_string(10), species=utils.random_string(10),
                                          abbreviation=utils.random_string(10), common_name=utils.random_string(10),
                                          infraspecific_name=utils.random_string(10), comment=utils.random_string(10),
-                                         type_id=type_obj.cvterm_id, version=utils.random_integer(100))
+                                         type_id=type_obj.cvterm_id)
         self.client.add_and_flush(organism_obj)
         return organism_obj
 
@@ -443,7 +443,7 @@ class TestPublic(unittest.TestCase):
         existing_obj = self.add_organism_object()
         obj = organism.Organism(genus=existing_obj.genus, species=existing_obj.species,
                                 infraspecific_name=existing_obj.infraspecific_name,
-                                abbreviation=utils.random_string(10), version=existing_obj.version)
+                                abbreviation=utils.random_string(10))
         with self.assertRaises(sqlalchemy.exc.IntegrityError):
             self.client.add_and_flush(obj)
 

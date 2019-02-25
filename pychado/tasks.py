@@ -147,23 +147,29 @@ def run_execute_command(specifier: str, arguments, uri: str) -> None:
 
 def run_select_command(specifier: str, arguments, uri: str) -> None:
     """Run a pre-compiled query against a database"""
-    if specifier == "organisms":
-        client = direct.DirectIOClient(uri)
-        query = client.select_organisms(arguments.public_only, arguments.extract_version)
+    # Load query template
+    if specifier == "organisms" and arguments.public_only:
+        template = queries.load_query("public_organisms")
     else:
         template = queries.load_query(specifier)
-        if specifier == "cvterms":
-            query = queries.set_query_conditions(template, database=arguments.database, vocabulary=arguments.vocabulary)
-        elif specifier == "genedb_products":
-            query = queries.set_query_conditions(template, organism=arguments.organism)
-        elif specifier == "stats":
-            query = queries.set_query_conditions(template, organism=arguments.organism, start_date=arguments.start_date,
-                                                 end_date=(arguments.end_date or utils.current_date()))
-        elif specifier == "comments":
-            query = queries.set_query_conditions(template, organism=arguments.organism)
-        else:
-            print("Functionality 'extract " + specifier + "' is not yet implemented.")
-            query = queries.set_query_conditions("")
+
+    # Bind query parameters
+    if specifier == "organisms":
+        query = template
+    elif specifier == "cvterms":
+        query = queries.set_query_conditions(template, database=arguments.database, vocabulary=arguments.vocabulary)
+    elif specifier == "gene_products":
+        query = queries.set_query_conditions(template, organism=arguments.organism)
+    elif specifier == "stats":
+        query = queries.set_query_conditions(template, organism=arguments.organism, start_date=arguments.start_date,
+                                             end_date=(arguments.end_date or utils.current_date()))
+    elif specifier == "comments":
+        query = queries.set_query_conditions(template, organism=arguments.organism)
+    else:
+        print("Functionality 'extract " + specifier + "' is not yet implemented.")
+        return
+
+    # Execute query
     dbutils.query_and_print(uri, query, arguments.output_file, arguments.format, arguments.include_header,
                             arguments.delimiter)
     if arguments.output_file:
@@ -172,17 +178,18 @@ def run_select_command(specifier: str, arguments, uri: str) -> None:
 
 def run_insert_command(specifier: str, arguments, uri: str) -> None:
     """Insert a new entity of a specified type into a database"""
-    client = direct.DirectIOClient(uri)
+    client = direct.DirectIOClient(uri, arguments.verbose)
     if specifier == "organism":
         client.insert_organism(arguments.genus, arguments.species, arguments.abbreviation, arguments.common_name,
-                               arguments.infraspecific_name, arguments.comment, arguments.genome_version)
+                               arguments.infraspecific_name, arguments.comment, arguments.genome_version,
+                               arguments.taxon_id, arguments.wikidata_id)
     else:
         print("Functionality 'insert " + specifier + "' is not yet implemented.")
 
 
 def run_delete_command(specifier: str, arguments, uri: str) -> None:
     """Delete an entity of a specified type from a database"""
-    client = direct.DirectIOClient(uri)
+    client = direct.DirectIOClient(uri, arguments.verbose)
     if specifier == "organism":
         client.delete_organism(arguments.organism)
     else:
@@ -222,7 +229,7 @@ def run_export_command(specifier: str, arguments, uri: str) -> None:
     if specifier == "fasta":
         client = fasta.FastaExportClient(uri, arguments.verbose)
         client.export(arguments.output_file, arguments.organism, arguments.sequence_type, arguments.release,
-                      arguments.extract_version, arguments.include_obsolete)
+                      arguments.include_obsolete)
     elif specifier == "gff":
         client = gff.GFFExportClient(uri, arguments.verbose)
         client.export(arguments.output_file, arguments.organism, arguments.export_fasta, arguments.fasta_file,

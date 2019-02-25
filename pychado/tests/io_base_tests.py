@@ -332,24 +332,6 @@ class TestChadoClient(unittest.TestCase):
         self.assertIn("FROM public.cvterm JOIN public.cv ON public.cv.cv_id = public.cvterm.cv_id", compiled_query)
         self.assertIn("WHERE public.cvterm.cvterm_id = 44", compiled_query)
 
-    def test_query_all_organisms(self):
-        # Tests the function that creates a query against the organism table
-        query = self.client.query_all_organisms(False)
-        compiled_query = str(query.statement.compile(compile_kwargs={"literal_binds": True}))
-        self.assertIn("SELECT public.organism.abbreviation, public.organism.genus, public.organism.species, "
-                      "public.organism.infraspecific_name AS strain, public.organism.common_name", compiled_query)
-        self.assertIn("FROM public.organism", compiled_query)
-
-    def test_query_organisms_by_property_type(self):
-        # Tests the function that creates a query against the organism table
-        query = self.client.query_organisms_by_property_type(44, False)
-        compiled_query = str(query.statement.compile(compile_kwargs={"literal_binds": True}))
-        self.assertIn("SELECT public.organism.abbreviation, public.organism.genus, public.organism.species, "
-                      "public.organism.infraspecific_name AS strain, public.organism.common_name", compiled_query)
-        self.assertIn("FROM public.organismprop JOIN public.organism "
-                      "ON public.organism.organism_id = public.organismprop.organism_id", compiled_query)
-        self.assertIn("WHERE public.organismprop.type_id = 44", compiled_query)
-
     def insert_default_entries(self):
         # Inserts CV terms needed as basis for virtually all tests
         default_db = general.Db(name="defaultdb")
@@ -454,6 +436,83 @@ class TestChadoClient(unittest.TestCase):
         self.client.add_and_flush(feature_entry)
         all_uniquenames = self.client._load_feature_names(self.default_organism)
         self.assertIn("testname", all_uniquenames)
+
+    def test_handle_organism(self):
+        # Tests the function importing an organism to the database
+        # Insert an organism and check this is successful
+        new_entry = organism.Organism(genus="testgenus", species="testspecies", infraspecific_name="teststrain",
+                                      abbreviation="testabbreviation", common_name="testname", comment="testcomment")
+        first_entry = self.client._handle_organism(new_entry)
+        self.assertIsNotNone(first_entry.organism_id)
+        self.assertEqual(first_entry.common_name, "testname")
+
+        # Try to insert an organism with the same genus/species/strain, but different abbreviation,
+        # and check that nothing changes
+        another_entry = organism.Organism(genus="testgenus", species="testspecies", infraspecific_name="teststrain",
+                                          abbreviation="otherabbreviation", common_name="othername")
+        second_entry = self.client._handle_organism(another_entry)
+        self.assertIs(second_entry, first_entry)
+        self.assertEqual(second_entry.common_name, "testname")
+
+        # Try to insert an organism with the different genus/species/strain, but same abbreviation,
+        # and check that nothing changes
+        yet_another_entry = organism.Organism(genus="othergenus", species="otherspecies", common_name="othername",
+                                              infraspecific_name="otherstrain", abbreviation="testabbreviation")
+        third_entry = self.client._handle_organism(yet_another_entry)
+        self.assertIs(third_entry, first_entry)
+        self.assertEqual(third_entry.common_name, "testname")
+
+        # Try to insert an organism with same genus/species/strain and abbreviation, and check that this updates the
+        # additional properties
+        another_entry.abbreviation = "testabbreviation"
+        fourth_entry = self.client._handle_organism(another_entry)
+        self.assertIs(fourth_entry, first_entry)
+        self.assertEqual(fourth_entry.common_name, "othername")
+
+    def test_delete_organism(self):
+        # Tests the function deleting an organism from the database
+        existing_entry = organism.Organism(genus="testgenus", species="testspecies", infraspecific_name="teststrain",
+                                           abbreviation="testabbreviation", common_name="testname")
+        self.client.add_and_flush(existing_entry)
+        all_entries = self.client.query_all(organism.Organism)
+        self.assertIn(existing_entry, all_entries)
+
+        deleted_entries = self.client._delete_organism("inexistent_abbreviation")
+        self.assertEqual(len(deleted_entries), 0)
+
+        deleted_entries = self.client._delete_organism("testabbreviation")
+        self.assertEqual(len(deleted_entries), 1)
+        self.assertIn(existing_entry, deleted_entries)
+        all_entries = self.client.query_all(organism.Organism)
+        self.assertNotIn(existing_entry, all_entries)
+
+    def test_handle_organismprop(self):
+        # Tests the function importing an organism property to the database
+        new_entry = organism.OrganismProp(organism_id=self.default_organism.organism_id,
+                                          type_id=self.default_cvterm.cvterm_id, value="testvalue")
+        first_entry = self.client._handle_organismprop(new_entry)
+        self.assertIsNotNone(first_entry.organismprop_id)
+        self.assertEqual(first_entry.value, "testvalue")
+
+        another_entry = organism.OrganismProp(organism_id=self.default_organism.organism_id,
+                                              type_id=self.default_cvterm.cvterm_id, value="othervalue")
+        second_entry = self.client._handle_organismprop(another_entry)
+        self.assertIs(second_entry, first_entry)
+        self.assertEqual(second_entry.value, "othervalue")
+
+    def test_handle_organism_dbxref(self):
+        # Tests the function importing a db cross reference for an organism to the database
+        new_entry = organism.OrganismDbxRef(organism_id=self.default_organism.organism_id,
+                                            dbxref_id=self.default_dbxref.dbxref_id)
+        first_entry = self.client._handle_organism_dbxref(new_entry)
+        self.assertIsNotNone(first_entry.organism_dbxref_id)
+
+        other_dbxref = general.DbxRef(db_id=self.default_db.db_id, accession="otheraccession")
+        self.client.add_and_flush(other_dbxref)
+        another_entry = organism.OrganismDbxRef(organism_id=self.default_organism.organism_id,
+                                                dbxref_id=other_dbxref.dbxref_id)
+        second_entry = self.client._handle_organism_dbxref(another_entry)
+        self.assertIsNot(second_entry, first_entry)
 
     def test_handle_db(self):
         # Tests the function importing a db to the database
@@ -851,6 +910,24 @@ class TestChadoClient(unittest.TestCase):
         obsolete_feature = self.client._mark_feature_as_obsolete(self.default_organism, "testname")
         self.assertIs(obsolete_feature, feature)
         self.assertTrue(obsolete_feature.is_obsolete)
+
+    def test_update_organism_properties(self):
+        # Tests the function that transfers properties from one organism object to another
+        organism1 = organism.Organism(genus="testgenus", species="testspecies", infraspecific_name="teststrain",
+                                      abbreviation="testabbreviation", common_name="testname", comment="testcomment")
+        organism2 = organism.Organism(genus="testgenus", species="testspecies", infraspecific_name="teststrain",
+                                      abbreviation="testabbreviation", common_name="othername", comment="othercomment")
+        updated = self.client.update_organism_properties(organism1, organism2)
+        self.assertTrue(updated)
+        self.assertEqual(organism1.common_name, "othername")
+
+    def test_update_organismprop_properties(self):
+        # Tests the function that transfers properties from one organismprop object to another
+        organismprop1 = organism.OrganismProp(organism_id=1, type_id=1, value="testvalue")
+        organismprop2 = organism.OrganismProp(organism_id=1, type_id=1, value="othervalue")
+        updated = self.client.update_organismprop_properties(organismprop1, organismprop2)
+        self.assertTrue(updated)
+        self.assertEqual(organismprop1.value, "othervalue")
 
     def test_update_feature_properties(self):
         # Tests the function that transfers properties from one feature object to another

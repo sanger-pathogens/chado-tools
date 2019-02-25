@@ -168,7 +168,7 @@ class FastaExportClient(iobase.ChadoClient):
                              type_entry: cv.CvTerm, residues: str, genome_version: str, release: str
                              ) -> Union[None, SeqIO.SeqRecord]:
         """Creates a FASTA record"""
-        attributes = self._create_fasta_attributes(organism_entry, type_entry, genome_version, release)
+        attributes = self._create_fasta_attributes(organism_entry, feature_entry, type_entry, genome_version, release)
         record = SeqIO.SeqRecord(Seq.Seq(residues), id=feature_entry.uniquename, name=feature_entry.uniquename,
                                  description=attributes)
         return record
@@ -262,10 +262,12 @@ class FastaExportClient(iobase.ChadoClient):
         else:
             return None
 
-    def _create_fasta_attributes(self, organism_entry: organism.Organism, type_entry: cv.CvTerm, genome_version: str,
-                                 release: str) -> str:
+    def _create_fasta_attributes(self, organism_entry: organism.Organism, feature_entry: sequence.Feature,
+                                 type_entry: cv.CvTerm, genome_version: str, release: str) -> str:
         """Creates a header line for a FASTA sequence with several attributes"""
         attributes_as_list = ["", self._organism_key_value_pair(organism_entry), self._type_key_value_pair(type_entry)]
+        if feature_entry.name:
+            attributes_as_list.append(self._feature_name_key_value_pair(feature_entry.name))
         if genome_version:
             attributes_as_list.append(self._genome_version_key_value_pair(genome_version))
         if release:
@@ -285,11 +287,15 @@ class FastaExportClient(iobase.ChadoClient):
         return organism_pair
 
     @staticmethod
+    def _feature_name_key_value_pair(feature_name: str):
+        """Creates a key-value pair for the FASTA header with the genome version"""
+        feature_name_pair = "=".join(["sequence_name", urllib.parse.quote(feature_name)])
+        return feature_name_pair
+
+    @staticmethod
     def _genome_version_key_value_pair(genome_version: str):
         """Creates a key-value pair for the FASTA header with the genome version"""
-        version_key = "genome_version"
-        version_number = genome_version
-        version_pair = "=".join([version_key, version_number])
+        version_pair = "=".join(["genome_version", urllib.parse.quote(genome_version)])
         return version_pair
 
     @staticmethod

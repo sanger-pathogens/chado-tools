@@ -259,6 +259,11 @@ class TestGFFImport(unittest.TestCase):
         featureloc_entry = self.client._handle_location(self.default_gff_record, feature_entry)
         self.assertIsNone(featureloc_entry)
 
+        mock_query.return_value = sequence.Feature(organism_id=11, type_id=300, uniquename="chromname", feature_id=2)
+        self.default_gff_record.seqid = self.default_gff_record.id
+        featureloc_entry = self.client._handle_location(self.default_gff_record, feature_entry)
+        self.assertIsNone(featureloc_entry)
+
     @unittest.mock.patch("pychado.io.gff.GFFImportClient._delete_feature_synonym")
     @unittest.mock.patch("pychado.io.gff.GFFImportClient._handle_feature_synonym")
     @unittest.mock.patch("pychado.orm.sequence.FeatureSynonym")

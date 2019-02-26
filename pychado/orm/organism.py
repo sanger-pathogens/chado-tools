@@ -17,11 +17,10 @@ class Organism(base.PublicBase):
     type_id = sqlalchemy.Column(sqlalchemy.BIGINT, sqlalchemy.ForeignKey(
         cv.CvTerm.cvterm_id, onupdate="CASCADE", ondelete="CASCADE"), nullable=True)
     comment = sqlalchemy.Column(sqlalchemy.TEXT, nullable=True)
-    version = sqlalchemy.orm.deferred(sqlalchemy.Column(sqlalchemy.INTEGER, nullable=True))
 
     # Constraints
     __tablename__ = "organism"
-    __table_args__ = (sqlalchemy.UniqueConstraint(genus, species, infraspecific_name, "version", name="organism_c1"),
+    __table_args__ = (sqlalchemy.UniqueConstraint(genus, species, infraspecific_name, name="organism_c1"),
                       sqlalchemy.UniqueConstraint(abbreviation, name="organism_c2"))
 
     # Relationships
@@ -29,7 +28,7 @@ class Organism(base.PublicBase):
 
     # Initialisation
     def __init__(self, genus, species, abbreviation=None, common_name=None, infraspecific_name=None,
-                 type_id=None, comment=None, version=None, organism_id=None):
+                 type_id=None, comment=None, organism_id=None):
         for key, value in locals().items():
             if key != self:
                 setattr(self, key, value)

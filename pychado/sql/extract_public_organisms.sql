@@ -26,6 +26,11 @@ FROM
         JOIN
         cvterm c2 ON (op2.type_id = c2.cvterm_id AND c2.name = 'taxonId')
     ) ON op2.organism_id = o.organism_id
+    JOIN (
+        organismprop op3
+        JOIN
+        cvterm c3 ON (op3.type_id = c3.cvterm_id AND c3.name = 'genedb_public')
+    ) ON op3.organism_id = o.organism_id
 WHERE
     o.abbreviation != 'dummy'
 ORDER BY

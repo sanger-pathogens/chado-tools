@@ -156,6 +156,22 @@ class TestFastaExport(unittest.TestCase):
         residues = self.client._extract_nucleotide_sequence(feature_entry, srcfeature_entries)
         self.assertIsNone(residues)
 
+    @unittest.mock.patch("pychado.io.fasta.FastaExportClient.query_first")
+    @unittest.mock.patch("pychado.io.fasta.FastaExportClient._load_cvterm")
+    def test_extract_genome_version(self, mock_load: unittest.mock.Mock, mock_query: unittest.mock.Mock):
+        # Tests the function that extracts the genome version from the database
+        self.assertIs(mock_load, self.client._load_cvterm)
+        self.assertIs(mock_query, self.client.query_first)
+        organism_entry = organism.Organism(genus="testgenus", species="testspecies", organism_id=44)
+
+        mock_query.return_value = None
+        genome_version = self.client._extract_genome_version(organism_entry)
+        self.assertIsNone(genome_version)
+
+        mock_query.return_value = organism.OrganismProp(organismprop_id=1, organism_id=12, type_id=33, value="v8")
+        genome_version = self.client._extract_genome_version(organism_entry)
+        self.assertEqual(genome_version, "v8")
+
     @unittest.mock.patch("Bio.SeqIO.SeqRecord")
     @unittest.mock.patch("Bio.Seq.Seq")
     @unittest.mock.patch("pychado.io.fasta.FastaExportClient._create_fasta_attributes")
@@ -172,8 +188,8 @@ class TestFastaExport(unittest.TestCase):
         mock_attributes.return_value = "desc"
         mock_sequence.return_value = "seq"
 
-        self.client._create_fasta_record(feature_entry, organism_entry, type_entry, "AGCT", "testrelease", True)
-        mock_attributes.assert_called_with(organism_entry, type_entry, "testrelease", True)
+        self.client._create_fasta_record(feature_entry, organism_entry, type_entry, "AGCT", "v3.6", "testrelease")
+        mock_attributes.assert_called_with(organism_entry, feature_entry, type_entry, "v3.6", "testrelease")
         mock_sequence.assert_called_with("AGCT")
         mock_record.assert_called_with("seq", id="test", name="test", description="desc")
 
@@ -223,35 +239,43 @@ class TestFastaExport(unittest.TestCase):
 
     @unittest.mock.patch("pychado.io.fasta.FastaExportClient._release_key_value_pair")
     @unittest.mock.patch("pychado.io.fasta.FastaExportClient._genome_version_key_value_pair")
+    @unittest.mock.patch("pychado.io.fasta.FastaExportClient._feature_name_key_value_pair")
     @unittest.mock.patch("pychado.io.fasta.FastaExportClient._type_key_value_pair")
     @unittest.mock.patch("pychado.io.fasta.FastaExportClient._organism_key_value_pair")
     def test_create_fasta_attributes(self, mock_organism: unittest.mock.Mock, mock_type: unittest.mock.Mock,
-                                     mock_version: unittest.mock.Mock, mock_release: unittest.mock.Mock):
+                                     mock_name: unittest.mock.Mock, mock_version: unittest.mock.Mock,
+                                     mock_release: unittest.mock.Mock):
         # Tests the correct creation of a header for a FASTA sequence
         self.assertIs(mock_organism, self.client._organism_key_value_pair)
         self.assertIs(mock_type, self.client._type_key_value_pair)
+        self.assertIs(mock_name, self.client._feature_name_key_value_pair)
         self.assertIs(mock_version, self.client._genome_version_key_value_pair)
         self.assertIs(mock_release, self.client._release_key_value_pair)
 
         organism_entry = organism.Organism(genus="testgenus", species="testspecies", organism_id=33)
+        feature_entry = sequence.Feature(organism_id=33, type_id=2, uniquename="test", feature_id=99)
         type_entry = cv.CvTerm(name="contig", cv_id=1, dbxref_id=2, cvterm_id=44)
         mock_organism.return_value = "orgname"
         mock_type.return_value = "typename"
+        mock_name.return_value = "genename"
         mock_version.return_value = "versionnumber"
         mock_release.return_value = "relname"
 
-        attributes = self.client._create_fasta_attributes(organism_entry, type_entry, "", True)
+        attributes = self.client._create_fasta_attributes(organism_entry, feature_entry, type_entry, "", "")
         mock_organism.assert_called_with(organism_entry)
         mock_type.assert_called_with(type_entry)
+        mock_name.assert_not_called()
         mock_version.assert_not_called()
         mock_release.assert_not_called()
         self.assertEqual(attributes, "| orgname | typename")
 
-        organism_entry.version = 11
-        attributes = self.client._create_fasta_attributes(organism_entry, type_entry, "testrelease", True)
-        mock_version.assert_called_with(organism_entry)
+        feature_entry.name = "ABCD"
+        attributes = self.client._create_fasta_attributes(organism_entry, feature_entry, type_entry, "v3",
+                                                          "testrelease")
+        mock_name.assert_called_with("ABCD")
+        mock_version.assert_called_with("v3")
         mock_release.assert_called_with("testrelease")
-        self.assertEqual(attributes, "| orgname | typename | versionnumber | relname")
+        self.assertEqual(attributes, "| orgname | typename | genename | versionnumber | relname")
 
     def test_organism_key_value_pair(self):
         # Tests the correct creation of a key-value pair for an organism name with proper escaping applied
@@ -262,11 +286,15 @@ class TestFastaExport(unittest.TestCase):
         pair = self.client._organism_key_value_pair(organism_entry)
         self.assertEqual(pair, "organism=testgenus%20testspecies%20teststrain")
 
+    def test_feature_name_key_value_pair(self):
+        # Tests the correct creation of a key-value pair for a feature name with proper escaping applied
+        pair = self.client._feature_name_key_value_pair("some name")
+        self.assertEqual(pair, "sequence_name=some%20name")
+
     def test_genome_version_key_value_pair(self):
         # Tests the correct creation of a key-value pair for a genome version with proper escaping applied
-        organism_entry = organism.Organism(genus="testgenus", species="testspecies", organism_id=33, version=11)
-        pair = self.client._genome_version_key_value_pair(organism_entry)
-        self.assertEqual(pair, "genome_version=11")
+        pair = self.client._genome_version_key_value_pair("3.5")
+        self.assertEqual(pair, "genome_version=3.5")
 
     def test_type_key_value_pair(self):
         # Tests the correct creation of a key-value pair for a feature type with proper escaping applied

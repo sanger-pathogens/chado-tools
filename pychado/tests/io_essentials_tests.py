@@ -104,8 +104,8 @@ class TestEssentials(unittest.TestCase):
     def test_load_genedb_misc_entries(self):
         # Tests the loading of GeneDB-specific entries into the Chado 'cvterm' table
         self.client._load_genedb_misc_entries()
-        misc_dv = self.client.query_first(cv.Cv, name="genedb_misc")                        # type: cv.Cv
-        self.assertIsNotNone(misc_dv.cv_id)
+        misc_cv = self.client.query_first(cv.Cv, name="genedb_misc")                        # type: cv.Cv
+        self.assertIsNotNone(misc_cv.cv_id)
         top_level_seq_cvterm = self.client.query_first(cv.CvTerm, name="top_level_seq")     # type: cv.CvTerm
         self.assertIsNotNone(top_level_seq_cvterm.cvterm_id)
-        self.assertEqual(top_level_seq_cvterm.cv_id, misc_dv.cv_id)
+        self.assertEqual(top_level_seq_cvterm.cv_id, misc_cv.cv_id)

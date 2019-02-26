@@ -354,6 +354,10 @@ class GFFImportClient(iobase.ChadoClient, GFFClient):
                          ) -> Union[None, sequence.FeatureLoc]:
         """Inserts or updates an entry in the 'featureloc' table and returns it"""
 
+        # Ignore if the considered feature is in fact the 'srcfeature'
+        if gff_record.seqid == gff_record.id:
+            return None
+
         # Get entry from 'srcfeature' table
         srcfeature_entry = self.query_first(sequence.Feature, organism_id=feature_entry.organism_id,
                                             uniquename=gff_record.seqid)

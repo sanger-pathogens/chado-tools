@@ -32,6 +32,7 @@ class GAFClient(iobase.ChadoClient):
         self._derives_from_term = self._load_cvterm_from_cv("derives_from", "sequence")
         self._date_term = self._load_cvterm("date")
         self._evidence_term = self._load_cvterm("evidence")
+        self._assigned_by_term = self._load_cvterm("assigned_by")
         self._synonym_term = self._load_cvterm("synonym")
         self._taxon_term = self._load_cvterm("taxonId")
         self._default_pub = self._load_pub("null")
@@ -266,7 +267,7 @@ class GAFImportClient(GAFClient):
         if not feature_cvterm_entry:
             return
 
-        # Update/insert feature_cvtermprop entries for date and evidence code
+        # Update/insert feature_cvtermprop entries for date, evidence code and assigning database
         self._handle_properties(gaf_record, feature_cvterm_entry, requested_feature_entry)
 
         # Update/insert feature_cvterm_dbxref entries
@@ -437,7 +438,15 @@ class GAFImportClient(GAFClient):
         evidence_feature_cvtermprop_entry = self._handle_feature_cvtermprop(
             new_feature_cvtermprop_entry, existing_feature_cvtermprops, "evidence", feature_entry.uniquename)
 
-        return [date_feature_cvtermprop_entry, evidence_feature_cvtermprop_entry]
+        # Insert/update entry for 'assigned_by'
+        assigning_db = gaf_record["Assigned_By"].strip()
+        new_feature_cvtermprop_entry = sequence.FeatureCvTermProp(
+            feature_cvterm_id=feature_cvterm_entry.feature_cvterm_id, type_id=self._assigned_by_term.cvterm_id,
+            value=assigning_db)
+        assigned_by_feature_cvtermprop_entry = self._handle_feature_cvtermprop(
+            new_feature_cvtermprop_entry, existing_feature_cvtermprops, "assigned_by", feature_entry.uniquename)
+
+        return [date_feature_cvtermprop_entry, evidence_feature_cvtermprop_entry, assigned_by_feature_cvtermprop_entry]
 
     def _handle_crossrefs(self, gaf_record: dict, feature_cvterm_entry: sequence.FeatureCvTerm,
                           feature_entry: sequence.Feature) -> List[sequence.FeatureCvTermDbxRef]:
@@ -601,6 +610,7 @@ class GAFExportClient(GAFClient):
             self._add_gaf_aspect(gaf_record, go_namespace)
             self._add_gaf_annotation_date(gaf_record, feature_cvterm_properties)
             self._add_gaf_evidence_code(gaf_record, feature_cvterm_properties)
+            self._add_gaf_assigning_db(gaf_record, feature_cvterm_properties)
             self._add_gaf_withfrom_info(gaf_record, feature_cvterm_dbxrefs)
             self._add_gaf_db_references(gaf_record, feature_cvterm_publications, feature_cvterm_dbxrefs)
             self._add_gaf_object_type(gaf_record, featuretype)
@@ -635,7 +645,6 @@ class GAFExportClient(GAFClient):
         """Creates a GAF record"""
         gaf_record = {key: None for key in GOA.GAF10FIELDS}
         gaf_record["DB"] = database_authority
-        gaf_record["Assigned_By"] = database_authority
         gaf_record["DB_Object_ID"] = feature_entry.uniquename
         gaf_record["Taxon_ID"] = taxon_id
         if feature_cvterm_entry.is_not:
@@ -752,6 +761,14 @@ class GAFExportClient(GAFClient):
                 gaf_record["Evidence"] = self._default_evidence_code()
             else:
                 gaf_record["Evidence"] = evidence_code
+
+    @staticmethod
+    def _add_gaf_assigning_db(gaf_record: dict, properties: Dict[str, str]) -> None:
+        """Adds the assigning database to a GAF record"""
+        if "assigned_by" not in properties:
+            gaf_record["Assigned_By"] = gaf_record["DB"]
+        else:
+            gaf_record["Assigned_By"] = properties["assigned_by"]
 
     def _add_gaf_db_references(self, gaf_record: dict, publications: List[str], dbxrefs: List[str]) -> None:
         """Adds reference IDs to a GAF record"""

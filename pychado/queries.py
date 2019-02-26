@@ -6,12 +6,14 @@ from . import utils
 def load_query(specifier: str) -> str:
     """Loads the SQL query for a 'chado extract' command"""
     query = ""
-    if specifier == "organisms":
+    if specifier == "public_organisms":
+        query = utils.read_text(pkg_resources.resource_filename("pychado", "sql/extract_public_organisms.sql"))
+    elif specifier == "organisms":
         query = utils.read_text(pkg_resources.resource_filename("pychado", "sql/extract_organisms.sql"))
     elif specifier == "cvterms":
         query = utils.read_text(pkg_resources.resource_filename("pychado", "sql/extract_cvterms.sql"))
-    elif specifier == "genedb_products":
-        query = utils.read_text(pkg_resources.resource_filename("pychado", "sql/extract_genedb_products.sql"))
+    elif specifier == "gene_products":
+        query = utils.read_text(pkg_resources.resource_filename("pychado", "sql/extract_gene_products.sql"))
     elif specifier == "stats":
         query = utils.read_text(pkg_resources.resource_filename("pychado", "sql/extract_stats.sql"))
     elif specifier == "comments":

@@ -10,7 +10,7 @@ class Analysis(base.PublicBase):
     # Columns
     analysis_id = sqlalchemy.Column(sqlalchemy.BIGINT, nullable=False, primary_key=True, autoincrement=True)
     name = sqlalchemy.Column(sqlalchemy.VARCHAR(255), nullable=True)
-    desription = sqlalchemy.Column(sqlalchemy.TEXT, nullable=True)
+    description = sqlalchemy.Column(sqlalchemy.TEXT, nullable=True)
     program = sqlalchemy.Column(sqlalchemy.VARCHAR(255), nullable=False)
     programversion = sqlalchemy.Column(sqlalchemy.VARCHAR(255), nullable=False)
     algorithm = sqlalchemy.Column(sqlalchemy.VARCHAR(255), nullable=True)
@@ -35,7 +35,7 @@ class Analysis(base.PublicBase):
     def __repr__(self):
         return "<companalysis.Analysis(analysis_id={0}, name='{1}', desription='{2}', program='{3}', " \
                "programversion='{4}', algorithm='{5}', sourcename='{6}', sourceversion='{7}, sourceuri='{8}'," \
-               "timeexecuted='{9}')>".format(self.analysis_id, self.name, self.desription, self.program,
+               "timeexecuted='{9}')>".format(self.analysis_id, self.name, self.description, self.program,
                                              self.programversion, self.algorithm, self.sourcename, self.sourceversion,
                                              self.sourceuri, self.timeexecuted)
 

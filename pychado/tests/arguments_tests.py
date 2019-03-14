@@ -198,7 +198,7 @@ class TestArguments(unittest.TestCase):
     def test_extract_stats_args(self):
         # Tests if the command line arguments for the subcommand 'chado extract stats' are parsed correctly
         args = ["chado", "extract", "stats", "-H", "-d", ";", "-o", "testfile", "-F", "json", "-a", "testorganism",
-                "--start_date", "testdate", "--end_date", "testdate2", "testdb"]
+                "--public_only", "--start_date", "testdate", "--end_date", "testdate2", "testdb"]
         parsed_args = vars(chado_tools.parse_arguments(args))
         self.assertTrue(parsed_args["include_header"])
         self.assertEqual(parsed_args["delimiter"], ";")
@@ -207,6 +207,7 @@ class TestArguments(unittest.TestCase):
         self.assertEqual(parsed_args["organism"], "testorganism")
         self.assertEqual(parsed_args["start_date"], "testdate")
         self.assertEqual(parsed_args["end_date"], "testdate2")
+        self.assertTrue(parsed_args["public_only"])
         self.assertEqual(parsed_args["dbname"], "testdb")
 
         # Test the default values
@@ -217,6 +218,7 @@ class TestArguments(unittest.TestCase):
         self.assertEqual(parsed_args["output_file"], "")
         self.assertEqual(parsed_args["format"], "csv")
         self.assertEqual(parsed_args["organism"], None)
+        self.assertFalse(parsed_args["public_only"])
         self.assertEqual(parsed_args["end_date"], "")
 
     def test_extract_organisms_args(self):
@@ -252,6 +254,7 @@ class TestArguments(unittest.TestCase):
         self.assertEqual(parsed_args["output_file"], "testfile")
         self.assertEqual(parsed_args["format"], "csv")
         self.assertEqual(parsed_args["organism"], "testorganism")
+        self.assertFalse(parsed_args["public_only"])
         self.assertEqual(parsed_args["dbname"], "testdb")
 
     def test_extract_comments_args(self):

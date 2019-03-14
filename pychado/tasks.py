@@ -148,8 +148,9 @@ def run_execute_command(specifier: str, arguments, uri: str) -> None:
 def run_select_command(specifier: str, arguments, uri: str) -> None:
     """Run a pre-compiled query against a database"""
     # Load query template
-    if specifier == "organisms" and arguments.public_only:
-        template = queries.load_query("public_organisms")
+    if hasattr(arguments, "public_only") and arguments.public_only:
+        modified_specifier = "public_" + specifier
+        template = queries.load_query(modified_specifier)
     else:
         template = queries.load_query(specifier)
 

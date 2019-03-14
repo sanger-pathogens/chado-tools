@@ -12,8 +12,12 @@ def load_query(specifier: str) -> str:
         query = utils.read_text(pkg_resources.resource_filename("pychado", "sql/extract_organisms.sql"))
     elif specifier == "cvterms":
         query = utils.read_text(pkg_resources.resource_filename("pychado", "sql/extract_cvterms.sql"))
+    elif specifier == "public_gene_products":
+        query = utils.read_text(pkg_resources.resource_filename("pychado", "sql/extract_public_gene_products.sql"))
     elif specifier == "gene_products":
         query = utils.read_text(pkg_resources.resource_filename("pychado", "sql/extract_gene_products.sql"))
+    elif specifier == "public_stats":
+        query = utils.read_text(pkg_resources.resource_filename("pychado", "sql/extract_public_stats.sql"))
     elif specifier == "stats":
         query = utils.read_text(pkg_resources.resource_filename("pychado", "sql/extract_stats.sql"))
     elif specifier == "comments":

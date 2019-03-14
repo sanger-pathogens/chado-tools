@@ -10,10 +10,12 @@ class TestQueries(unittest.TestCase):
         # Checks that all required resources are available
         self.assertTrue(pkg_resources.resource_isdir("pychado", "sql"))
         self.assertTrue(pkg_resources.resource_exists("pychado", "sql/extract_stats.sql"))
+        self.assertTrue(pkg_resources.resource_exists("pychado", "sql/extract_public_stats.sql"))
         self.assertTrue(pkg_resources.resource_exists("pychado", "sql/extract_organisms.sql"))
         self.assertTrue(pkg_resources.resource_exists("pychado", "sql/extract_public_organisms.sql"))
         self.assertTrue(pkg_resources.resource_exists("pychado", "sql/extract_cvterms.sql"))
         self.assertTrue(pkg_resources.resource_exists("pychado", "sql/extract_gene_products.sql"))
+        self.assertTrue(pkg_resources.resource_exists("pychado", "sql/extract_public_gene_products.sql"))
 
     def test_load_query(self):
         # Checks that the templates for the 'chado extracts' queries are correctly loaded
@@ -26,7 +28,13 @@ class TestQueries(unittest.TestCase):
         query = queries.load_query("cvterms")
         self.assertIn("SELECT", query)
 
+        query = queries.load_query("public_gene_products")
+        self.assertIn("SELECT", query)
+
         query = queries.load_query("gene_products")
+        self.assertIn("SELECT", query)
+
+        query = queries.load_query("public_stats")
         self.assertIn("SELECT", query)
 
         query = queries.load_query("stats")

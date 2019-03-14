@@ -342,6 +342,7 @@ def add_extract_gene_product_arguments(parser: argparse.ArgumentParser):
     """Defines formal arguments for the 'chado extract gene_products' sub-command"""
     parser.add_argument("-a", "--abbreviation", dest="organism",
                         help="restrict to a certain organism, defined by its abbreviation/short name (default: all)")
+    parser.add_argument("--public_only", action="store_true", help="restrict to public genomes (default: all)")
 
 
 def add_extract_stats_arguments(parser: argparse.ArgumentParser):
@@ -351,6 +352,7 @@ def add_extract_stats_arguments(parser: argparse.ArgumentParser):
     parser.add_argument("--start_date", required=True, help="date for maximum age of updates, format 'YYYYMMDD'")
     parser.add_argument("--end_date", default="", help="date for minimum age of updates, format 'YYYYMMDD' "
                                                        "(default: today)")
+    parser.add_argument("--public_only", action="store_true", help="restrict to public genomes (default: all)")
 
 
 def add_extract_comments_arguments(parser: argparse.ArgumentParser):

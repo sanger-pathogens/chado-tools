@@ -57,7 +57,8 @@ class OrganismDbxRef(base.PublicBase):
                       sqlalchemy.Index("organism_dbxref_idx2", dbxref_id))
 
     # Relationships
-    organism = sqlalchemy.orm.relationship(Organism, foreign_keys=organism_id, backref="organism_dbxref_organism")
+    organism = sqlalchemy.orm.relationship(Organism, foreign_keys=organism_id, backref=sqlalchemy.orm.backref(
+        "organism_dbxref_organism", passive_deletes=True))
     dbxref = sqlalchemy.orm.relationship(general.DbxRef, backref="organism_dbxref_dbxref")
 
     # Initialisation
@@ -90,7 +91,8 @@ class OrganismProp(base.PublicBase):
                       sqlalchemy.Index("organismprop_idx2", type_id))
 
     # Relationships
-    organism = sqlalchemy.orm.relationship(Organism, foreign_keys=organism_id, backref="organismprop_organism")
+    organism = sqlalchemy.orm.relationship(Organism, foreign_keys=organism_id, backref=sqlalchemy.orm.backref(
+        "organismprop_organism", passive_deletes=True))
     type = sqlalchemy.orm.relationship(cv.CvTerm, foreign_keys=type_id, backref="organismprop_type")
 
     # Initialisation

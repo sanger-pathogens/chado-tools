@@ -416,6 +416,13 @@ class TestTasks(unittest.TestCase):
         mock_set.assert_called_with("testquery", organism="testorganism")
         mock_query.assert_called_with(self.uri, "testquery_with_params", "", "csv", False, "\t")
 
+        args = ["chado", "extract", "comments", "--public_only", "testdb"]
+        parsed_args = chado_tools.parse_arguments(args)
+        tasks.run_select_command(args[2], parsed_args, self.uri)
+        mock_load.assert_called_with("public_comments")
+        mock_set.assert_called_with("testquery", organism=None)
+        mock_query.assert_called_with(self.uri, "testquery_with_params", "", "csv", False, "\t")
+
     @unittest.mock.patch('pychado.tasks.run_insert_command')
     def test_run_insert(self, mock_run):
         # Checks that database inserts are correctly run

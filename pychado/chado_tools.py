@@ -359,6 +359,7 @@ def add_extract_comments_arguments(parser: argparse.ArgumentParser):
     """Defines formal arguments for the 'chado extract comments' sub-command"""
     parser.add_argument("-a", "--abbreviation", dest="organism",
                         help="restrict to a certain organism, defined by its abbreviation/short name (default: all)")
+    parser.add_argument("--public_only", action="store_true", help="restrict to public genomes (default: all)")
 
 
 def add_insert_arguments(parser: argparse.ArgumentParser):

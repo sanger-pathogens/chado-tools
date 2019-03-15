@@ -20,6 +20,8 @@ def load_query(specifier: str) -> str:
         query = utils.read_text(pkg_resources.resource_filename("pychado", "sql/extract_public_stats.sql"))
     elif specifier == "stats":
         query = utils.read_text(pkg_resources.resource_filename("pychado", "sql/extract_stats.sql"))
+    elif specifier == "public_comments":
+        query = utils.read_text(pkg_resources.resource_filename("pychado", "sql/extract_public_comments.sql"))
     elif specifier == "comments":
         query = utils.read_text(pkg_resources.resource_filename("pychado", "sql/extract_comments.sql"))
     return query

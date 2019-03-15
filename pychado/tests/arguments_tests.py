@@ -267,6 +267,7 @@ class TestArguments(unittest.TestCase):
         self.assertEqual(parsed_args["output_file"], "testfile")
         self.assertEqual(parsed_args["format"], "csv")
         self.assertEqual(parsed_args["organism"], "testorganism")
+        self.assertFalse(parsed_args["public_only"])
         self.assertEqual(parsed_args["dbname"], "testdb")
 
     def test_insert_organism_args(self):

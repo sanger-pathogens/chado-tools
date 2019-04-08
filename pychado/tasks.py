@@ -161,10 +161,10 @@ def run_select_command(specifier: str, arguments, uri: str) -> None:
         query = queries.set_query_conditions(template, database=arguments.database, vocabulary=arguments.vocabulary)
     elif specifier == "gene_products":
         query = queries.set_query_conditions(template, organism=arguments.organism)
-    elif specifier == "stats":
+    elif specifier == "annotation_updates":
         query = queries.set_query_conditions(template, organism=arguments.organism, start_date=arguments.start_date,
                                              end_date=(arguments.end_date or utils.current_date()))
-    elif specifier == "comments":
+    elif specifier == "curator_comments":
         query = queries.set_query_conditions(template, organism=arguments.organism)
     else:
         print("Functionality 'extract " + specifier + "' is not yet implemented.")

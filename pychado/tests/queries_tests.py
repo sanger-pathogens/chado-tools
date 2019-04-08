@@ -9,15 +9,15 @@ class TestQueries(unittest.TestCase):
     def test_sql_resources(self):
         # Checks that all required resources are available
         self.assertTrue(pkg_resources.resource_isdir("pychado", "sql"))
-        self.assertTrue(pkg_resources.resource_exists("pychado", "sql/extract_stats.sql"))
-        self.assertTrue(pkg_resources.resource_exists("pychado", "sql/extract_public_stats.sql"))
+        self.assertTrue(pkg_resources.resource_exists("pychado", "sql/extract_annotation_updates.sql"))
+        self.assertTrue(pkg_resources.resource_exists("pychado", "sql/extract_public_annotation_updates.sql"))
         self.assertTrue(pkg_resources.resource_exists("pychado", "sql/extract_organisms.sql"))
         self.assertTrue(pkg_resources.resource_exists("pychado", "sql/extract_public_organisms.sql"))
         self.assertTrue(pkg_resources.resource_exists("pychado", "sql/extract_cvterms.sql"))
         self.assertTrue(pkg_resources.resource_exists("pychado", "sql/extract_gene_products.sql"))
         self.assertTrue(pkg_resources.resource_exists("pychado", "sql/extract_public_gene_products.sql"))
-        self.assertTrue(pkg_resources.resource_exists("pychado", "sql/extract_comments.sql"))
-        self.assertTrue(pkg_resources.resource_exists("pychado", "sql/extract_public_comments.sql"))
+        self.assertTrue(pkg_resources.resource_exists("pychado", "sql/extract_curator_comments.sql"))
+        self.assertTrue(pkg_resources.resource_exists("pychado", "sql/extract_public_curator_comments.sql"))
 
     def test_load_query(self):
         # Checks that the templates for the 'chado extracts' queries are correctly loaded
@@ -36,16 +36,16 @@ class TestQueries(unittest.TestCase):
         query = queries.load_query("gene_products")
         self.assertIn("SELECT", query)
 
-        query = queries.load_query("public_stats")
+        query = queries.load_query("public_annotation_updates")
         self.assertIn("SELECT", query)
 
-        query = queries.load_query("stats")
+        query = queries.load_query("annotation_updates")
         self.assertIn("SELECT", query)
 
-        query = queries.load_query("public_comments")
+        query = queries.load_query("public_curator_comments")
         self.assertIn("SELECT", query)
 
-        query = queries.load_query("comments")
+        query = queries.load_query("curator_comments")
         self.assertIn("SELECT", query)
 
         query = queries.load_query("non_existent_specifier")

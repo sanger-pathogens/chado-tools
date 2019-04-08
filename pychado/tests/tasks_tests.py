@@ -299,30 +299,30 @@ class TestTasks(unittest.TestCase):
     @unittest.mock.patch('pychado.dbutils.query_and_print')
     @unittest.mock.patch('pychado.queries.set_query_conditions')
     @unittest.mock.patch('pychado.queries.load_query')
-    def test_extract_stats(self, mock_load, mock_set, mock_query):
-        # Checks that the function providing database statistics is correctly called
+    def test_extract_annotation_updates(self, mock_load, mock_set, mock_query):
+        # Checks that the function extracting annotation updates is correctly called
         self.assertIs(mock_load, queries.load_query)
         self.assertIs(mock_set, queries.set_query_conditions)
         self.assertIs(mock_query, dbutils.query_and_print)
 
-        args = ["chado", "extract", "stats", "--start_date", "teststartdate", "--end_date", "testenddate",
+        args = ["chado", "extract", "annotation_updates", "--start_date", "teststartdate", "--end_date", "testenddate",
                 "-a", "testorganism", "testdb"]
         parsed_args = chado_tools.parse_arguments(args)
         mock_load.return_value = "testquery"
         mock_set.return_value = "testquery_with_params"
 
         tasks.run_select_command(args[2], parsed_args, self.uri)
-        mock_load.assert_called_with("stats")
+        mock_load.assert_called_with("annotation_updates")
         mock_set.assert_called_with("testquery", organism="testorganism", start_date="teststartdate",
                                     end_date="testenddate")
         mock_query.assert_called_with(self.uri, "testquery_with_params", "", "csv", False, "\t")
 
-        args = ["chado", "extract", "stats", "-H", "-d", ";", "-o", "testfile", "--start_date", "teststartdate",
-                "--public_only", "testdb"]
+        args = ["chado", "extract", "annotation_updates", "-H", "-d", ";", "-o", "testfile", "--start_date",
+                "teststartdate", "--public_only", "testdb"]
         parsed_args = chado_tools.parse_arguments(args)
 
         tasks.run_select_command(args[2], parsed_args, self.uri)
-        mock_load.assert_called_with("public_stats")
+        mock_load.assert_called_with("public_annotation_updates")
         mock_set.assert_called_with("testquery", organism=None, start_date="teststartdate",
                                     end_date=utils.current_date())
         mock_query.assert_called_with(self.uri, "testquery_with_params", "testfile", "csv", True, ";")
@@ -400,26 +400,26 @@ class TestTasks(unittest.TestCase):
     @unittest.mock.patch('pychado.dbutils.query_and_print')
     @unittest.mock.patch('pychado.queries.set_query_conditions')
     @unittest.mock.patch('pychado.queries.load_query')
-    def test_extract_comments(self, mock_load, mock_set, mock_query):
-        # Checks that the function extracting comments on features is correctly called
+    def test_extract_curator_comments(self, mock_load, mock_set, mock_query):
+        # Checks that the function extracting curator comments on features is correctly called
         self.assertIs(mock_load, queries.load_query)
         self.assertIs(mock_set, queries.set_query_conditions)
         self.assertIs(mock_query, dbutils.query_and_print)
 
-        args = ["chado", "extract", "comments", "-a", "testorganism", "testdb"]
+        args = ["chado", "extract", "curator_comments", "-a", "testorganism", "testdb"]
         parsed_args = chado_tools.parse_arguments(args)
         mock_load.return_value = "testquery"
         mock_set.return_value = "testquery_with_params"
 
         tasks.run_select_command(args[2], parsed_args, self.uri)
-        mock_load.assert_called_with("comments")
+        mock_load.assert_called_with("curator_comments")
         mock_set.assert_called_with("testquery", organism="testorganism")
         mock_query.assert_called_with(self.uri, "testquery_with_params", "", "csv", False, "\t")
 
-        args = ["chado", "extract", "comments", "--public_only", "testdb"]
+        args = ["chado", "extract", "curator_comments", "--public_only", "testdb"]
         parsed_args = chado_tools.parse_arguments(args)
         tasks.run_select_command(args[2], parsed_args, self.uri)
-        mock_load.assert_called_with("public_comments")
+        mock_load.assert_called_with("public_curator_comments")
         mock_set.assert_called_with("testquery", organism=None)
         mock_query.assert_called_with(self.uri, "testquery_with_params", "", "csv", False, "\t")
 

@@ -148,8 +148,9 @@ def run_execute_command(specifier: str, arguments, uri: str) -> None:
 def run_select_command(specifier: str, arguments, uri: str) -> None:
     """Run a pre-compiled query against a database"""
     # Load query template
-    if specifier == "organisms" and arguments.public_only:
-        template = queries.load_query("public_organisms")
+    if hasattr(arguments, "public_only") and arguments.public_only:
+        modified_specifier = "public_" + specifier
+        template = queries.load_query(modified_specifier)
     else:
         template = queries.load_query(specifier)
 
@@ -160,10 +161,10 @@ def run_select_command(specifier: str, arguments, uri: str) -> None:
         query = queries.set_query_conditions(template, database=arguments.database, vocabulary=arguments.vocabulary)
     elif specifier == "gene_products":
         query = queries.set_query_conditions(template, organism=arguments.organism)
-    elif specifier == "stats":
+    elif specifier == "annotation_updates":
         query = queries.set_query_conditions(template, organism=arguments.organism, start_date=arguments.start_date,
                                              end_date=(arguments.end_date or utils.current_date()))
-    elif specifier == "comments":
+    elif specifier == "curator_comments":
         query = queries.set_query_conditions(template, organism=arguments.organism)
     else:
         print("Functionality 'extract " + specifier + "' is not yet implemented.")

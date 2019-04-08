@@ -45,8 +45,8 @@ class TestCommands(unittest.TestCase):
         self.assertIn("organisms", commands)
         self.assertIn("cvterms", commands)
         self.assertIn("gene_products", commands)
-        self.assertIn("stats", commands)
-        self.assertIn("comments", commands)
+        self.assertIn("annotation_updates", commands)
+        self.assertIn("curator_comments", commands)
 
     def test_insert_commands(self):
         commands = chado_tools.insert_commands()
@@ -195,10 +195,10 @@ class TestArguments(unittest.TestCase):
         self.assertEqual(parsed_args["date"], "testdate")
         self.assertEqual(parsed_args["dbname"], "testdb")
 
-    def test_extract_stats_args(self):
-        # Tests if the command line arguments for the subcommand 'chado extract stats' are parsed correctly
-        args = ["chado", "extract", "stats", "-H", "-d", ";", "-o", "testfile", "-F", "json", "-a", "testorganism",
-                "--start_date", "testdate", "--end_date", "testdate2", "testdb"]
+    def test_extract_annotation_updates_args(self):
+        # Tests if the command line arguments for the subcommand 'chado extract annotation_updates' are parsed correctly
+        args = ["chado", "extract", "annotation_updates", "-H", "-d", ";", "-o", "testfile", "-F", "json", "-a",
+                "testorganism", "--public_only", "--start_date", "testdate", "--end_date", "testdate2", "testdb"]
         parsed_args = vars(chado_tools.parse_arguments(args))
         self.assertTrue(parsed_args["include_header"])
         self.assertEqual(parsed_args["delimiter"], ";")
@@ -207,16 +207,18 @@ class TestArguments(unittest.TestCase):
         self.assertEqual(parsed_args["organism"], "testorganism")
         self.assertEqual(parsed_args["start_date"], "testdate")
         self.assertEqual(parsed_args["end_date"], "testdate2")
+        self.assertTrue(parsed_args["public_only"])
         self.assertEqual(parsed_args["dbname"], "testdb")
 
         # Test the default values
-        args = ["chado", "extract", "stats", "--start_date", "testdate", "testdb"]
+        args = ["chado", "extract", "annotation_updates", "--start_date", "testdate", "testdb"]
         parsed_args = vars(chado_tools.parse_arguments(args))
         self.assertFalse(parsed_args["include_header"])
         self.assertEqual(parsed_args["delimiter"], "\t")
         self.assertEqual(parsed_args["output_file"], "")
         self.assertEqual(parsed_args["format"], "csv")
         self.assertEqual(parsed_args["organism"], None)
+        self.assertFalse(parsed_args["public_only"])
         self.assertEqual(parsed_args["end_date"], "")
 
     def test_extract_organisms_args(self):
@@ -252,11 +254,12 @@ class TestArguments(unittest.TestCase):
         self.assertEqual(parsed_args["output_file"], "testfile")
         self.assertEqual(parsed_args["format"], "csv")
         self.assertEqual(parsed_args["organism"], "testorganism")
+        self.assertFalse(parsed_args["public_only"])
         self.assertEqual(parsed_args["dbname"], "testdb")
 
-    def test_extract_comments_args(self):
-        # Tests if the command line arguments for the subcommand 'chado extract comments' are parsed correctly
-        args = ["chado", "extract", "comments", "-H", "-d", ";", "-o", "testfile", "-a", "testorganism",
+    def test_extract_curator_comments_args(self):
+        # Tests if the command line arguments for the subcommand 'chado extract curator_comments' are parsed correctly
+        args = ["chado", "extract", "curator_comments", "-H", "-d", ";", "-o", "testfile", "-a", "testorganism",
                 "testdb"]
         parsed_args = vars(chado_tools.parse_arguments(args))
         self.assertTrue(parsed_args["include_header"])
@@ -264,6 +267,7 @@ class TestArguments(unittest.TestCase):
         self.assertEqual(parsed_args["output_file"], "testfile")
         self.assertEqual(parsed_args["format"], "csv")
         self.assertEqual(parsed_args["organism"], "testorganism")
+        self.assertFalse(parsed_args["public_only"])
         self.assertEqual(parsed_args["dbname"], "testdb")
 
     def test_insert_organism_args(self):

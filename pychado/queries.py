@@ -12,12 +12,18 @@ def load_query(specifier: str) -> str:
         query = utils.read_text(pkg_resources.resource_filename("pychado", "sql/extract_organisms.sql"))
     elif specifier == "cvterms":
         query = utils.read_text(pkg_resources.resource_filename("pychado", "sql/extract_cvterms.sql"))
+    elif specifier == "public_gene_products":
+        query = utils.read_text(pkg_resources.resource_filename("pychado", "sql/extract_public_gene_products.sql"))
     elif specifier == "gene_products":
         query = utils.read_text(pkg_resources.resource_filename("pychado", "sql/extract_gene_products.sql"))
-    elif specifier == "stats":
-        query = utils.read_text(pkg_resources.resource_filename("pychado", "sql/extract_stats.sql"))
-    elif specifier == "comments":
-        query = utils.read_text(pkg_resources.resource_filename("pychado", "sql/extract_comments.sql"))
+    elif specifier == "public_annotation_updates":
+        query = utils.read_text(pkg_resources.resource_filename("pychado", "sql/extract_public_annotation_updates.sql"))
+    elif specifier == "annotation_updates":
+        query = utils.read_text(pkg_resources.resource_filename("pychado", "sql/extract_annotation_updates.sql"))
+    elif specifier == "public_curator_comments":
+        query = utils.read_text(pkg_resources.resource_filename("pychado", "sql/extract_public_curator_comments.sql"))
+    elif specifier == "curator_comments":
+        query = utils.read_text(pkg_resources.resource_filename("pychado", "sql/extract_curator_comments.sql"))
     return query
 
 

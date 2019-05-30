@@ -406,6 +406,7 @@ class GFFImportClient(iobase.ChadoClient, GFFClient):
                     pub_id=self._default_pub.pub_id, is_current=is_current)
                 feature_synonym_entry = self._handle_feature_synonym(
                     new_feature_synonym_entry, existing_feature_synonyms, alias.value, feature_entry.uniquename)
+                existing_feature_synonyms.append(feature_synonym_entry)
                 all_feature_synonyms.append(feature_synonym_entry)
 
         # Delete obsolete entries
@@ -433,6 +434,7 @@ class GFFImportClient(iobase.ChadoClient, GFFClient):
             new_feature_pub_entry = sequence.FeaturePub(feature_id=feature_entry.feature_id, pub_id=pub_entry.pub_id)
             feature_pub_entry = self._handle_feature_pub(new_feature_pub_entry, existing_feature_pubs,
                                                          feature_entry.uniquename, pub_entry.uniquename)
+            existing_feature_pubs.append(feature_pub_entry)
             all_feature_pubs.append(feature_pub_entry)
 
         # Delete obsolete entries
@@ -476,6 +478,7 @@ class GFFImportClient(iobase.ChadoClient, GFFClient):
                 feature_relationship_entry = self._handle_feature_relationship(
                     new_relationship_entry, existing_feature_relationships, subject_entry.uniquename,
                     object_entry.uniquename, type_entry.name)
+                existing_feature_relationships.append(feature_relationship_entry)
                 all_feature_relationships.append(feature_relationship_entry)
 
         # Delete obsolete entries
@@ -509,6 +512,7 @@ class GFFImportClient(iobase.ChadoClient, GFFClient):
                                                              type_id=type_entry.cvterm_id, value=value)
                 featureprop_entry = self._handle_featureprop(new_featureprop_entry, existing_featureprops, prop, value,
                                                              feature_entry.uniquename)
+                existing_featureprops.append(featureprop_entry)
                 all_featureprops.append(featureprop_entry)
 
         # Delete obsolete entries
@@ -544,6 +548,7 @@ class GFFImportClient(iobase.ChadoClient, GFFClient):
                                                               dbxref_id=dbxref_entry.dbxref_id)
             feature_dbxref_entry = self._handle_feature_dbxref(new_feature_dbxref_entry, existing_feature_dbxrefs,
                                                                crossref, feature_entry.uniquename)
+            existing_feature_dbxrefs.append(feature_dbxref_entry)
             all_feature_dbxrefs.append(feature_dbxref_entry)
 
         # Delete obsolete entries
@@ -592,6 +597,7 @@ class GFFImportClient(iobase.ChadoClient, GFFClient):
                                                               pub_id=self._default_pub.pub_id)
             feature_cvterm_entry = self._handle_feature_cvterm(new_feature_cvterm_entry, existing_feature_cvterms,
                                                                cvterm_entry.name, feature_entry.uniquename)
+            existing_feature_cvterms.append(feature_cvterm_entry)
             all_feature_cvterms.append(feature_cvterm_entry)
 
         # Delete obsolete entries

@@ -2,15 +2,6 @@ from . import utils, dbutils, queries, ddl
 from .io import direct, essentials, ontology, fasta, gff, gaf
 
 
-def create_connection_string(filename: str, dbname: str) -> str:
-    """Reads database connection parameters from a configuration file and generates a connection string"""
-    if not filename:
-        filename = dbutils.default_configuration_file()
-    connection_parameters = utils.parse_yaml(filename)
-    connection_parameters["database"] = dbname
-    return dbutils.generate_uri(connection_parameters)
-
-
 def check_access(connection_uri: str, task: str) -> bool:
     """Checks if the database of interest exists and is accessible. If the database doesn't exist, but the
     task implies its creation, create it. Otherwise exit the program."""
@@ -31,18 +22,6 @@ def check_access(connection_uri: str, task: str) -> bool:
             # Database doesn't exist, and task can't be completed. Return without further action
             print("Database does not exist. Task can't be completed.")
             return False
-
-
-def init(command: str) -> None:
-    """Initiates or resets the default connection parameters"""
-    if command == "init":
-        # Set the default connection parameters
-        dbutils.set_default_parameters()
-    elif command == "reset":
-        # Reset the default connection parameters to factory settings
-        dbutils.reset_default_parameters()
-    else:
-        print("Functionality '" + command + "' is not yet implemented.")
 
 
 def run_command_with_arguments(command: str, sub_command: str, arguments, connection_uri: str) -> None:

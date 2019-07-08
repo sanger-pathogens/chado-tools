@@ -27,30 +27,27 @@ There are a number of ways to install chado-tools and details are provided below
 
 ### Required dependencies
 
-* Python 3.6 or higher
+* Python 3.6
 * PostgreSQL 9.6 or higher
 
 ### From source
 
 Download the latest release from this github repository, or clone the repository to obtain the most recent updates.
-
-Modify the file with [default connection settings](pychado/data/defaultDatabase.yml) such that it contains the settings for an existing PostgreSQL database server to which you can connect.
-
-Then run the tests:
-
-    python3 setup.py test
-
-If the tests all pass, install:
+Then install the software:
 
     python3 setup.py install
+
+NOTE: Some of the integration tests rely on temporary PostgreSQL databases. In order to successfully run those tests, 
+modify the [default connection settings](pychado/data/defaultDatabase.yml) such that they describe an existing 
+PostgreSQL database server to which you can connect. The tests can then be run as
+
+    python3 setup.py test
 
 ### Using pip
 
 You can install the program from the *Python Package Index (PyPI)* using the command
 
     pip install chado-tools
-
-Now change the default connection parameters by running `chado init`. You can always reset them to the original state by running `chado reset`.
 
 ### Using Bioconda
 
@@ -69,13 +66,30 @@ The usage is:
 * To display the version of the program, type `chado -v` or `chado --version`.
 * Use `chado <command> -h` or `chado <command> --help` to get a detailed description and the usage of that command.
 
+### Database connection
+
+You can set up default values for database host, port and user with environment variables. To do so, add the following 
+lines to your `.bashrc` (replacing the example values):
+
+    export CHADO_HOST=localhost
+    export CHADO_PORT=5432
+    export CHADO_USER=chadouser
+
+The software seeks for these environment variables on your system. If they do not exist, it will use the 
+[default connection settings](pychado/data/defaultDatabase.yml), which you can edit manually if you really want.
+
+By default the software will assume that no password is required to connect as the user specified as `CHADO_USER`. The 
+flag `-p` enforces asking the user for a password.
+
+Alternatively, you can supply your own YAML configuration file in the same format as the [default file](pychado/data/defaultDatabase.yml)
+with flag `-c` (including password). The software will then ignore any environment variables. 
+
+
 ### Available commands
 
 ------------------------------------------------------------------------------------------------
 | Command               | Description                                                          |
 |-----------------------|----------------------------------------------------------------------|
-| init                  | set the default connection parameters                                |
-| reset                 | reset the default connection parameters to factory settings          |
 | connect               | connect to a CHADO database for an interactive session               |
 | query                 | query a CHADO database and export the result into a text file        |
 | execute               | execute a function defined in a CHADO database                       |
@@ -106,10 +120,9 @@ Query the database to check the meaning of a certain `cvterm_id`:
 
     chado query -q "SELECT name FROM cvterm WHERE cvterm_id = 25" eukaryotes
 
-### Note
+Export a FASTA file containing the sequences of the organism `Pfalciparum`:
 
-Unless explicitly specified by the flag `-c`, all commands employ the [default connection settings](pychado/data/defaultDatabase.yml).
-You can change these by running `chado init`.
+    chado export fasta -a Pfalciparum -o Pfalciparum.fasta -t contigs eukaryotes
 
 ## License
 chado-tools is free software, licensed under [GPLv3](https://github.com/sanger-pathogens/chado-tools/blob/master/LICENSE).

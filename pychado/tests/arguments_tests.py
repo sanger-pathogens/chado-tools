@@ -5,12 +5,6 @@ from .. import chado_tools
 class TestCommands(unittest.TestCase):
     """Tests if all implemented commands and sub-commands are available through the entry point"""
 
-    def test_init_commands(self):
-        commands = chado_tools.init_commands()
-        self.assertEqual(len(commands), 2)
-        self.assertIn("init", commands)
-        self.assertIn("reset", commands)
-
     def test_general_commands(self):
         commands = chado_tools.general_commands()
         self.assertEqual(len(commands), 2)
@@ -88,13 +82,15 @@ class TestArguments(unittest.TestCase):
         args = ["chado", "connect", "-c", "testconfig", "-V", "testdb"]
         parsed_args = vars(chado_tools.parse_arguments(args))
         self.assertEqual(parsed_args["config"], "testconfig")
-        self.assertEqual(parsed_args["dbname"], "testdb")
+        self.assertFalse(parsed_args["use_password"])
         self.assertTrue(parsed_args["verbose"])
+        self.assertEqual(parsed_args["dbname"], "testdb")
 
         # Test the default values
-        args = ["chado", "connect", "testdb"]
+        args = ["chado", "connect", "-p", "testdb"]
         parsed_args = vars(chado_tools.parse_arguments(args))
         self.assertEqual(parsed_args["config"], "")
+        self.assertTrue(parsed_args["use_password"])
         self.assertFalse(parsed_args["verbose"])
         self.assertNotIn("non_existent_argument", parsed_args)
 

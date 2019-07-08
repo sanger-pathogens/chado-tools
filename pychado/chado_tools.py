@@ -3,7 +3,7 @@ import os
 import pkg_resources
 import argparse
 import time
-from . import tasks
+from . import tasks, dbutils
 
 
 def main():
@@ -16,31 +16,18 @@ def main():
     if command in wrapper_commands():
         sub_command = sys.argv[2]
 
-    if command in init_commands():
+    # Check database access
+    start_time = time.time()
+    connection_params = dbutils.get_connection_parameters(arguments.config, arguments.use_password, arguments.dbname)
+    connection_string = dbutils.generate_uri(connection_params)
+    if tasks.check_access(connection_string, sub_command):
 
-        # Set database connection parameters
-        tasks.init(command)
-    else:
+        # Run the command
+        tasks.run_command_with_arguments(command, sub_command, arguments, connection_string)
 
-        # Check database access
-        start_time = time.time()
-        connection_string = tasks.create_connection_string(arguments.config, arguments.dbname)
-        if tasks.check_access(connection_string, sub_command):
-
-            # Run the command
-            tasks.run_command_with_arguments(command, sub_command, arguments, connection_string)
-
-        # Print run time
-        if arguments.verbose:
-            print("Runtime: {0:.2f} s".format(time.time()-start_time))
-
-
-def init_commands() -> dict:
-    """Lists the available sub-commands of the 'chado' command for database initiation"""
-    return {
-        "init": "set the default connection parameters",
-        "reset": "reset the default connection parameters to factory settings"
-    }
+    # Print run time
+    if arguments.verbose:
+        print("Runtime: {0:.2f} s".format(time.time()-start_time))
 
 
 def general_commands() -> dict:
@@ -143,10 +130,6 @@ def parse_arguments(input_arguments: list) -> argparse.Namespace:
     # Add subparsers for all sub-commands
     subparsers = parser.add_subparsers()
 
-    for command, description in init_commands().items():
-        # Create subparser
-        subparsers.add_parser(command, description=description, help=description)
-
     for command, description in general_commands().items():
         # Create subparser and add general and specific formal arguments
         sub = subparsers.add_parser(command, description=description, help=description)
@@ -165,7 +148,10 @@ def parse_arguments(input_arguments: list) -> argparse.Namespace:
 def add_general_arguments(parser: argparse.ArgumentParser):
     """Defines general formal arguments (available to all sub-commands)"""
     parser.add_argument("-V", "--verbose", action="store_true", help="verbose mode")
-    parser.add_argument("-c", "--config", default="", help="YAML file containing connection details")
+    parser_group = parser.add_mutually_exclusive_group(required=False)
+    parser_group.add_argument("-c", "--config", default="", help="YAML file containing connection details")
+    parser_group.add_argument("-p", "--use_password", action="store_true",
+                              help="connect with password (default: no password)")
     parser.add_argument("dbname", help="name of the database")
 
 

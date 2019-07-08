@@ -7,25 +7,8 @@ class TestTasks(unittest.TestCase):
     """Tests the functionality of all commands of the CHADO program"""
 
     def setUp(self):
-        self.uri = tasks.create_connection_string("", "testdb")
-
-    @unittest.mock.patch('pychado.utils.parse_yaml')
-    @unittest.mock.patch('pychado.dbutils.default_configuration_file')
-    def test_create_connection_string(self, mock_default, mock_parse):
-        # Checks that the default configuration file is used unless another file is supplied
-        self.assertIs(mock_default, dbutils.default_configuration_file)
-        self.assertIs(mock_parse, utils.parse_yaml)
-
-        mock_default.return_value = "default_file"
-        tasks.create_connection_string("", "testdb")
-        mock_default.assert_called()
-        mock_parse.assert_called_with("default_file")
-
-        mock_default.reset_mock()
-        mock_parse.reset_mock()
-        tasks.create_connection_string("user_supplied_file", "testdb")
-        mock_default.assert_not_called()
-        mock_parse.assert_called_with("user_supplied_file")
+        connection_params = dbutils.get_connection_parameters("", False, "testdb")
+        self.uri = dbutils.generate_uri(connection_params)
 
     @unittest.mock.patch('pychado.dbutils.exists')
     def test_access(self, mock_exist):
@@ -40,29 +23,6 @@ class TestTasks(unittest.TestCase):
         mock_exist.return_value = False
         self.assertFalse(tasks.check_access(self.uri, "connect"))
         self.assertTrue(tasks.check_access(self.uri, "create"))
-
-    @unittest.mock.patch('pychado.dbutils.reset_default_parameters')
-    @unittest.mock.patch('pychado.dbutils.set_default_parameters')
-    def test_init_reset(self, mock_set, mock_reset):
-        # Checks that the functions setting/resetting default connection parameters are correctly called
-        self.assertIs(mock_set, dbutils.set_default_parameters)
-        self.assertIs(mock_reset, dbutils.reset_default_parameters)
-
-        tasks.init("init")
-        mock_set.assert_called()
-        mock_reset.assert_not_called()
-        mock_set.reset_mock()
-        mock_reset.reset_mock()
-
-        tasks.init("reset")
-        mock_set.assert_not_called()
-        mock_reset.assert_called()
-        mock_set.reset_mock()
-        mock_reset.reset_mock()
-
-        tasks.init("non_existing_command")
-        mock_set.assert_not_called()
-        mock_reset.assert_not_called()
 
     @unittest.mock.patch('pychado.dbutils.connect_to_database')
     def test_connect(self, mock_connect):

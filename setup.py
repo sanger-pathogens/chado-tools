@@ -11,7 +11,7 @@ except FileNotFoundError or FileExistsError:
 
 setuptools.setup(
     name="chado-tools",
-    version="0.2.11",
+    version="0.2.12",
     author="Christoph Puethe",
     author_email="path-help@sanger.ac.uk",
     description="Tools to access CHADO databases",
@@ -38,13 +38,13 @@ setuptools.setup(
         "nose >= 1.3"
     ],
     install_requires=[
-        "sqlalchemy",
-        "sqlalchemy-utils",
-        "psycopg2-binary",
-        "pyyaml",
+        "sqlalchemy >= 1.3.3",
+        "sqlalchemy-utils >= 0.34.0",
+        "psycopg2 >= 2.7.6",
+        "pyyaml >= 5.1",
         "pronto >= 0.11.0",
-        "gffutils",
-        "biopython"
+        "gffutils >= 0.9",
+        "biopython >= 1.73"
     ],
     license="GPLv3",
     classifiers=[

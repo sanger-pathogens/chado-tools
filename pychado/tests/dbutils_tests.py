@@ -24,11 +24,6 @@ class TestConnection(unittest.TestCase):
     def tearDown(self):
         self.connectionParameters.clear()
 
-    def test_factory_settings(self):
-        # Tests if the settings in the default connection file are equivalent to the factory settings
-        factory_settings = utils.parse_yaml(dbutils.factory_settings_configuration_file())
-        self.assertEqual(self.connectionParameters, factory_settings)
-
     def test_connection_parameters(self):
         # Tests if the default connection file contains all required parameters
         self.assertIn("database", self.connectionParameters)
@@ -37,24 +32,65 @@ class TestConnection(unittest.TestCase):
         self.assertIn("host", self.connectionParameters)
         self.assertIn("port", self.connectionParameters)
 
-    @unittest.mock.patch('builtins.input')
+    @unittest.mock.patch('pychado.dbutils.get_connection_password')
+    @unittest.mock.patch('pychado.dbutils.get_connection_parameters_from_env')
+    @unittest.mock.patch('pychado.utils.parse_yaml')
+    def test_get_connection_parameters(self, mock_parse, mock_env, mock_pw):
+        # Tests the function that determines connection parameters
+        self.assertIs(mock_env, dbutils.get_connection_parameters_from_env)
+        self.assertIs(mock_pw, dbutils.get_connection_password)
+        self.assertIs(mock_parse, utils.parse_yaml)
+        mock_pw.return_value = "mypw"
+        mock_env.return_value = {"host": "myhost", "port": 1234, "user": "myself"}
+        mock_parse.return_value = {"host": "otherhost", "port": 4321, "user": "someone", "password": "too_easy"}
+
+        params = dbutils.get_connection_parameters("", True, "testdb")
+        mock_parse.assert_not_called()
+        mock_env.assert_called()
+        mock_pw.assert_called_with(True)
+        self.assertEqual(params["host"], "myhost")
+        self.assertEqual(params["password"], "mypw")
+        self.assertEqual(params["database"], "testdb")
+
+        mock_env.reset_mock()
+        mock_pw.reset_mock()
+        mock_parse.reset_mock()
+        params = dbutils.get_connection_parameters("user_supplied_file", False, "otherdb")
+        mock_parse.assert_called_with("user_supplied_file")
+        mock_env.assert_not_called()
+        mock_pw.assert_not_called()
+        self.assertEqual(params["host"], "otherhost")
+        self.assertEqual(params["password"], "too_easy")
+        self.assertEqual(params["database"], "otherdb")
+
+    def test_get_connection_parameters_from_env(self):
+        # Tests the function that reads connection parameters from environment variables
+        params = dbutils.get_connection_parameters_from_env()
+        self.assertEqual(params["host"], self.connectionParameters["host"])
+        self.assertEqual(params["port"], self.connectionParameters["port"])
+        self.assertEqual(params["user"], self.connectionParameters["user"])
+
+        os.environ["CHADO_HOST"] = "newhost"
+        os.environ["CHADO_PORT"] = "5555"
+        os.environ["CHADO_USER"] = "newuser"
+        params = dbutils.get_connection_parameters_from_env()
+        self.assertEqual(params["host"], "newhost")
+        self.assertEqual(params["port"], "5555")
+        self.assertEqual(params["user"], "newuser")
+
     @unittest.mock.patch('getpass.getpass')
-    def test_set_reset_parameters(self, mock_getpass, mock_input):
-        # Tests if the default connection parameters can be changed
-        self.assertIs(mock_input, input)
+    def test_get_connection_password(self, mock_getpass):
+        # Tests the setting of a connection password by the user
         self.assertIs(mock_getpass, getpass.getpass)
-        mock_input.side_effect = ["myhost", 5555, "mydb", "myuser"]
         mock_getpass.return_value = "mypw"
-        dbutils.set_default_parameters()
-        default_parameters = utils.parse_yaml(dbutils.default_configuration_file())
-        self.assertEqual(default_parameters["host"], "myhost")
-        self.assertEqual(default_parameters["port"], "5555")
-        self.assertEqual(default_parameters["database"], "mydb")
-        self.assertEqual(default_parameters["user"], "myuser")
-        self.assertEqual(default_parameters["password"], "mypw")
-        dbutils.reset_default_parameters()
-        default_parameters = utils.parse_yaml(dbutils.default_configuration_file())
-        self.assertEqual(self.connectionParameters, default_parameters)
+
+        pw = dbutils.get_connection_password(False)
+        mock_getpass.assert_not_called()
+        self.assertIsNone(pw)
+
+        pw = dbutils.get_connection_password(True)
+        mock_getpass.assert_called()
+        self.assertEqual(pw, "mypw")
 
     def test_connection_uri(self):
         # Tests the correct creation of a database connection string in URI format

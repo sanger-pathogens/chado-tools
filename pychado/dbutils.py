@@ -1,4 +1,5 @@
-import shutil
+from typing import Union
+import os
 import pkg_resources
 import subprocess
 import urllib.parse
@@ -10,23 +11,33 @@ import sqlalchemy_utils
 from . import utils
 
 
-def set_default_parameters() -> None:
-    """Sets the default connection parameters"""
-    parameters = {}
-    print("Please set the connection parameters for your default database.")
-    parameters["host"] = input("host: ")
-    parameters["port"] = input("port: ")
-    parameters["database"] = input("database: ")
-    parameters["user"] = input("username: ")
-    parameters["password"] = getpass.getpass(prompt="password: ")
-    utils.dump_yaml(default_configuration_file(), parameters)
-    print("Your default connection parameters have been changed.")
+def get_connection_parameters(filename: str, use_password: bool, dbname: str) -> dict:
+    """Reads database connection parameters from a configuration file or the environment"""
+    if filename:
+        connection_parameters = utils.parse_yaml(filename)
+    else:
+        connection_parameters = get_connection_parameters_from_env()
+        connection_parameters["password"] = get_connection_password(use_password)
+    connection_parameters["database"] = dbname
+    return connection_parameters
 
 
-def reset_default_parameters() -> None:
-    """Resets the default connection parameters to factory settings"""
-    shutil.copyfile(factory_settings_configuration_file(), default_configuration_file())
-    print("Your default connection parameters have been reset.")
+def get_connection_parameters_from_env() -> dict:
+    """Reads connection parameters from environment variables"""
+    default_connection_parameters = utils.parse_yaml(default_configuration_file())
+    connection_parameters = dict()
+    connection_parameters["host"] = os.getenv('CHADO_HOST', default_connection_parameters["host"])
+    connection_parameters["port"] = os.getenv('CHADO_PORT', default_connection_parameters["port"])
+    connection_parameters["user"] = os.getenv('CHADO_USER', default_connection_parameters["user"])
+    return connection_parameters
+
+
+def get_connection_password(use_password: bool) -> Union[None, str]:
+    """Asks the user to supply the connection password"""
+    if use_password:
+        return getpass.getpass(prompt="password: ")
+    else:
+        return None
 
 
 def generate_uri(connection_details: dict) -> str:
@@ -56,11 +67,6 @@ def default_schema_url() -> str:
 def default_configuration_file() -> str:
     """Returns the name of the default configuration file"""
     return pkg_resources.resource_filename("pychado", "data/defaultDatabase.yml")
-
-
-def factory_settings_configuration_file() -> str:
-    """Returns the name of the configuration file with factory settings"""
-    return pkg_resources.resource_filename("pychado", "data/factorySettings.yml")
 
 
 def open_connection(uri: str) -> sqlalchemy.engine.base.Connection:

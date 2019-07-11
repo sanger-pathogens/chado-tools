@@ -41,13 +41,24 @@ class TestConnection(unittest.TestCase):
         self.assertIs(mock_pw, dbutils.get_connection_password)
         self.assertIs(mock_parse, utils.parse_yaml)
         mock_pw.return_value = "mypw"
-        mock_env.return_value = {"host": "myhost", "port": 1234, "user": "myself"}
+        mock_env.return_value = {"host": "myhost", "port": 1234, "user": "myself", "password": "somepw"}
         mock_parse.return_value = {"host": "otherhost", "port": 4321, "user": "someone", "password": "too_easy"}
 
+        params = dbutils.get_connection_parameters("", False, "testdb")
+        mock_parse.assert_not_called()
+        mock_env.assert_called()
+        mock_pw.assert_not_called()
+        self.assertEqual(params["host"], "myhost")
+        self.assertEqual(params["password"], "somepw")
+        self.assertEqual(params["database"], "testdb")
+
+        mock_env.reset_mock()
+        mock_pw.reset_mock()
+        mock_parse.reset_mock()
         params = dbutils.get_connection_parameters("", True, "testdb")
         mock_parse.assert_not_called()
         mock_env.assert_called()
-        mock_pw.assert_called_with(True)
+        mock_pw.assert_called()
         self.assertEqual(params["host"], "myhost")
         self.assertEqual(params["password"], "mypw")
         self.assertEqual(params["database"], "testdb")
@@ -63,32 +74,32 @@ class TestConnection(unittest.TestCase):
         self.assertEqual(params["password"], "too_easy")
         self.assertEqual(params["database"], "otherdb")
 
+    @unittest.skipIf("TRAVIS_BUILD" not in os.environ or os.environ["TRAVIS_BUILD"] == "no",
+                     "Only run this test on Travis CI (to avoid messing up local environment).")
     def test_get_connection_parameters_from_env(self):
         # Tests the function that reads connection parameters from environment variables
         params = dbutils.get_connection_parameters_from_env()
         self.assertEqual(params["host"], self.connectionParameters["host"])
         self.assertEqual(params["port"], self.connectionParameters["port"])
         self.assertEqual(params["user"], self.connectionParameters["user"])
+        self.assertEqual(params["password"], self.connectionParameters["password"])
 
         os.environ["CHADO_HOST"] = "newhost"
         os.environ["CHADO_PORT"] = "5555"
         os.environ["CHADO_USER"] = "newuser"
+        os.environ["CHADO_PASS"] = "newpassword"
         params = dbutils.get_connection_parameters_from_env()
         self.assertEqual(params["host"], "newhost")
         self.assertEqual(params["port"], "5555")
         self.assertEqual(params["user"], "newuser")
+        self.assertEqual(params["password"], "newpassword")
 
     @unittest.mock.patch('getpass.getpass')
     def test_get_connection_password(self, mock_getpass):
         # Tests the setting of a connection password by the user
         self.assertIs(mock_getpass, getpass.getpass)
         mock_getpass.return_value = "mypw"
-
-        pw = dbutils.get_connection_password(False)
-        mock_getpass.assert_not_called()
-        self.assertIsNone(pw)
-
-        pw = dbutils.get_connection_password(True)
+        pw = dbutils.get_connection_password()
         mock_getpass.assert_called()
         self.assertEqual(pw, "mypw")
 

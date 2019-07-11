@@ -1,4 +1,3 @@
-from typing import Union
 import os
 import pkg_resources
 import subprocess
@@ -17,7 +16,8 @@ def get_connection_parameters(filename: str, use_password: bool, dbname: str) ->
         connection_parameters = utils.parse_yaml(filename)
     else:
         connection_parameters = get_connection_parameters_from_env()
-        connection_parameters["password"] = get_connection_password(use_password)
+        if use_password:
+            connection_parameters["password"] = get_connection_password()
     connection_parameters["database"] = dbname
     return connection_parameters
 
@@ -29,15 +29,13 @@ def get_connection_parameters_from_env() -> dict:
     connection_parameters["host"] = os.getenv('CHADO_HOST', default_connection_parameters["host"])
     connection_parameters["port"] = os.getenv('CHADO_PORT', default_connection_parameters["port"])
     connection_parameters["user"] = os.getenv('CHADO_USER', default_connection_parameters["user"])
+    connection_parameters["password"] = os.getenv('CHADO_PASS', default_connection_parameters["password"])
     return connection_parameters
 
 
-def get_connection_password(use_password: bool) -> Union[None, str]:
+def get_connection_password() -> str:
     """Asks the user to supply the connection password"""
-    if use_password:
-        return getpass.getpass(prompt="password: ")
-    else:
-        return None
+    return getpass.getpass()
 
 
 def generate_uri(connection_details: dict) -> str:

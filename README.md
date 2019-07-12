@@ -14,60 +14,56 @@ Python3 command line script providing various tools for accessing CHADO database
     * [From source](#from-source)
     * [Using pip](#using-pip)
     * [Using Bioconda](#using-bioconda)
+    * [Using a Docker container](#using-a-docker-container)
   * [Usage](#usage)
+    * [Database connection](#database-connection)
     * [Available commands](#available-commands)
     * [Examples](#examples)
-    * [Note](#note)
+    * [Note concerning tests](#note-concerning-tests)
   * [License](#license)
-  * [Feedback/Issues](#feedbackissues)
+  * [Feedback/Issues](#feedback/issues)
 
 ## Installation
-
 There are a number of ways to install chado-tools and details are provided below. If you encounter an issue when installing chado-tools please contact your local system administrator. If you encounter a bug please log it [here](https://github.com/sanger-pathogens/chado-tools/issues) or email us at path-help@sanger.ac.uk.
 
 ### Required dependencies
-
 * Python 3.6
 * PostgreSQL 9.6 or higher
 
 ### From source
-
 Download the latest release from this github repository, or clone the repository to obtain the most recent updates.
 Then install the software:
 
     python3 setup.py install
 
-NOTE: Some of the integration tests rely on temporary PostgreSQL databases. In order to successfully run those tests, 
-modify the [default connection settings](pychado/data/defaultDatabase.yml) such that they describe an existing 
-PostgreSQL database server to which you can connect. The tests can then be run as
-
-    python3 setup.py test
+For running tests please see the [note](#note-concerning-tests) below.
 
 ### Using pip
-
-You can install the program from the *Python Package Index (PyPI)* using the command
+You can install the program from the [Python Package Index (PyPI)](https://pypi.org/project/chado-tools/) using the command
 
     pip install chado-tools
 
 ### Using Bioconda
-
-The program is also available as *Bioconda* package. Install it with the command
+The program is also available as [Bioconda package](https://anaconda.org/bioconda/chado-tools). Install it with the command
 
     conda install -c bioconda chado-tools
 
-## Usage
+### Using a Docker container
+The program has been containerized by the BioContainers community. The latest build can be found [here](https://biocontainers.pro/#/tools/chado-tools).
+When running the container with Docker, use the flags `--interactive --tty` and map all required environment variables (see below) with flag `--env`.
 
+
+## Usage
 The installation will put a single script called `chado` in your PATH.
 The usage is:
 
-    chado <command> [options]
+    chado <command> [<subcommand>] [options]
 
 * To list the available commands and brief descriptions, just run `chado -h` or `chado --help`.
 * To display the version of the program, type `chado -v` or `chado --version`.
 * Use `chado <command> -h` or `chado <command> --help` to get a detailed description and the usage of that command.
 
 ### Database connection
-
 You can set up default values for database host, port and user with environment variables. To do so, add the following 
 lines to your `.bashrc` (replacing the example values):
 
@@ -78,8 +74,8 @@ lines to your `.bashrc` (replacing the example values):
 The software seeks for these environment variables on your system. If they do not exist, it will use the 
 [default connection settings](pychado/data/defaultDatabase.yml), which you can edit manually if you really want.
 
-By default the software will assume that no password is required to connect as the user specified as `CHADO_USER`. The 
-flag `-p` enforces asking the user for a password.
+Analogously, you can specify a default password with the environment variable `CHADO_PASS`.
+The flag `-p` enforces asking the user for a password, which is useful if you don't want to store a default password in your environment.
 
 Alternatively, you can supply your own YAML configuration file in the same format as the [default file](pychado/data/defaultDatabase.yml)
 with flag `-c` (including password). The software will then ignore any environment variables. 
@@ -102,7 +98,6 @@ with flag `-c` (including password). The software will then ignore any environme
 ------------------------------------------------------------------------------------------------
 
 ### Examples
-
 Create a new CHADO database called `eukaryotes` according to the current GMOD schema:
 
     chado admin create eukaryotes
@@ -123,6 +118,14 @@ Query the database to check the meaning of a certain `cvterm_id`:
 Export a FASTA file containing the sequences of the organism `Pfalciparum`:
 
     chado export fasta -a Pfalciparum -o Pfalciparum.fasta -t contigs eukaryotes
+
+### Note concerning tests
+Some of the integration tests rely on access to a PostgreSQL server. In order to successfully run those tests, 
+modify the [default connection settings](pychado/data/defaultDatabase.yml) such that they describe an existing 
+PostgreSQL database server to which you can connect. The tests can then be run as `python3 setup.py test`.
+They create temporary databases on that server and clean those up when finished, so this shouldn't interfere with
+anything you have stored in any database on that server. If you are concerned about this, though, make sure to point
+the tool to an empty test server.
 
 ## License
 chado-tools is free software, licensed under [GPLv3](https://github.com/sanger-pathogens/chado-tools/blob/master/LICENSE).

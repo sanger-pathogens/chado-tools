@@ -120,11 +120,12 @@ Export a FASTA file containing the sequences of the organism `Pfalciparum`:
     chado export fasta -a Pfalciparum -o Pfalciparum.fasta -t contigs eukaryotes
 
 ### Note concerning tests
-Some of the integration tests rely on temporary PostgreSQL databases. In order to successfully run those tests, 
+Some of the integration tests rely on access to a PostgreSQL server. In order to successfully run those tests, 
 modify the [default connection settings](pychado/data/defaultDatabase.yml) such that they describe an existing 
-PostgreSQL database server to which you can connect. The tests can then be run as
-
-    python3 setup.py test
+PostgreSQL database server to which you can connect. The tests can then be run as `python3 setup.py test`.
+They create temporary databases on that server and clean those up when finished, so this shouldn't interfere with
+anything you have stored in any database on that server. If you are concerned about this, though, make sure to point
+the tool to an empty test server.
 
 ## License
 chado-tools is free software, licensed under [GPLv3](https://github.com/sanger-pathogens/chado-tools/blob/master/LICENSE).

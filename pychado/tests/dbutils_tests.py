@@ -19,6 +19,7 @@ class TestConnection(unittest.TestCase):
         # Checks if the default connection file is available and reads in the parameters
         self.assertTrue(os.path.exists(os.path.abspath(dbutils.default_configuration_file())))
         self.connectionParameters = utils.parse_yaml(dbutils.default_configuration_file())
+        self.connectionParameters["database"] = "postgres"
         self.uri = dbutils.generate_uri(self.connectionParameters)
 
     def tearDown(self):

@@ -6,6 +6,8 @@ Python3 command line script providing various tools for accessing CHADO database
 [![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-brightgreen.svg)](https://github.com/sanger-pathogens/chado-tools/blob/master/LICENSE)   
 [![install with bioconda](https://img.shields.io/badge/install%20with-bioconda-brightgreen.svg?style=flat-square)](http://bioconda.github.io/recipes/chado-tools/README.html)   
 [![Container ready](https://img.shields.io/badge/container-ready-brightgreen.svg)](https://quay.io/repository/biocontainers/chado-tools)   
+[![Docker Build Status](https://img.shields.io/docker/build/sangerpathogens/chado-tools.svg)](https://hub.docker.com/r/sangerpathogens/chado-tools)   
+[![Docker Pulls](https://img.shields.io/docker/pulls/sangerpathogens/chado-tools.svg)](https://hub.docker.com/r/sangerpathogens/chado-tools)   
 [![codecov](https://codecov.io/gh/sanger-pathogens/chado-tools/branch/master/graph/badge.svg)](https://codecov.io/gh/sanger-pathogens/chado-tools)
 
 ## Contents
@@ -49,7 +51,10 @@ The program is also available as [Bioconda package](https://anaconda.org/biocond
     conda install -c bioconda chado-tools
 
 ### Using a Docker container
-The program has been containerized by the BioContainers community. The latest build can be found [here](https://biocontainers.pro/#/tools/chado-tools).
+The program is also available as a standalone Docker container. The latest build can be downloaded from [DockerHub](https://hub.docker.com/r/sangerpathogens/chado-tools) with the command
+
+    docker pull sangerpathogens/chado-tools
+
 When running the container with Docker, use the flags `--interactive --tty` and map all required environment variables (see below) with flag `--env`.
 
 

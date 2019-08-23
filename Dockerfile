@@ -23,8 +23,14 @@ COPY . ${BUILD_DIR}
 RUN pip3 install wheel && \
     pip3 install ${BUILD_DIR}
 
+# Set mount volume
+ENV       WORKINGDIR=/data
+VOLUME    $WORKINGDIR
+
 # Define the default command
-CMD echo "Usage: docker run --rm -it <IMAGE_NAME> chado -h"
+CMD echo "Usage: docker run --rm -v \`pwd\`:$WORKINGDIR -it <IMAGE_NAME> chado <options>" && \
+    echo "" && \
+    echo "This will allow you to read from/write to files in your current working directory, which will be accessible as /data."
 
 #Metadata
 LABEL maintainer "path-help@sanger.ac.uk"

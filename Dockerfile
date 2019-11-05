@@ -13,7 +13,13 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
     postgresql-client \
     postgresql-contrib \
     libpq-dev \
-    gcc
+    gcc \
+    locales
+
+# Set locale
+RUN   sed -i -e 's/# \(en_GB\.UTF-8 .*\)/\1/' /etc/locale.gen && \
+      touch /usr/share/locale/locale.alias && \
+      locale-gen
 
 # Copy repo content into container
 RUN  mkdir -p ${BUILD_DIR}
@@ -26,6 +32,11 @@ RUN pip3 install wheel && \
 # Set mount volume
 ENV       WORKINGDIR=/data
 VOLUME    $WORKINGDIR
+
+# Set further environment variables
+ENV   LANG     en_GB.UTF-8
+ENV   LANGUAGE en_GB:en
+ENV   LC_ALL   en_GB.UTF-8
 
 # Define the default command
 CMD echo "Usage: docker run --rm -v \`pwd\`:$WORKINGDIR -it <IMAGE_NAME> chado <options>" && \

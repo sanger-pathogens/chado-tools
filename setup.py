@@ -42,7 +42,7 @@ setuptools.setup(
         "sqlalchemy-utils >= 0.34.0",
         "psycopg2 >= 2.7.6",
         "pyyaml >= 5.1",
-        "pronto >= 0.11.0",
+        "pronto == 0.11.0",
         "gffutils >= 0.9",
         "biopython >= 1.73"
     ],

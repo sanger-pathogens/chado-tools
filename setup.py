@@ -44,7 +44,7 @@ setuptools.setup(
         "pyyaml >= 5.1",
         "pronto == 0.11.0",
         "gffutils >= 0.9",
-        "biopython >= 1.73"
+        "biopython >= 1.73, < 1.78"
     ],
     license="GPLv3",
     classifiers=[

@@ -2,7 +2,7 @@
 
 Python3 command line script providing various tools for accessing CHADO databases.
 
-[![Build Status](https://travis-ci.org/sanger-pathogens/chado-tools.svg?branch=master)](https://travis-ci.org/sanger-pathogens/chado-tools)   
+[![Build Status](https://travis-ci.com/sanger-pathogens/chado-tools.svg?branch=master)](https://travis-ci.com/sanger-pathogens/chado-tools)   
 [![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-brightgreen.svg)](https://github.com/sanger-pathogens/chado-tools/blob/master/LICENSE)   
 [![install with bioconda](https://img.shields.io/badge/install%20with-bioconda-brightgreen.svg?style=flat-square)](http://bioconda.github.io/recipes/chado-tools/README.html)   
 [![Container ready](https://img.shields.io/badge/container-ready-brightgreen.svg)](https://quay.io/repository/biocontainers/chado-tools)   
